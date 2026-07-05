@@ -1,0 +1,14 @@
+[
+  {
+    "id": "refresh-selected-project-readme",
+    "label": "Refresh selected project README",
+    "description": "Example custom preset that rebuilds the README for the selected project folder.",
+    "category": "Custom",
+    "workingDirectory": "{{workspace_root}}",
+    "shellCommand": "python3 Resources/knowledge_ops/scripts/build_project_readme.py --project-root {{selected_path}} --write-readme",
+    "selectionRequirement": "workspaceItem",
+    "isWriteAction": true,
+    "expectedArtifacts": ["{{selected_readme_path}}"],
+    "note": "Copy this file to workflows.json if you want a local preset."
+  }
+]

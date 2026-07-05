@@ -1,0 +1,794 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Journalism Workflow Hub - Overview Prototype</title>
+  <style>
+    :root {
+      --bg: #f5f0e7;
+      --panel: rgba(252, 248, 241, 0.88);
+      --card: #fffdf8;
+      --ink: #1b2326;
+      --muted: #667177;
+      --line: #d8cebf;
+      --accent: #a94f2d;
+      --accent-soft: #f1ddd2;
+      --sage: #5c6955;
+      --sage-soft: #dbe3d4;
+      --gold: #8b6500;
+      --gold-soft: #f2e9c3;
+      --danger: #8a3734;
+      --danger-soft: #eed6d3;
+      --shadow: 0 18px 44px rgba(36, 32, 26, 0.12);
+      --radius: 24px;
+      --radius-sm: 16px;
+      --sans: "Avenir Next", "Segoe UI", sans-serif;
+      --serif: "Iowan Old Style", "Palatino Linotype", serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(169, 79, 45, 0.12), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(92, 105, 85, 0.12), transparent 24%),
+        linear-gradient(180deg, #f8f3ea 0%, #f2ebdf 100%);
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 290px 1fr;
+      gap: 20px;
+      padding: 20px;
+    }
+
+    .sidebar,
+    .content {
+      background: var(--panel);
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(216, 206, 191, 0.9);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius);
+    }
+
+    .sidebar {
+      padding: 24px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .brand {
+      padding: 6px 10px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand small,
+    .section-label {
+      display: block;
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .brand h1 {
+      margin: 10px 0 0;
+      font-family: var(--serif);
+      font-size: 29px;
+      line-height: 1.02;
+    }
+
+    .brand p {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .nav-group h2 {
+      margin: 0 0 10px;
+      padding: 0 10px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .nav-item,
+    .project-mini,
+    .ops-mini {
+      border-radius: 16px;
+      padding: 12px;
+      margin-bottom: 8px;
+      border: 1px solid transparent;
+    }
+
+    .nav-item.active,
+    .project-mini.active,
+    .ops-mini.active {
+      background: linear-gradient(135deg, rgba(169, 79, 45, 0.12), rgba(169, 79, 45, 0.04));
+      border-color: rgba(169, 79, 45, 0.2);
+    }
+
+    .nav-item strong,
+    .project-mini strong,
+    .ops-mini strong {
+      display: block;
+      font-size: 14px;
+    }
+
+    .nav-item span,
+    .project-mini span,
+    .ops-mini span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .content {
+      padding: 26px;
+      display: grid;
+      gap: 18px;
+      align-content: start;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 18px;
+    }
+
+    .topbar h2 {
+      margin: 0;
+      font-size: 13px;
+      color: var(--accent);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .topbar h3 {
+      margin: 10px 0 0;
+      font-family: var(--serif);
+      font-size: 43px;
+      line-height: 0.98;
+      max-width: 820px;
+    }
+
+    .topbar p {
+      margin: 12px 0 0;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      cursor: default;
+    }
+
+    .button.primary {
+      background: var(--ink);
+      color: #fff;
+    }
+
+    .button.secondary {
+      background: var(--card);
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.55fr 0.95fr;
+      gap: 18px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 18px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .card-header h4 {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .card-header strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 22px;
+      line-height: 1.12;
+    }
+
+    .card-header p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+      max-width: 520px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .badge.accent { background: var(--accent-soft); color: var(--accent); }
+    .badge.sage { background: var(--sage-soft); color: var(--sage); }
+    .badge.gold { background: var(--gold-soft); color: var(--gold); }
+    .badge.danger { background: var(--danger-soft); color: var(--danger); }
+
+    .project-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .project-card {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 14px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 15px;
+      background: #fffdf9;
+    }
+
+    .project-top {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .mini {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-size: 11px;
+      color: var(--muted);
+      background: white;
+    }
+
+    .project-card h5 {
+      margin: 0 0 6px;
+      font-size: 18px;
+    }
+
+    .project-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+      max-width: 520px;
+    }
+
+    .project-next {
+      min-width: 180px;
+      align-self: start;
+      border-left: 1px solid var(--line);
+      padding-left: 14px;
+    }
+
+    .project-next small,
+    .action-item small,
+    .ops-row small,
+    .teaser small,
+    .review-item small {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .project-next strong {
+      display: block;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .action-list,
+    .review-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .action-item,
+    .review-item {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 14px;
+      background: #fffdf9;
+    }
+
+    .action-item strong,
+    .review-item strong {
+      display: block;
+      font-size: 16px;
+      margin-bottom: 5px;
+    }
+
+    .action-item p,
+    .review-item p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .ops-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .ops-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 13px 14px;
+      background: #fffdf9;
+    }
+
+    .ops-row strong {
+      display: block;
+      font-size: 15px;
+      line-height: 1.3;
+    }
+
+    .ops-row span,
+    .teaser p {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .ops-count {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--ink);
+      align-self: center;
+    }
+
+    .new-work {
+      display: grid;
+      gap: 12px;
+    }
+
+    .new-work .button-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .teaser {
+      margin-top: 2px;
+      border-radius: 18px;
+      padding: 14px;
+      background: linear-gradient(135deg, rgba(92, 105, 85, 0.09), rgba(92, 105, 85, 0.03));
+      border: 1px dashed rgba(92, 105, 85, 0.28);
+    }
+
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .plan-box {
+      display: grid;
+      gap: 10px;
+    }
+
+    .plan-row {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      background: #fffdf9;
+    }
+
+    .plan-row strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+
+    .plan-row span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .footer-note {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 1220px) {
+      .shell,
+      .hero-grid,
+      .bottom-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .topbar,
+      .project-card {
+        grid-template-columns: 1fr;
+        flex-direction: column;
+      }
+
+      .project-next {
+        border-left: 0;
+        border-top: 1px solid var(--line);
+        padding-left: 0;
+        padding-top: 12px;
+        min-width: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <small>Overview prototype / 2026-07-06</small>
+        <h1>Journalism Workflow Hub</h1>
+        <p>A calmer editorial home screen for active investigations, safe follow-up, and reproducible local-first reporting work.</p>
+      </div>
+
+      <div class="nav-group">
+        <h2>Primary</h2>
+        <div class="nav-item active">
+          <strong>Overview</strong>
+          <span>Active stories, next steps, and what needs review.</span>
+        </div>
+        <div class="nav-item">
+          <strong>Workspace</strong>
+          <span>Understand folders, local rules, and project safety.</span>
+        </div>
+        <div class="nav-item">
+          <strong>Workflows</strong>
+          <span>Preview commands and confirm write targets.</span>
+        </div>
+        <div class="nav-item">
+          <strong>Runs</strong>
+          <span>Inspect failures, artifacts, and execution history.</span>
+        </div>
+        <div class="nav-item">
+          <strong>Plan</strong>
+          <span>Keep product decisions visible next to the build.</span>
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <h2>Current Projects</h2>
+        <div class="project-mini active">
+          <strong>Water quality exports</strong>
+          <span>Source review pending before broader sharing.</span>
+        </div>
+        <div class="project-mini">
+          <strong>Housing permits</strong>
+          <span>Project basics need cleanup before the next push.</span>
+        </div>
+        <div class="project-mini">
+          <strong>Agro lobby timeline</strong>
+          <span>Ready to move from collection into structure.</span>
+        </div>
+        <div class="project-mini">
+          <strong>Methane enforcement</strong>
+          <span>Workflow follow-up after a failed refresh run.</span>
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <h2>Secondary</h2>
+        <div class="ops-mini">
+          <strong>Publishing follow-up</strong>
+          <span>3 items waiting for PDF or publication metadata.</span>
+        </div>
+        <div class="ops-mini">
+          <strong>Workflow checks</strong>
+          <span>2 runs need review before rerun.</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <section class="topbar">
+        <div>
+          <h2>Overview / Active Work First</h2>
+          <h3>Your current stories, what needs attention, and what to do next.</h3>
+          <p>This version shifts Overview away from a busy technical dashboard. Active reporting projects are now the main object on the screen. Workflow risk, trust review, and admin work still matter, but they support story work instead of competing with it.</p>
+        </div>
+        <div class="actions">
+          <button class="button secondary">Refresh</button>
+          <button class="button primary">Start New Project</button>
+        </div>
+      </section>
+
+      <section class="hero-grid">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h4>Active Projects</h4>
+              <strong>What stories do I have cooking?</strong>
+              <p>Show only the current reporting work that really deserves attention. Each project gets one clear next step and one plain-language signal if it needs review.</p>
+            </div>
+            <span class="badge accent">3 to 4 by default</span>
+          </div>
+
+          <div class="project-list">
+            <article class="project-card">
+              <div>
+                <div class="project-top">
+                  <span class="badge gold">Needs review before sharing</span>
+                  <span class="mini">Investigative</span>
+                  <span class="mini">Source-heavy</span>
+                </div>
+                <h5>Water quality exports</h5>
+                <p>Interview material, field notes, and export files are in place, but the project still needs a clearer review pass before sharing outputs or moving toward publication-oriented workflows.</p>
+              </div>
+              <div class="project-next">
+                <small>Next Step</small>
+                <strong>Check interview notes against the export summary and mark what can safely circulate.</strong>
+              </div>
+            </article>
+
+            <article class="project-card">
+              <div>
+                <div class="project-top">
+                  <span class="badge danger">Project basics missing</span>
+                  <span class="mini">Active reporting</span>
+                </div>
+                <h5>Housing permits</h5>
+                <p>The story is moving, but local guidance and publication metadata are still incomplete. That makes the project harder to trust at a glance and easier to neglect operationally.</p>
+              </div>
+              <div class="project-next">
+                <small>Next Step</small>
+                <strong>Update the README and add the missing publication context before the next reporting round.</strong>
+              </div>
+            </article>
+
+            <article class="project-card">
+              <div>
+                <div class="project-top">
+                  <span class="badge sage">Ready to move</span>
+                  <span class="mini">Timeline work</span>
+                </div>
+                <h5>Agro lobby timeline</h5>
+                <p>Collection looks stable enough to turn into structure. The main need is not maintenance but editorial momentum: turn gathered material into a usable chronology.</p>
+              </div>
+              <div class="project-next">
+                <small>Next Step</small>
+                <strong>Draft the first chronology and tag the missing source gaps.</strong>
+              </div>
+            </article>
+
+            <article class="project-card">
+              <div>
+                <div class="project-top">
+                  <span class="badge danger">Workflow needs attention</span>
+                  <span class="mini">Refresh failed</span>
+                </div>
+                <h5>Methane enforcement</h5>
+                <p>A recent refresh run failed. The project itself may be fine, but the app should surface this because a stale or half-updated workflow can quietly distort the working picture.</p>
+              </div>
+              <div class="project-next">
+                <small>Next Step</small>
+                <strong>Inspect the failed run output before rerunning or trusting generated artifacts.</strong>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div class="stack">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h4>Suggested Next Actions</h4>
+                <strong>Three high-confidence moves</strong>
+                <p>These are the fixed v1 action cards, rewritten into calmer user-facing language.</p>
+              </div>
+              <span class="badge sage">Locked v1</span>
+            </div>
+
+            <div class="action-list">
+              <div class="action-item">
+                <small>2 projects</small>
+                <strong>Needs review before sharing</strong>
+                <p>Projects still need a safety or publishability pass before you should trust broader sharing or export actions.</p>
+              </div>
+              <div class="action-item">
+                <small>1 run</small>
+                <strong>Workflow needs attention</strong>
+                <p>A failed or risky run touched important project state and should be reviewed before it fades into the background.</p>
+              </div>
+              <div class="action-item">
+                <small>2 projects</small>
+                <strong>Project basics missing</strong>
+                <p>Some active stories are missing the guidance or metadata that keeps the workspace legible and reproducible.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h4>Operations</h4>
+                <strong>Important, but not the whole front page</strong>
+                <p>Administrative and maintenance work stays visible here without crowding out active reporting.</p>
+              </div>
+              <span class="badge gold">Secondary</span>
+            </div>
+
+            <div class="ops-list">
+              <div class="ops-row">
+                <div>
+                  <small>Publishing</small>
+                  <strong>PDF and publication follow-up</strong>
+                  <span>Finished work still waiting for archive-safe publication artifacts or metadata.</span>
+                </div>
+                <div class="ops-count">3</div>
+              </div>
+              <div class="ops-row">
+                <div>
+                  <small>Workflow</small>
+                  <strong>Git and run follow-up</strong>
+                  <span>Review recent write-related runs and repository maintenance prompts.</span>
+                </div>
+                <div class="ops-count">2</div>
+              </div>
+              <div class="ops-row">
+                <div>
+                  <small>Cleanup</small>
+                  <strong>Metadata and structure tidy-up</strong>
+                  <span>Low-urgency housekeeping that helps the workspace stay reliable over time.</span>
+                </div>
+                <div class="ops-count">4</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h4>New Work</h4>
+                <strong>Start something new without making the screen busier</strong>
+                <p>This is an entry point, not a second dashboard.</p>
+              </div>
+              <span class="badge accent">Small by design</span>
+            </div>
+
+            <div class="new-work">
+              <div class="button-row">
+                <button class="button primary">Start New Project</button>
+                <button class="button secondary">Brainstorm From Archive</button>
+              </div>
+              <div class="teaser">
+                <small>Future Direction</small>
+                <p>Later, Overview may also accept saved articles, LinkedIn posts, transcripts, or debate notes and resurface them when they become relevant. For now, that idea stays intentionally restrained.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="bottom-grid">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h4>Why These Projects Are Flagged</h4>
+              <strong>Flags should explain themselves</strong>
+              <p>The screen should never show a scary badge without saying what kind of follow-up it actually implies.</p>
+            </div>
+            <span class="badge danger">Plain language</span>
+          </div>
+
+          <div class="review-list">
+            <div class="review-item">
+              <small>Water quality exports</small>
+              <strong>Review before sharing</strong>
+              <p>This project contains material that may still need a more careful sharing and publishability judgment.</p>
+            </div>
+            <div class="review-item">
+              <small>Housing permits</small>
+              <strong>Missing project basics</strong>
+              <p>The project is active, but some of the structure that keeps it understandable and reproducible is still absent.</p>
+            </div>
+            <div class="review-item">
+              <small>Methane enforcement</small>
+              <strong>Workflow follow-up required</strong>
+              <p>A recent failure affects trust in the latest generated state, so the app should steer the user toward inspection before momentum is lost.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h4>Planning Anchor</h4>
+              <strong>The mockup is now tied to the planning layer</strong>
+              <p>This prototype follows the calmer Overview contract instead of the earlier status-heavy model.</p>
+            </div>
+            <span class="badge sage">Canonical</span>
+          </div>
+
+          <div class="plan-box">
+            <div class="plan-row">
+              <strong>Overview screen spec v1</strong>
+              <span>Defines the first-view rule, project-first hierarchy, plain-language labels, and the boundary between editorial work and operations.</span>
+            </div>
+            <div class="plan-row">
+              <strong>Overview decision pass</strong>
+              <span>Preserves the three high-confidence actions and conservative trust model underneath the simpler wording.</span>
+            </div>
+            <div class="plan-row">
+              <strong>Open-source portability constraint</strong>
+              <span>Future release for other journalists still requires reproducible workspace setup and config that does not depend on Jan-specific assumptions.</span>
+            </div>
+          </div>
+
+          <p class="footer-note">This is still a cheap planning artifact, not final visual design. Its job is to make the UX direction concrete enough that the next SwiftUI pass can implement one opinionated Overview instead of another generic dashboard.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,8 @@
+interface:
+  display_name: "JWH Chief"
+  short_description: "Routes meaningful work in journalism_workflow_hub through a chief-of-staff workflow with design, engineering, and review specialists."
+  default_prompt: |
+    Use the chief-of-staff workflow for this task.
+    Delegate only when it improves quality or speed.
+    Keep changes minimal and auditable.
+    Return one synthesized result unless blocked.
