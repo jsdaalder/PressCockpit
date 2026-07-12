@@ -32,6 +32,36 @@ You can also set an environment variable:
 JWH_WORKSPACE_ROOT="/path/to/coding_projects" swift run JournalismWorkflowHub
 ```
 
+## Package A Shareable Mac App
+
+Build a zipped macOS app bundle for alpha testers:
+
+```bash
+scripts/build-macos-release.sh --version 0.1.0
+```
+
+This creates:
+
+- `dist/PressCockpit-macOS-0.1.0.zip`
+- `dist/PressCockpit-macOS-0.1.0.zip.sha256`
+
+The packaged app defaults to standalone mode so testers can open the bundled demo workspace without your private newsroom setup.
+
+You can also change the default launch profile:
+
+```bash
+scripts/build-macos-release.sh --version 0.1.0 --profile standard
+```
+
+Tagged pushes like `v0.1.0` trigger `.github/workflows/macos-release.yml`, which rebuilds the app on GitHub Actions and attaches the zip to the GitHub Release.
+
+Example:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
 ## Standalone audit mode
 
 Run the app in a local standalone profile without depending on your full newsroom workspace:
