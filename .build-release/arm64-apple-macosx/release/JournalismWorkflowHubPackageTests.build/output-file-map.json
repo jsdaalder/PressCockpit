@@ -1,0 +1,13 @@
+{
+  "": {
+    "dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.build/JournalismWorkflowHubPackageTests.d",
+    "object": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.build/JournalismWorkflowHubPackageTests.o",
+    "swift-dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.build/primary.swiftdeps"
+  },
+  "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.derived/runner.swift": {
+    "object": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.build/runner.swift.o",
+    "swiftmodule": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.build/runner~partial.swiftmodule",
+    "swift-dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.build/runner.swiftdeps",
+    "diagnostics": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.build/runner.dia"
+  }
+}

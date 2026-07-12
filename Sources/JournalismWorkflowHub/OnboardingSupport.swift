@@ -112,6 +112,7 @@ struct OnboardingDraft: Hashable {
     var documentMode: OnboardingDocumentMode
     var workspacePath: String
     var createBaseStructure: Bool
+    var confirmedSeparateWorkspaceCreation: Bool
     var firstAction: OnboardingFirstAction
 
     static func initial(defaultNewWorkspacePath: String) -> OnboardingDraft {
@@ -120,6 +121,7 @@ struct OnboardingDraft: Hashable {
             documentMode: .localOnly,
             workspacePath: defaultNewWorkspacePath,
             createBaseStructure: true,
+            confirmedSeparateWorkspaceCreation: false,
             firstAction: .openOverview
         )
     }
@@ -134,6 +136,39 @@ struct OnboardingDraft: Hashable {
             }
             return [.openOverview, .inspectFirstProject]
         }
+    }
+
+    func needsSeparateWorkspaceConfirmation(
+        configuredWorkspacePath: String,
+        configuredWorkspaceLooksValid: Bool
+    ) -> Bool {
+        guard startMode == .createWorkspace,
+              configuredWorkspaceLooksValid else {
+            return false
+        }
+
+        let selected = Self.normalizedPath(workspacePath)
+        let configured = Self.normalizedPath(configuredWorkspacePath)
+        guard !selected.isEmpty, !configured.isEmpty else {
+            return false
+        }
+
+        return selected != configured
+    }
+
+    func canProceedWithNewWorkspaceCreation(
+        selectedPathAlreadyLooksLikeWorkspace: Bool,
+        needsExtraConfirmation: Bool
+    ) -> Bool {
+        createBaseStructure
+            && !selectedPathAlreadyLooksLikeWorkspace
+            && (!needsExtraConfirmation || confirmedSeparateWorkspaceCreation)
+    }
+
+    private static func normalizedPath(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        return URL(fileURLWithPath: trimmed).standardizedFileURL.path
     }
 }
 
@@ -207,6 +242,13 @@ struct WorkspaceStructureValidator {
         }
 
         return WorkspaceValidationReport(path: url.path, issues: issues, detectedDirectories: detectedDirectories)
+    }
+
+    static func looksLikeExistingWorkspace(
+        at url: URL,
+        fileManager: FileManager = .default
+    ) -> Bool {
+        validateExistingWorkspace(at: url, fileManager: fileManager).isValid
     }
 }
 

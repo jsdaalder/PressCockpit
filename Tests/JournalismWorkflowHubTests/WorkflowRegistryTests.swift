@@ -61,10 +61,19 @@ final class WorkflowRegistryTests: XCTestCase {
         state.textValues["project_type"] = "data_journalism"
         state.textValues["started"] = "2026-07-12"
         state.textValues["deliverable"] = "A short summary."
+        state.textValues["section_answer_1"] = "Main question"
+        state.textValues["section_answer_2"] = "Expected pattern"
+        state.textValues["section_answer_3"] = "Why data is needed"
 
         let resolved = try registry.resolveCommand(workflow: workflow, state: state, selection: nil)
 
         XCTAssertTrue(resolved.arguments.contains("--project-type"))
         XCTAssertTrue(resolved.arguments.contains("data_journalism"))
+        XCTAssertTrue(resolved.arguments.contains("--section-answer-1"))
+        XCTAssertTrue(resolved.arguments.contains("Main question"))
+        XCTAssertTrue(resolved.arguments.contains("--section-answer-2"))
+        XCTAssertTrue(resolved.arguments.contains("Expected pattern"))
+        XCTAssertTrue(resolved.arguments.contains("--section-answer-3"))
+        XCTAssertTrue(resolved.arguments.contains("Why data is needed"))
     }
 }

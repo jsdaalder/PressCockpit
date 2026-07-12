@@ -96,6 +96,28 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertEqual(store.statusMessage, "Using existing project. Add documents now.")
     }
 
+    func testReusingExistingScaffoldProjectWithoutImmediateDocumentsKeepsPromptDisabled() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+
+        let project = try XCTUnwrap(store.snapshot.items.first)
+
+        store.reuseExistingScaffoldProject(
+            projectTitle: project.title,
+            projectRoot: project.path,
+            sourceMaterialChoice: .later
+        )
+
+        let postCreateState = try XCTUnwrap(store.scaffoldPostCreateState)
+        XCTAssertEqual(postCreateState.mode, .reused)
+        XCTAssertFalse(postCreateState.shouldAutoPromptForDocuments)
+        XCTAssertEqual(store.statusMessage, "Using existing project")
+    }
+
     private func makeWorkspaceRoot() throws -> URL {
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let project = tmp.appendingPathComponent("Projects/2026/demo_story")

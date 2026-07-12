@@ -37,23 +37,26 @@ struct OnboardingFlowView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.95, green: 0.93, blue: 0.88),
-                    Color(red: 0.88, green: 0.92, blue: 0.87),
-                    Color(red: 0.84, green: 0.90, blue: 0.92)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+        GeometryReader { proxy in
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.95, green: 0.93, blue: 0.88),
+                        Color(red: 0.88, green: 0.92, blue: 0.87),
+                        Color(red: 0.84, green: 0.90, blue: 0.92)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
 
-            VStack(spacing: 24) {
-                onboardingHeader
-                contentCard
+                VStack(spacing: 24) {
+                    onboardingHeader
+                    contentCard(availableHeight: proxy.size.height)
+                }
+                .padding(32)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
-            .padding(32)
         }
         .onAppear {
             guard !didLoadDefaults else { return }
@@ -93,24 +96,28 @@ struct OnboardingFlowView: View {
         .frame(maxWidth: 780, alignment: .leading)
     }
 
-    private var contentCard: some View {
+    private func contentCard(availableHeight: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 24) {
-            Group {
-                switch step {
-                case .welcome:
-                    welcomeStep
-                case .startMode:
-                    startModeStep
-                case .documentMode:
-                    documentModeStep
-                case .workspaceLocation:
-                    workspaceLocationStep
-                case .workspaceSetup:
-                    workspaceSetupStep
-                case .finish:
-                    finishStep
+            ScrollView {
+                Group {
+                    switch step {
+                    case .welcome:
+                        welcomeStep
+                    case .startMode:
+                        startModeStep
+                    case .documentMode:
+                        documentModeStep
+                    case .workspaceLocation:
+                        workspaceLocationStep
+                    case .workspaceSetup:
+                        workspaceSetupStep
+                    case .finish:
+                        finishStep
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(maxHeight: max(220, availableHeight - 260))
 
             Divider()
                 .overlay(Color.white.opacity(0.45))
@@ -167,6 +174,7 @@ struct OnboardingFlowView: View {
                     isSelected: draft.startMode == mode
                 ) {
                     draft.startMode = mode
+                    draft.confirmedSeparateWorkspaceCreation = false
                     switch mode {
                     case .demo:
                         draft.firstAction = .inspectFirstProject
@@ -253,6 +261,35 @@ struct OnboardingFlowView: View {
                 }
                 .toggleStyle(.switch)
 
+                if selectedCreateWorkspaceAlreadyLooksValid {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("This path already looks like a working workspace.")
+                            .font(.headline)
+                        Text("Use that folder as an existing workspace instead of setting up another project root on top of it.")
+                            .foregroundStyle(Color(red: 0.18, green: 0.25, blue: 0.25))
+                        Button("Use this as existing workspace") {
+                            draft.startMode = .existingWorkspace
+                            draft.confirmedSeparateWorkspaceCreation = false
+                        }
+                    }
+                    .padding(18)
+                    .background(Color.white.opacity(0.45), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                } else if draft.needsSeparateWorkspaceConfirmation(
+                    configuredWorkspacePath: currentWorkspacePath,
+                    configuredWorkspaceLooksValid: currentWorkspaceLooksValid
+                ) {
+                    Toggle(isOn: $draft.confirmedSeparateWorkspaceCreation) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("I want to set up another workspace")
+                                .font(.headline)
+                            Text("You already have a usable workspace at `\(currentWorkspacePath)`. Only continue if you really want a separate workspace root.")
+                                .font(.caption)
+                                .foregroundStyle(Color(red: 0.30, green: 0.37, blue: 0.37))
+                        }
+                    }
+                    .toggleStyle(.switch)
+                }
+
                 capabilityIssueList(issues: createSetupMessages)
             }
         }
@@ -310,7 +347,13 @@ struct OnboardingFlowView: View {
             case .existingWorkspace:
                 return validationReport.isValid
             case .createWorkspace:
-                return draft.createBaseStructure
+                return draft.canProceedWithNewWorkspaceCreation(
+                    selectedPathAlreadyLooksLikeWorkspace: selectedCreateWorkspaceAlreadyLooksValid,
+                    needsExtraConfirmation: draft.needsSeparateWorkspaceConfirmation(
+                        configuredWorkspacePath: currentWorkspacePath,
+                        configuredWorkspaceLooksValid: currentWorkspaceLooksValid
+                    )
+                )
             }
         case .finish:
             return true
@@ -331,10 +374,27 @@ struct OnboardingFlowView: View {
     }
 
     private var createSetupMessages: [WorkspaceValidationIssue] {
-        [
+        var issues: [WorkspaceValidationIssue] = [
             .init(severity: .info, message: "The app will create the standard root folders and starter guidance files."),
             .init(severity: .warning, message: "Advanced Python-backed workflows will still need additional local tooling later.")
         ]
+
+        if selectedCreateWorkspaceAlreadyLooksValid {
+            issues.insert(
+                .init(severity: .blocking, message: "The selected path already looks like a working workspace. Switch to `Use existing workspace` instead."),
+                at: 0
+            )
+        } else if draft.needsSeparateWorkspaceConfirmation(
+            configuredWorkspacePath: currentWorkspacePath,
+            configuredWorkspaceLooksValid: currentWorkspaceLooksValid
+        ) {
+            issues.insert(
+                .init(severity: .warning, message: "A usable workspace already exists at `\(currentWorkspacePath)`. Confirm explicitly before creating another one."),
+                at: 0
+            )
+        }
+
+        return issues
     }
 
     private var finishMessages: [WorkspaceValidationIssue] {
@@ -364,6 +424,27 @@ struct OnboardingFlowView: View {
 
         issues.append(.init(severity: .warning, message: "Some advanced workflows may remain unavailable until their local tools are installed."))
         return issues
+    }
+
+    private var currentWorkspacePath: String {
+        store.workspaceRoot.path
+    }
+
+    private var currentWorkspaceLooksValid: Bool {
+        !store.isUsingDemoWorkspace
+            && WorkspaceStructureValidator.looksLikeExistingWorkspace(at: store.workspaceRoot)
+    }
+
+    private var selectedCreateWorkspaceAlreadyLooksValid: Bool {
+        guard draft.startMode == .createWorkspace else { return false }
+        let path = draft.workspacePath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !path.isEmpty else { return false }
+        let url = URL(fileURLWithPath: path)
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            return false
+        }
+        return WorkspaceStructureValidator.looksLikeExistingWorkspace(at: url)
     }
 
     private var availableFirstActions: [OnboardingFirstAction] {
@@ -397,7 +478,15 @@ struct OnboardingFlowView: View {
                 .font(.headline)
 
             HStack(spacing: 10) {
-                TextField("", text: $draft.workspacePath)
+                TextField("", text: Binding(
+                    get: { draft.workspacePath },
+                    set: { newValue in
+                        draft.workspacePath = newValue
+                        if draft.startMode == .createWorkspace {
+                            draft.confirmedSeparateWorkspaceCreation = false
+                        }
+                    }
+                ))
                     .textFieldStyle(.roundedBorder)
                     .font(.system(.body, design: .monospaced))
                 Button(browseLabel) {
@@ -508,6 +597,7 @@ struct OnboardingFlowView: View {
                 let currentName = URL(fileURLWithPath: draft.workspacePath).lastPathComponent
                 let suggestedName = currentName.isEmpty ? "JournalismWorkflowHub" : currentName
                 draft.workspacePath = url.appendingPathComponent(suggestedName, isDirectory: true).path
+                draft.confirmedSeparateWorkspaceCreation = false
             case .demo, .existingWorkspace:
                 draft.workspacePath = url.path
             }

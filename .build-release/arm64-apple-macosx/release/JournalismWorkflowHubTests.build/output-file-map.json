@@ -1,0 +1,91 @@
+{
+  "": {
+    "dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/JournalismWorkflowHubTests.d",
+    "object": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/JournalismWorkflowHubTests.o",
+    "swift-dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/primary.swiftdeps"
+  },
+  "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/AppStoreCatalogQueryTests.swift": {
+    "object": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/AppStoreCatalogQueryTests.swift.o",
+    "swiftmodule": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/AppStoreCatalogQueryTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/AppStoreCatalogQueryTests.swiftdeps",
+    "diagnostics": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/AppStoreCatalogQueryTests.dia"
+  },
+  "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/AppStoreNavigationTests.swift": {
+    "object": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/AppStoreNavigationTests.swift.o",
+    "swiftmodule": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/AppStoreNavigationTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/AppStoreNavigationTests.swiftdeps",
+    "diagnostics": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/AppStoreNavigationTests.dia"
+  },
+  "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/CommandRunnerTests.swift": {
+    "object": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/CommandRunnerTests.swift.o",
+    "swiftmodule": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/CommandRunnerTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/CommandRunnerTests.swiftdeps",
+    "diagnostics": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/CommandRunnerTests.dia"
+  },
+  "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/OnboardingSupportTests.swift": {
+    "object": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/OnboardingSupportTests.swift.o",
+    "swiftmodule": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/OnboardingSupportTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/OnboardingSupportTests.swiftdeps",
+    "diagnostics": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/OnboardingSupportTests.dia"
+  },
+  "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/OverviewDeriverTests.swift": {
+    "object": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/OverviewDeriverTests.swift.o",
+    "swiftmodule": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/OverviewDeriverTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/OverviewDeriverTests.swiftdeps",
+    "diagnostics": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/OverviewDeriverTests.dia"
+  },
+  "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/PlanningStoreTests.swift": {
+    "object": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/PlanningStoreTests.swift.o",
+    "swiftmodule": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/PlanningStoreTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/PlanningStoreTests.swiftdeps",
+    "diagnostics": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/PlanningStoreTests.dia"
+  },
+  "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/ScaffoldProjectScriptTests.swift": {
+    "object": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/ScaffoldProjectScriptTests.swift.o",
+    "swiftmodule": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/ScaffoldProjectScriptTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/ScaffoldProjectScriptTests.swiftdeps",
+    "diagnostics": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/ScaffoldProjectScriptTests.dia"
+  },
+  "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/ScaffoldProjectWizardDraftTests.swift": {
+    "object": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/ScaffoldProjectWizardDraftTests.swift.o",
+    "swiftmodule": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/ScaffoldProjectWizardDraftTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/ScaffoldProjectWizardDraftTests.swiftdeps",
+    "diagnostics": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/ScaffoldProjectWizardDraftTests.dia"
+  },
+  "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/SupportPathsTests.swift": {
+    "object": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/SupportPathsTests.swift.o",
+    "swiftmodule": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/SupportPathsTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/SupportPathsTests.swiftdeps",
+    "diagnostics": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/SupportPathsTests.dia"
+  },
+  "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkflowPreflightEvaluatorTests.swift": {
+    "object": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkflowPreflightEvaluatorTests.swift.o",
+    "swiftmodule": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkflowPreflightEvaluatorTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkflowPreflightEvaluatorTests.swiftdeps",
+    "diagnostics": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkflowPreflightEvaluatorTests.dia"
+  },
+  "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkflowRegistryTests.swift": {
+    "object": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkflowRegistryTests.swift.o",
+    "swiftmodule": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkflowRegistryTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkflowRegistryTests.swiftdeps",
+    "diagnostics": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkflowRegistryTests.dia"
+  },
+  "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkspaceCatalogStoreTests.swift": {
+    "object": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceCatalogStoreTests.swift.o",
+    "swiftmodule": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceCatalogStoreTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceCatalogStoreTests.swiftdeps",
+    "diagnostics": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceCatalogStoreTests.dia"
+  },
+  "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkspaceRootResolverTests.swift": {
+    "object": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceRootResolverTests.swift.o",
+    "swiftmodule": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceRootResolverTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceRootResolverTests.swiftdeps",
+    "diagnostics": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceRootResolverTests.dia"
+  },
+  "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkspaceScannerTests.swift": {
+    "object": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceScannerTests.swift.o",
+    "swiftmodule": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceScannerTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceScannerTests.swiftdeps",
+    "diagnostics": "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceScannerTests.dia"
+  }
+}

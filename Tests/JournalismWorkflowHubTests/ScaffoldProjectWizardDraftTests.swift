@@ -30,6 +30,58 @@ final class ScaffoldProjectWizardDraftTests: XCTestCase {
         )
     }
 
+    func testPunctuationOnlyTitleDoesNotFallbackToNewProject() {
+        var draft = ScaffoldProjectWizardDraft()
+        let workspaceRoot = URL(fileURLWithPath: "/tmp/workspace")
+
+        draft.updateWorkingTitle("!!!", workspaceRoot: workspaceRoot)
+
+        XCTAssertEqual(draft.workingTitle, "!!!")
+        XCTAssertEqual(draft.folderNameOverride, "")
+        XCTAssertEqual(draft.derivedFolderName, "")
+        XCTAssertEqual(draft.projectRootOverride, "")
+        XCTAssertEqual(draft.derivedProjectRoot(workspaceRoot: workspaceRoot), "")
+        XCTAssertFalse(draft.hasUsableDerivedFolderName)
+    }
+
+    func testSummaryOnlyDraftRequiresExplicitStructureStep() {
+        var draft = ScaffoldProjectWizardDraft()
+        draft.hasPitch = false
+        draft.summaryText = "A short project summary."
+
+        XCTAssertTrue(draft.requiresSummaryStructuring)
+        XCTAssertFalse(draft.hasCompletedSummaryStructuring)
+
+        draft.structureAnswerOne = "Main question"
+        draft.structureAnswerTwo = "Working hypothesis"
+        draft.structureAnswerThree = "Why now"
+
+        XCTAssertTrue(draft.hasCompletedSummaryStructuring)
+    }
+
+    func testMappedStateIncludesStructuredAnswers() throws {
+        var draft = ScaffoldProjectWizardDraft()
+        draft.updateWorkingTitle("Climate Story", workspaceRoot: URL(fileURLWithPath: "/tmp/workspace"))
+        draft.summaryText = "A short project summary."
+        draft.structureAnswerOne = "Main reporting question"
+        draft.structureAnswerTwo = "Working hypothesis"
+        draft.structureAnswerThree = "Why this matters now"
+
+        let workflow = WorkflowRegistry(
+            workspaceRoot: URL(fileURLWithPath: "/tmp/workspace"),
+            appProfile: .standard
+        ).allWorkflows().first(where: { $0.id == "scaffold-project" })
+
+        let state = draft.mappedState(
+            for: try XCTUnwrap(workflow),
+            workspaceRoot: URL(fileURLWithPath: "/tmp/workspace")
+        )
+
+        XCTAssertEqual(state.textValues["section_answer_1"], "Main reporting question")
+        XCTAssertEqual(state.textValues["section_answer_2"], "Working hypothesis")
+        XCTAssertEqual(state.textValues["section_answer_3"], "Why this matters now")
+    }
+
     private func currentYearString() -> String {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)

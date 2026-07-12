@@ -102,6 +102,9 @@ struct WorkflowRegistry {
                     "--project-type", "{{project_type}}",
                     "--started", "{{started}}",
                     "--deliverable", "{{deliverable}}",
+                    "--section-answer-1", "{{section_answer_1}}",
+                    "--section-answer-2", "{{section_answer_2}}",
+                    "--section-answer-3", "{{section_answer_3}}",
                     "--topics", "{{topics}}",
                     "--entities", "{{entities}}"
                 ],
@@ -114,6 +117,9 @@ struct WorkflowRegistry {
                     .init(id: "project_type", label: "Project type", kind: .choice, helpText: "Project classification written into README frontmatter.", defaultValue: "journalism", choices: ["journalism", "data_journalism", "tooling", "general"]),
                     .init(id: "started", label: "Started", kind: .text, helpText: "Date in YYYY-MM-DD.", defaultValue: isoDate()),
                     .init(id: "deliverable", label: "Deliverable", kind: .text, helpText: "Story or product description.", defaultValue: ""),
+                    .init(id: "section_answer_1", label: "Section answer 1", kind: .text, helpText: "First structured answer for the starter README.", defaultValue: ""),
+                    .init(id: "section_answer_2", label: "Section answer 2", kind: .text, helpText: "Second structured answer for the starter README.", defaultValue: ""),
+                    .init(id: "section_answer_3", label: "Section answer 3", kind: .text, helpText: "Third structured answer for the starter README.", defaultValue: ""),
                     .init(id: "topics", label: "Topics", kind: .multiline, helpText: "Space or comma separated topic slugs.", defaultValue: "", expandsToMultipleArguments: true),
                     .init(id: "entities", label: "Entities", kind: .multiline, helpText: "Space or comma separated entity slugs.", defaultValue: "", expandsToMultipleArguments: true)
                 ],

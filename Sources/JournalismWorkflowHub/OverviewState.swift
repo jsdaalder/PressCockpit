@@ -62,7 +62,7 @@ enum OverviewDeriver {
                 nextStep: nextStep(for: item, flags: flags),
                 primaryDocuments: item.primaryDocuments,
                 primaryTarget: failedRun.map { .run($0.id) } ?? .workspace(item.id),
-                primaryButtonTitle: failedRun == nil ? "Open project" : "Open run"
+                primaryButtonTitle: failedRun == nil ? "Show in app" : "Inspect run"
             )
         }
     }
@@ -70,7 +70,6 @@ enum OverviewDeriver {
     static func suggestedActions(from snapshot: WorkspaceSnapshot, runs: [WorkflowRun]) -> [OverviewActionSummary] {
         let activeProjects = activeReportingProjects(from: snapshot)
         let reviewProjects = activeProjects.filter(needsSharingReview)
-        let failedRuns = latestFailedRunsByScope(from: runs)
         let basicsProjects = activeProjects.filter(hasProjectBasicsGap)
 
         return [
@@ -85,16 +84,6 @@ enum OverviewDeriver {
                 target: reviewProjects.first.map { .workspace($0.id) } ?? activeProjects.first.map { .workspace($0.id) } ?? .overview
             ),
             OverviewActionSummary(
-                id: "runs",
-                title: "Workflow needs attention",
-                body: failedRuns.isEmpty
-                    ? "No failed workflow runs are waiting for follow-up."
-                    : "\(failedRuns.count) saved \(pluralized("run", count: failedRuns.count)) failed and should be reviewed before you trust the output.",
-                buttonTitle: failedRuns.isEmpty ? "View" : "Open",
-                count: failedRuns.count,
-                target: failedRuns.first.map { .run($0.id) } ?? .overview
-            ),
-            OverviewActionSummary(
                 id: "basics",
                 title: "Project basics missing",
                 body: basicsProjects.isEmpty
@@ -104,7 +93,7 @@ enum OverviewDeriver {
                 count: basicsProjects.count,
                 target: basicsProjects.first.map { .workspace($0.id) } ?? activeProjects.first.map { .workspace($0.id) } ?? .overview
             )
-        ]
+        ].filter { $0.count > 0 || activeProjects.isEmpty == false }
     }
 
     static func operationSummaries(from snapshot: WorkspaceSnapshot, runs: [WorkflowRun]) -> [OverviewOperationSummary] {
@@ -115,11 +104,11 @@ enum OverviewDeriver {
         return [
             OverviewOperationSummary(
                 id: "workflow-follow-up",
-                title: "Workflow follow-up",
+                title: "Failed workflow runs",
                 detail: failedRuns.isEmpty
                     ? "No failed runs are waiting."
                     : "\(failedRuns.count) saved \(pluralized("run", count: failedRuns.count)) need review.",
-                buttonTitle: "Open",
+                buttonTitle: failedRuns.isEmpty ? "View" : "Inspect",
                 count: failedRuns.count,
                 target: failedRuns.first.map { .run($0.id) } ?? .overview
             ),

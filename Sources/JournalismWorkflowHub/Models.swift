@@ -367,11 +367,29 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
         documents.contains { $0.provider == .googleDocPointer }
     }
 
+    var canonicalDraftDocument: WorkspaceDocument? {
+        preferredCanonicalDocument(for: .draft)
+    }
+
+    var overviewShortcutDocuments: [WorkspaceDocument] {
+        if let draft = canonicalDraftDocument {
+            return [draft]
+        }
+
+        for role in [WorkspaceDocumentRole.pitch, .research, .interviews, .notes, .transcript] {
+            if let document = preferredCanonicalDocument(for: role) {
+                return [document]
+            }
+        }
+
+        return []
+    }
+
     var primaryDocuments: [WorkspaceDocument] {
         var selected: [WorkspaceDocument] = []
         var selectedRoles: Set<WorkspaceDocumentRole> = []
         for role in Self.overviewDocumentRoles {
-            guard let document = preferredDocument(for: role), !selected.contains(document) else {
+            guard let document = preferredCanonicalDocument(for: role), !selected.contains(document) else {
                 continue
             }
             selected.append(document)
@@ -392,11 +410,59 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
         return selected
     }
 
-    private func preferredDocument(for role: WorkspaceDocumentRole) -> WorkspaceDocument? {
-        documents
-            .filter { $0.role == role }
-            .sorted(by: Self.compareOverviewDocuments)
-            .first
+    func isLikelyDerivedSnapshot(_ document: WorkspaceDocument) -> Bool {
+        guard document.provider == .localFile else { return false }
+
+        let normalizedPath = document.path.folding(options: .diacriticInsensitive, locale: .current).lowercased()
+        if normalizedPath.contains("/_derived/") || normalizedPath.contains("/derived/") {
+            return true
+        }
+
+        let normalizedTitle = Self.normalizedDocumentIdentity(document.title)
+        let snapshotTokens = ["snapshot", "cached", "cache", "export", "download", "analysis"]
+        if snapshotTokens.contains(where: { normalizedTitle.contains($0) }) {
+            return true
+        }
+
+        guard document.role == .draft else {
+            return false
+        }
+
+        let siblingDraftPointers = documents
+            .filter { $0.provider == .googleDocPointer && $0.role == .draft }
+            .map { Self.normalizedDocumentIdentity($0.title) }
+
+        return siblingDraftPointers.contains(normalizedTitle)
+    }
+
+    func draftTargetExplanation(for document: WorkspaceDocument) -> String {
+        if document.provider == .localFile {
+            return "This project uses a local draft file as the main draft target."
+        }
+        return "This project uses the root Google Doc pointer as the main draft target."
+    }
+
+    private func preferredCanonicalDocument(for role: WorkspaceDocumentRole) -> WorkspaceDocument? {
+        let roleDocuments = documents.filter { $0.role == role }
+        guard !roleDocuments.isEmpty else { return nil }
+
+        if role == .draft {
+            if let googleDraft = roleDocuments
+                .filter({ $0.provider == .googleDocPointer })
+                .sorted(by: Self.compareOverviewDocuments)
+                .first {
+                return googleDraft
+            }
+
+            if let localDraft = roleDocuments
+                .filter({ $0.provider == .localFile && !isLikelyDerivedSnapshot($0) })
+                .sorted(by: Self.compareOverviewDocuments)
+                .first {
+                return localDraft
+            }
+        }
+
+        return roleDocuments.sorted(by: Self.compareOverviewDocuments).first
     }
 
     private static let overviewDocumentRoles: [WorkspaceDocumentRole] = [
@@ -507,6 +573,18 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
         case .stale:
             return 4
         }
+    }
+
+    private static func normalizedDocumentIdentity(_ value: String) -> String {
+        let normalized = value
+            .folding(options: .diacriticInsensitive, locale: .current)
+            .lowercased()
+        let mappedScalars = normalized.unicodeScalars.map { scalar -> Character in
+            CharacterSet.alphanumerics.contains(scalar) ? Character(scalar) : "_"
+        }
+        return String(mappedScalars)
+            .replacingOccurrences(of: "_+", with: "_", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
     }
 }
 

@@ -27,6 +27,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--project-type", default="journalism")
     parser.add_argument("--started", required=True)
     parser.add_argument("--deliverable", default="")
+    parser.add_argument("--section-answer-1", default="")
+    parser.add_argument("--section-answer-2", default="")
+    parser.add_argument("--section-answer-3", default="")
     parser.add_argument("--topics", nargs="*", default=[])
     parser.add_argument("--entities", nargs="*", default=[])
     return parser.parse_args()
@@ -55,11 +58,12 @@ def build_readme(
     project_type: str,
     started: str,
     deliverable: str,
+    structured_answers: list[str],
     topics: list[str],
     entities: list[str],
 ) -> str:
     summary = deliverable.strip() or "Short project summary."
-    sections = readme_sections(project_type)
+    sections = readme_sections(project_type, structured_answers)
     return textwrap.dedent(
         f"""\
         ---
@@ -135,86 +139,145 @@ def current_date() -> str:
     return date.today().isoformat()
 
 
-def readme_sections(project_type: str) -> str:
+def readme_sections(project_type: str, structured_answers: list[str]) -> str:
+    prompts = structured_section_prompts(project_type)
+    first_section_lines = [
+        render_structured_line(label, answer)
+        for label, answer in zip(prompts, structured_answers)
+    ]
+
     sections_by_type = {
-        "journalism": """
-        ## Reporting question
-
-        - Main reporting question:
-        - Working hypothesis:
-        - Why this matters now:
-
-        ## Source status
-
-        - Key documents:
-        - Interviews:
-        - Known gaps:
-
-        ## Next reporting steps
-
-        - Add the first source materials to `docs/`
-        - Record the first reporting questions and assumptions
-        - Note the first fact-check and publication risks
-        """,
-        "data_journalism": """
-        ## Core question
-
-        - Main question:
-        - Expected pattern or claim:
-        - Why data is needed here:
-
-        ## Data plan
-
-        - Primary datasets:
-        - Join keys or units of analysis:
-        - Cleaning or transformation needs:
-
-        ## Next analysis steps
-
-        - Add raw data sources with provenance notes
-        - Record the first transformation and validation steps
-        - Note likely charts, tables, or publication outputs
-        """,
-        "tooling": """
-        ## Problem
-
-        - What this tool should unblock:
-        - Who it is for:
-        - Constraints or non-goals:
-
-        ## Technical shape
-
-        - Inputs and outputs:
-        - Runtime or stack:
-        - Dependencies or integrations:
-
-        ## Next build steps
-
-        - Define the smallest working slice
-        - Record setup and run commands
-        - Keep implementation notes and risks explicit
-        """,
-        "general": """
-        ## Scope
-
-        - What this project is:
-        - What it is not:
-        - Why it exists:
-
-        ## Current context
-
-        - Relevant inputs:
-        - Open questions:
-        - Risks or unknowns:
-
-        ## Next steps
-
-        - Add the first materials or references
-        - Clarify the first concrete goal
-        - Keep assumptions and decisions visible in the README
-        """,
+        "journalism": [
+            (
+                "Reporting question",
+                first_section_lines,
+            ),
+            (
+                "Source status",
+                [
+                    "Key documents:",
+                    "Interviews:",
+                    "Known gaps:",
+                ],
+            ),
+            (
+                "Next reporting steps",
+                [
+                    "Add the first source materials to `docs/`",
+                    "Record the first reporting questions and assumptions",
+                    "Note the first fact-check and publication risks",
+                ],
+            ),
+        ],
+        "data_journalism": [
+            (
+                "Core question",
+                first_section_lines,
+            ),
+            (
+                "Data plan",
+                [
+                    "Primary datasets:",
+                    "Join keys or units of analysis:",
+                    "Cleaning or transformation needs:",
+                ],
+            ),
+            (
+                "Next analysis steps",
+                [
+                    "Add raw data sources with provenance notes",
+                    "Record the first transformation and validation steps",
+                    "Note likely charts, tables, or publication outputs",
+                ],
+            ),
+        ],
+        "tooling": [
+            (
+                "Problem",
+                first_section_lines,
+            ),
+            (
+                "Technical shape",
+                [
+                    "Inputs and outputs:",
+                    "Runtime or stack:",
+                    "Dependencies or integrations:",
+                ],
+            ),
+            (
+                "Next build steps",
+                [
+                    "Define the smallest working slice",
+                    "Record setup and run commands",
+                    "Keep implementation notes and risks explicit",
+                ],
+            ),
+        ],
+        "general": [
+            (
+                "Scope",
+                first_section_lines,
+            ),
+            (
+                "Current context",
+                [
+                    "Relevant inputs:",
+                    "Open questions:",
+                    "Risks or unknowns:",
+                ],
+            ),
+            (
+                "Next steps",
+                [
+                    "Add the first materials or references",
+                    "Clarify the first concrete goal",
+                    "Keep assumptions and decisions visible in the README",
+                ],
+            ),
+        ],
     }
-    return textwrap.dedent(sections_by_type.get(project_type, sections_by_type["general"])).strip()
+    sections = sections_by_type.get(project_type, sections_by_type["general"])
+    return "\n\n".join(render_section(title, bullets) for title, bullets in sections)
+
+
+def structured_section_prompts(project_type: str) -> list[str]:
+    prompts_by_type = {
+        "journalism": [
+            "Main reporting question:",
+            "Working hypothesis:",
+            "Why this matters now:",
+        ],
+        "data_journalism": [
+            "Main question:",
+            "Expected pattern or claim:",
+            "Why data is needed here:",
+        ],
+        "tooling": [
+            "What this tool should unblock:",
+            "Who it is for:",
+            "Constraints or non-goals:",
+        ],
+        "general": [
+            "What this project is:",
+            "What it is not:",
+            "Why it exists:",
+        ],
+    }
+    return prompts_by_type.get(project_type, prompts_by_type["general"])
+
+
+def render_structured_line(label: str, answer: str) -> str:
+    trimmed = answer.strip()
+    return f"{label} {trimmed}" if trimmed else label
+
+
+def render_section(title: str, bullets: list[str]) -> str:
+    return textwrap.dedent(
+        "\n".join(
+            [f"## {title}", ""]
+            + [f"- {bullet}" for bullet in bullets]
+        )
+    ).strip()
 
 
 def docs_overview_expected_contents(project_type: str) -> str:
@@ -296,6 +359,11 @@ def main() -> int:
                 project_type=project_type,
                 started=args.started.strip(),
                 deliverable=args.deliverable,
+                structured_answers=[
+                    args.section_answer_1,
+                    args.section_answer_2,
+                    args.section_answer_3,
+                ],
                 topics=args.topics,
                 entities=args.entities,
             ),

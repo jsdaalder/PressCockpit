@@ -391,25 +391,71 @@ struct WorkspaceScanner {
     }
 
     private func extractSummary(from body: String) -> String {
-        for line in body.components(separatedBy: .newlines) {
+        let sanitizedBody = removingHTMLComments(from: body)
+        var paragraphLines: [String] = []
+
+        for line in sanitizedBody.components(separatedBy: .newlines) {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty || trimmed == "---" {
+                if let paragraph = summarizedParagraph(from: paragraphLines) {
+                    return paragraph
+                }
+                paragraphLines.removeAll()
                 continue
             }
-            if markdownHeadingText(from: trimmed) != nil {
+
+            guard isSummaryCandidateLine(trimmed) else {
+                if let paragraph = summarizedParagraph(from: paragraphLines) {
+                    return paragraph
+                }
+                paragraphLines.removeAll()
                 continue
             }
-            if trimmed.hasPrefix("-")
-                || trimmed.hasPrefix(">")
-                || trimmed.hasPrefix("```")
-                || trimmed.hasPrefix("![](") {
-                continue
-            }
-            if trimmed.count >= 24 {
-                return trimmed
-            }
+
+            paragraphLines.append(trimmed)
         }
-        return ""
+
+        return summarizedParagraph(from: paragraphLines) ?? ""
+    }
+
+    private func summarizedParagraph(from lines: [String]) -> String? {
+        let paragraph = lines.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        return paragraph.count >= 24 ? paragraph : nil
+    }
+
+    private func isSummaryCandidateLine(_ line: String) -> Bool {
+        if markdownHeadingText(from: line) != nil {
+            return false
+        }
+
+        if line.hasPrefix("-")
+            || line.hasPrefix("*")
+            || line.hasPrefix("+")
+            || line.hasPrefix(">")
+            || line.hasPrefix("```")
+            || line.hasPrefix("![](")
+            || line.hasPrefix("|") {
+            return false
+        }
+
+        if line.range(of: #"^\d+\.\s+"#, options: .regularExpression) != nil {
+            return false
+        }
+
+        if line.range(of: #"^`[^`]+`$"#, options: .regularExpression) != nil {
+            return false
+        }
+
+        return true
+    }
+
+    private func removingHTMLComments(from text: String) -> String {
+        guard let regex = try? NSRegularExpression(pattern: #"<!--[\s\S]*?-->"#) else {
+            return text
+        }
+
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return regex.stringByReplacingMatches(in: text, range: range, withTemplate: "")
     }
 
     private func markdownHeadingText(from line: String) -> String? {

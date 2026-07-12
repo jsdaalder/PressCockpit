@@ -217,7 +217,7 @@ final class OverviewDeriverTests: XCTestCase {
             runs: [olderFailedRun, newerSuccessfulRun, workflowFailedRun]
         )
 
-        XCTAssertEqual(actions.map(\.count), [1, 1, 1])
+        XCTAssertEqual(actions.map(\.count), [1, 1])
         XCTAssertEqual(operations.map(\.count), [1, 1, 3])
     }
 
@@ -301,6 +301,124 @@ final class OverviewDeriverTests: XCTestCase {
         ).first)
 
         XCTAssertEqual(summary.primaryDocuments.map(\.title), ["Artikel", "Research"])
+    }
+
+    func testCanonicalDraftPrefersGoogleDocOverLocalSnapshotCopy() throws {
+        let project = makeProject(
+            id: "snapshot",
+            title: "Snapshot Project",
+            projectType: .journalism,
+            status: "active",
+            safety: .internalOnly,
+            deliverable: "Story",
+            hasAgents: true,
+            started: "2026-07-06"
+        )
+        let pointerDraft = WorkspaceDocument(
+            id: "/tmp/snapshot/Artikel.gdoc",
+            path: "/tmp/snapshot/Artikel.gdoc",
+            title: "Artikel",
+            fileExtension: "gdoc",
+            provider: .googleDocPointer,
+            role: .draft,
+            cacheState: .cachedText,
+            externalURL: "https://docs.google.com/document/d/abc/edit",
+            docID: "abc",
+            cachePath: "/tmp/snapshot/docs/_derived/google_docs/artikel.md",
+            cachedOn: "2026-07-06"
+        )
+        let localSnapshot = WorkspaceDocument(
+            id: "/tmp/snapshot/Artikel.md",
+            path: "/tmp/snapshot/Artikel.md",
+            title: "Artikel",
+            fileExtension: "md",
+            provider: .localFile,
+            role: .draft,
+            cacheState: .localFile,
+            externalURL: nil,
+            docID: nil,
+            cachePath: nil,
+            cachedOn: nil
+        )
+        let item = WorkspaceItem(
+            id: project.id,
+            section: project.section,
+            path: project.path,
+            readmePath: project.readmePath,
+            agentsPath: project.agentsPath,
+            title: project.title,
+            summary: project.summary,
+            agentsSummary: project.agentsSummary,
+            frontmatter: project.frontmatter,
+            googleDriveFolderURL: nil,
+            projectType: project.projectType,
+            lifecycleStage: project.lifecycleStage,
+            safetyPosture: project.safetyPosture,
+            directFileCount: project.directFileCount,
+            directFolderCount: project.directFolderCount,
+            markdownFiles: project.markdownFiles,
+            pdfFiles: project.pdfFiles,
+            gdocFiles: 1,
+            csvFiles: project.csvFiles,
+            xlsxFiles: project.xlsxFiles,
+            documents: [localSnapshot, pointerDraft]
+        )
+
+        XCTAssertEqual(item.canonicalDraftDocument?.id, pointerDraft.id)
+        XCTAssertTrue(item.isLikelyDerivedSnapshot(localSnapshot))
+        XCTAssertEqual(item.overviewShortcutDocuments.map(\.title), ["Artikel"])
+    }
+
+    func testCanonicalDraftPrefersLocalAuthoredDraftWhenNoGoogleDraftPointerExists() {
+        let project = makeProject(
+            id: "local-draft",
+            title: "Local Draft Project",
+            projectType: .journalism,
+            status: "active",
+            safety: .internalOnly,
+            deliverable: "Story",
+            hasAgents: true,
+            started: "2026-07-06"
+        )
+        let localDraft = WorkspaceDocument(
+            id: "/tmp/local-draft/Draft.md",
+            path: "/tmp/local-draft/Draft.md",
+            title: "Working Draft",
+            fileExtension: "md",
+            provider: .localFile,
+            role: .draft,
+            cacheState: .localFile,
+            externalURL: nil,
+            docID: nil,
+            cachePath: nil,
+            cachedOn: nil
+        )
+        let item = WorkspaceItem(
+            id: project.id,
+            section: project.section,
+            path: project.path,
+            readmePath: project.readmePath,
+            agentsPath: project.agentsPath,
+            title: project.title,
+            summary: project.summary,
+            agentsSummary: project.agentsSummary,
+            frontmatter: project.frontmatter,
+            googleDriveFolderURL: nil,
+            projectType: project.projectType,
+            lifecycleStage: project.lifecycleStage,
+            safetyPosture: project.safetyPosture,
+            directFileCount: project.directFileCount,
+            directFolderCount: project.directFolderCount,
+            markdownFiles: project.markdownFiles,
+            pdfFiles: project.pdfFiles,
+            gdocFiles: 0,
+            csvFiles: project.csvFiles,
+            xlsxFiles: project.xlsxFiles,
+            documents: [localDraft]
+        )
+
+        XCTAssertEqual(item.canonicalDraftDocument?.id, localDraft.id)
+        XCTAssertFalse(item.isLikelyDerivedSnapshot(localDraft))
     }
 
     func testProjectSummariesHideWorkflowAndSetupFlagsFromCards() throws {

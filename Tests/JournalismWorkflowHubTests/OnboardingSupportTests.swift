@@ -2,6 +2,47 @@ import XCTest
 @testable import JournalismWorkflowHub
 
 final class OnboardingSupportTests: XCTestCase {
+    func testCreateWorkspaceDraftRequiresExplicitConfirmationWhenAnotherValidWorkspaceExists() {
+        var draft = OnboardingDraft.initial(defaultNewWorkspacePath: "/tmp/new-workspace")
+        draft.startMode = .createWorkspace
+
+        XCTAssertTrue(
+            draft.needsSeparateWorkspaceConfirmation(
+                configuredWorkspacePath: "/tmp/existing-workspace",
+                configuredWorkspaceLooksValid: true
+            )
+        )
+        XCTAssertFalse(
+            draft.canProceedWithNewWorkspaceCreation(
+                selectedPathAlreadyLooksLikeWorkspace: false,
+                needsExtraConfirmation: true
+            )
+        )
+
+        draft.confirmedSeparateWorkspaceCreation = true
+
+        XCTAssertTrue(
+            draft.canProceedWithNewWorkspaceCreation(
+                selectedPathAlreadyLooksLikeWorkspace: false,
+                needsExtraConfirmation: true
+            )
+        )
+    }
+
+    func testCreateWorkspaceDraftBlocksWhenSelectedPathAlreadyLooksLikeWorkspace() {
+        var draft = OnboardingDraft.initial(defaultNewWorkspacePath: "/tmp/existing-workspace")
+        draft.startMode = .createWorkspace
+        draft.createBaseStructure = true
+        draft.confirmedSeparateWorkspaceCreation = true
+
+        XCTAssertFalse(
+            draft.canProceedWithNewWorkspaceCreation(
+                selectedPathAlreadyLooksLikeWorkspace: true,
+                needsExtraConfirmation: false
+            )
+        )
+    }
+
     func testWorkspaceValidatorFlagsMissingRequiredDirectories() throws {
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true, attributes: nil)
@@ -24,5 +65,13 @@ final class OnboardingSupportTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: tmp.appendingPathComponent("Archives").path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: tmp.appendingPathComponent("README.md").path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: tmp.appendingPathComponent("AGENTS.md").path))
+    }
+
+    func testWorkspaceValidatorCanRecognizeExistingWorkspaceShape() throws {
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+
+        try WorkspaceBootstrapper(workspaceRoot: tmp).createBaseStructure()
+
+        XCTAssertTrue(WorkspaceStructureValidator.looksLikeExistingWorkspace(at: tmp))
     }
 }

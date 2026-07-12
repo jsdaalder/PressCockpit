@@ -1,0 +1,1298 @@
+{
+  "builtTestProducts" : [
+    {
+      "binaryPath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.xctest/Contents/MacOS/JournalismWorkflowHubPackageTests",
+      "packagePath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub",
+      "productName" : "JournalismWorkflowHubPackageTests"
+    }
+  ],
+  "copyCommands" : {
+    "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub_JournalismWorkflowHub.bundle/DemoWorkspace" : {
+      "inputs" : [
+        {
+          "kind" : "directory",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/Resources/DemoWorkspace"
+        }
+      ],
+      "outputs" : [
+        {
+          "kind" : "directory",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub_JournalismWorkflowHub.bundle/DemoWorkspace"
+        }
+      ]
+    },
+    "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub_JournalismWorkflowHub.bundle/Info.plist" : {
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/Info.plist"
+        }
+      ],
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub_JournalismWorkflowHub.bundle/Info.plist"
+        }
+      ]
+    }
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.JournalismWorkflowHub-arm64-apple-macosx-release.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/sources",
+      "importPath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/AppStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/CommandRunner.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/JournalismWorkflowHubApp.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/Models.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/OnboardingSupport.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/OnboardingViews.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/OverviewState.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/PlanningStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/PublicationStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/ScaffoldProjectWizardView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/SupportPaths.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/Views.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkflowRegistry.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkflowRuntime.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkspaceCatalogStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkspaceQueryStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkspaceRootResolver.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkspaceScanner.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/DerivedSources/resource_bundle_accessor.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "virtual",
+          "name" : "<JournalismWorkflowHub-arm64-apple-macosx-release.module-resources>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "JournalismWorkflowHub",
+      "moduleOutputPath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/Modules/JournalismWorkflowHub.swiftmodule",
+      "objects" : [
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/AppStore.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/CommandRunner.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/JournalismWorkflowHubApp.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/Models.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/OnboardingSupport.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/OnboardingViews.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/OverviewState.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/PlanningStore.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/PublicationStore.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/ScaffoldProjectWizardView.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/SupportPaths.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/Views.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkflowRegistry.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkflowRuntime.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkspaceCatalogStore.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkspaceQueryStore.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkspaceRootResolver.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkspaceScanner.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/resource_bundle_accessor.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-whole-module-optimization",
+        "-num-threads",
+        "11",
+        "-serialize-diagnostics",
+        "-O",
+        "-j11",
+        "-DSWIFT_PACKAGE",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_AVAILABLE",
+        "-module-cache-path",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "JournalismWorkflowHub_main",
+        "-swift-version",
+        "6",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "journalism_workflow_hub"
+      ],
+      "outputFileMapPath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/AppStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/CommandRunner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/JournalismWorkflowHubApp.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/Models.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/OnboardingSupport.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/OnboardingViews.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/OverviewState.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/PlanningStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/PublicationStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/ScaffoldProjectWizardView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/SupportPaths.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/Views.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkflowRegistry.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkflowRuntime.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkspaceCatalogStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkspaceQueryStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkspaceRootResolver.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkspaceScanner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/resource_bundle_accessor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/Modules/JournalismWorkflowHub.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/AppStore.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/CommandRunner.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/JournalismWorkflowHubApp.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/Models.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/OnboardingSupport.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/OnboardingViews.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/OverviewState.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/PlanningStore.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/PublicationStore.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/ScaffoldProjectWizardView.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/SupportPaths.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/Views.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkflowRegistry.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkflowRuntime.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkspaceCatalogStore.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkspaceQueryStore.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkspaceRootResolver.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkspaceScanner.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/DerivedSources/resource_bundle_accessor.swift"
+      ],
+      "tempsPath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build",
+      "wholeModuleOptimization" : true
+    },
+    "C.JournalismWorkflowHubPackageTests-arm64-apple-macosx-release.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.build/sources",
+      "importPath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.derived/runner.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/Modules/JournalismWorkflowHubTests.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "JournalismWorkflowHubPackageTests",
+      "moduleOutputPath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/Modules/JournalismWorkflowHubPackageTests.swiftmodule",
+      "objects" : [
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.build/runner.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-whole-module-optimization",
+        "-num-threads",
+        "11",
+        "-serialize-diagnostics",
+        "-O",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j11",
+        "-DSWIFT_PACKAGE",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.build/include/JournalismWorkflowHubPackageTests-Swift.h",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "journalism_workflow_hub"
+      ],
+      "outputFileMapPath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.build/runner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/Modules/JournalismWorkflowHubPackageTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.derived/runner.swift"
+      ],
+      "tempsPath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.build",
+      "wholeModuleOptimization" : true
+    },
+    "C.JournalismWorkflowHubTests-arm64-apple-macosx-release.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/sources",
+      "importPath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/AppStoreCatalogQueryTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/AppStoreNavigationTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/CommandRunnerTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/OnboardingSupportTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/OverviewDeriverTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/PlanningStoreTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/ScaffoldProjectScriptTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/ScaffoldProjectWizardDraftTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/SupportPathsTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkflowPreflightEvaluatorTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkflowRegistryTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkspaceCatalogStoreTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkspaceRootResolverTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkspaceScannerTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "JournalismWorkflowHubTests",
+      "moduleOutputPath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/Modules/JournalismWorkflowHubTests.swiftmodule",
+      "objects" : [
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/AppStoreCatalogQueryTests.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/AppStoreNavigationTests.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/CommandRunnerTests.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/OnboardingSupportTests.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/OverviewDeriverTests.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/PlanningStoreTests.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/ScaffoldProjectScriptTests.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/ScaffoldProjectWizardDraftTests.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/SupportPathsTests.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkflowPreflightEvaluatorTests.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkflowRegistryTests.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceCatalogStoreTests.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceRootResolverTests.swift.o",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceScannerTests.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-whole-module-optimization",
+        "-num-threads",
+        "11",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/index/store",
+        "-O",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j11",
+        "-DSWIFT_PACKAGE",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-swift-version",
+        "6",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "journalism_workflow_hub"
+      ],
+      "outputFileMapPath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/AppStoreCatalogQueryTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/AppStoreNavigationTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/CommandRunnerTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/OnboardingSupportTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/OverviewDeriverTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/PlanningStoreTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/ScaffoldProjectScriptTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/ScaffoldProjectWizardDraftTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/SupportPathsTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkflowPreflightEvaluatorTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkflowRegistryTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceCatalogStoreTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceRootResolverTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceScannerTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/Modules/JournalismWorkflowHubTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/AppStoreCatalogQueryTests.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/AppStoreNavigationTests.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/CommandRunnerTests.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/OnboardingSupportTests.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/OverviewDeriverTests.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/PlanningStoreTests.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/ScaffoldProjectScriptTests.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/ScaffoldProjectWizardDraftTests.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/SupportPathsTests.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkflowPreflightEvaluatorTests.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkflowRegistryTests.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkspaceCatalogStoreTests.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkspaceRootResolverTests.swift",
+        "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkspaceScannerTests.swift"
+      ],
+      "tempsPath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build",
+      "wholeModuleOptimization" : true
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "JournalismWorkflowHub" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "JournalismWorkflowHub",
+      "-package-name",
+      "journalism_workflow_hub",
+      "-c",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/AppStore.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/CommandRunner.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/JournalismWorkflowHubApp.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/Models.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/OnboardingSupport.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/OnboardingViews.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/OverviewState.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/PlanningStore.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/PublicationStore.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/ScaffoldProjectWizardView.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/SupportPaths.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/Views.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkflowRegistry.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkflowRuntime.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkspaceCatalogStore.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkspaceQueryStore.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkspaceRootResolver.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkspaceScanner.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/DerivedSources/resource_bundle_accessor.swift",
+      "-I",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-whole-module-optimization",
+      "-num-threads",
+      "11",
+      "-serialize-diagnostics",
+      "-O",
+      "-j11",
+      "-DSWIFT_PACKAGE",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_AVAILABLE",
+      "-module-cache-path",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "JournalismWorkflowHub_main",
+      "-swift-version",
+      "6",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "journalism_workflow_hub",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "JournalismWorkflowHubPackageTests" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "JournalismWorkflowHubPackageTests",
+      "-package-name",
+      "journalism_workflow_hub",
+      "-c",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.derived/runner.swift",
+      "-I",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-whole-module-optimization",
+      "-num-threads",
+      "11",
+      "-serialize-diagnostics",
+      "-O",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j11",
+      "-DSWIFT_PACKAGE",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.build/include/JournalismWorkflowHubPackageTests-Swift.h",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "journalism_workflow_hub",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "JournalismWorkflowHubTests" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "JournalismWorkflowHubTests",
+      "-package-name",
+      "journalism_workflow_hub",
+      "-c",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/AppStoreCatalogQueryTests.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/AppStoreNavigationTests.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/CommandRunnerTests.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/OnboardingSupportTests.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/OverviewDeriverTests.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/PlanningStoreTests.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/ScaffoldProjectScriptTests.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/ScaffoldProjectWizardDraftTests.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/SupportPathsTests.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkflowPreflightEvaluatorTests.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkflowRegistryTests.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkspaceCatalogStoreTests.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkspaceRootResolverTests.swift",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkspaceScannerTests.swift",
+      "-I",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-whole-module-optimization",
+      "-num-threads",
+      "11",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/index/store",
+      "-O",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j11",
+      "-DSWIFT_PACKAGE",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-swift-version",
+      "6",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "journalism_workflow_hub",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "JournalismWorkflowHub" : [
+
+    ],
+    "JournalismWorkflowHubPackageTests" : [
+      "JournalismWorkflowHubTests",
+      "JournalismWorkflowHub"
+    ],
+    "JournalismWorkflowHubTests" : [
+      "JournalismWorkflowHub"
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+    "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.derived/runner.swift" : {
+      "inputs" : [
+
+      ],
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.derived/runner.swift"
+        }
+      ]
+    }
+  },
+  "traitConfiguration" : {
+    "default" : {
+
+    }
+  },
+  "writeCommands" : {
+    "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/AppStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/CommandRunner.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/JournalismWorkflowHubApp.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/Models.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/OnboardingSupport.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/OnboardingViews.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/OverviewState.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/PlanningStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/PublicationStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/ScaffoldProjectWizardView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/SupportPaths.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/Views.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkflowRegistry.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkflowRuntime.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkspaceCatalogStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkspaceQueryStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkspaceRootResolver.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Sources/JournalismWorkflowHub/WorkspaceScanner.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/DerivedSources/resource_bundle_accessor.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/sources"
+    },
+    "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/AppStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/CommandRunner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/JournalismWorkflowHubApp.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/Models.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/OnboardingSupport.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/OnboardingViews.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/OverviewState.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/PlanningStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/PublicationStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/ScaffoldProjectWizardView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/SupportPaths.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/Views.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkflowRegistry.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkflowRuntime.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkspaceCatalogStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkspaceQueryStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkspaceRootResolver.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkspaceScanner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/resource_bundle_accessor.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.product/Objects.LinkFileList"
+    },
+    "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.derived/runner.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.build/sources"
+    },
+    "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/AppStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/CommandRunner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/JournalismWorkflowHubApp.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/Models.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/OnboardingSupport.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/OnboardingViews.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/OverviewState.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/PlanningStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/PublicationStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/ScaffoldProjectWizardView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/SupportPaths.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/Views.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkflowRegistry.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkflowRuntime.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkspaceCatalogStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkspaceQueryStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkspaceRootResolver.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/WorkspaceScanner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHub.build/resource_bundle_accessor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.build/runner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/AppStoreCatalogQueryTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/AppStoreNavigationTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/CommandRunnerTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/OnboardingSupportTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/OverviewDeriverTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/PlanningStoreTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/ScaffoldProjectScriptTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/ScaffoldProjectWizardDraftTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/SupportPathsTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkflowPreflightEvaluatorTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkflowRegistryTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceCatalogStoreTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceRootResolverTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/WorkspaceScannerTests.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubPackageTests.product/Objects.LinkFileList"
+    },
+    "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/AppStoreCatalogQueryTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/AppStoreNavigationTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/CommandRunnerTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/OnboardingSupportTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/OverviewDeriverTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/PlanningStoreTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/ScaffoldProjectScriptTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/ScaffoldProjectWizardDraftTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/SupportPathsTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkflowPreflightEvaluatorTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkflowRegistryTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkspaceCatalogStoreTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkspaceRootResolverTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/Tests/JournalismWorkflowHubTests/WorkspaceScannerTests.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/JournalismWorkflowHubTests.build/sources"
+    },
+    "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/jandaalder/My Drive/coding_projects/Resources/Overig/journalism_workflow_hub/.build-release/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+    }
+  }
+}

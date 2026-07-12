@@ -7,6 +7,7 @@ enum ScaffoldProjectWizardStep: Int, CaseIterable, Hashable {
     case startingPoint
     case pitch
     case summary
+    case structure
     case sourceMaterial
     case priority
     case review
@@ -23,6 +24,8 @@ enum ScaffoldProjectWizardStep: Int, CaseIterable, Hashable {
             return "Pitch or brief"
         case .summary:
             return "Project summary"
+        case .structure:
+            return "First structure"
         case .sourceMaterial:
             return "Source material"
         case .priority:
@@ -123,6 +126,9 @@ struct ScaffoldProjectWizardDraft: Hashable {
     var projectRootOverride: String = ""
     var topics: String = ""
     var entities: String = ""
+    var structureAnswerOne: String = ""
+    var structureAnswerTwo: String = ""
+    var structureAnswerThree: String = ""
 
     mutating func syncAdvancedDefaults(workspaceRoot: URL) {
         guard !trimmedTitle.isEmpty else { return }
@@ -139,7 +145,7 @@ struct ScaffoldProjectWizardDraft: Hashable {
         let previousTitle = workingTitle
         let previousFolderOverride = folderNameOverride.trimmingCharacters(in: .whitespacesAndNewlines)
         let previousProjectRootOverride = projectRootOverride.trimmingCharacters(in: .whitespacesAndNewlines)
-        let previousDerivedFolderName = slugifyProjectName(previousTitle.trimmingCharacters(in: .whitespacesAndNewlines))
+        let previousDerivedFolderName = normalizedProjectSlug(previousTitle.trimmingCharacters(in: .whitespacesAndNewlines))
         let previousDerivedProjectRoot = workspaceRoot
             .appendingPathComponent("Projects", isDirectory: true)
             .appendingPathComponent(currentProjectYear(), isDirectory: true)
@@ -147,17 +153,22 @@ struct ScaffoldProjectWizardDraft: Hashable {
             .path
 
         workingTitle = newValue
+        let nextDerivedFolderName = normalizedProjectSlug(newValue.trimmingCharacters(in: .whitespacesAndNewlines))
 
         if previousFolderOverride.isEmpty || previousFolderOverride == previousDerivedFolderName {
-            folderNameOverride = slugifyProjectName(newValue.trimmingCharacters(in: .whitespacesAndNewlines))
+            folderNameOverride = nextDerivedFolderName
         }
 
         if previousProjectRootOverride.isEmpty || previousProjectRootOverride == previousDerivedProjectRoot {
-            projectRootOverride = workspaceRoot
-                .appendingPathComponent("Projects", isDirectory: true)
-                .appendingPathComponent(currentProjectYear(), isDirectory: true)
-                .appendingPathComponent(derivedFolderName, isDirectory: true)
-                .path
+            if nextDerivedFolderName.isEmpty {
+                projectRootOverride = ""
+            } else {
+                projectRootOverride = workspaceRoot
+                    .appendingPathComponent("Projects", isDirectory: true)
+                    .appendingPathComponent(currentProjectYear(), isDirectory: true)
+                    .appendingPathComponent(nextDerivedFolderName, isDirectory: true)
+                    .path
+            }
         }
     }
 
@@ -168,11 +179,16 @@ struct ScaffoldProjectWizardDraft: Hashable {
         folderNameOverride = newValue
 
         if previousProjectRootOverride.isEmpty || previousProjectRootOverride == previousDerivedProjectRoot {
-            projectRootOverride = workspaceRoot
-                .appendingPathComponent("Projects", isDirectory: true)
-                .appendingPathComponent(currentProjectYear(), isDirectory: true)
-                .appendingPathComponent(slugifyProjectName(newValue.trimmingCharacters(in: .whitespacesAndNewlines)), isDirectory: true)
-                .path
+            let normalizedFolderName = normalizedProjectSlug(newValue.trimmingCharacters(in: .whitespacesAndNewlines))
+            if normalizedFolderName.isEmpty {
+                projectRootOverride = ""
+            } else {
+                projectRootOverride = workspaceRoot
+                    .appendingPathComponent("Projects", isDirectory: true)
+                    .appendingPathComponent(currentProjectYear(), isDirectory: true)
+                    .appendingPathComponent(normalizedFolderName, isDirectory: true)
+                    .path
+            }
         }
     }
 
@@ -188,18 +204,47 @@ struct ScaffoldProjectWizardDraft: Hashable {
         summaryText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    var trimmedStructureAnswerOne: String {
+        structureAnswerOne.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var trimmedStructureAnswerTwo: String {
+        structureAnswerTwo.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var trimmedStructureAnswerThree: String {
+        structureAnswerThree.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var requiresSummaryStructuring: Bool {
+        trimmedPitch.isEmpty && !trimmedSummary.isEmpty
+    }
+
+    var hasCompletedSummaryStructuring: Bool {
+        !trimmedStructureAnswerOne.isEmpty
+            && !trimmedStructureAnswerTwo.isEmpty
+            && !trimmedStructureAnswerThree.isEmpty
+    }
+
+    var hasUsableDerivedFolderName: Bool {
+        !derivedFolderName.isEmpty
+    }
+
     var derivedFolderName: String {
         let override = folderNameOverride.trimmingCharacters(in: .whitespacesAndNewlines)
         if !override.isEmpty {
-            return slugifyProjectName(override)
+            return normalizedProjectSlug(override)
         }
-        return slugifyProjectName(trimmedTitle)
+        return normalizedProjectSlug(trimmedTitle)
     }
 
     func derivedProjectRoot(workspaceRoot: URL) -> String {
         let override = projectRootOverride.trimmingCharacters(in: .whitespacesAndNewlines)
         if !override.isEmpty {
             return override
+        }
+        guard !derivedFolderName.isEmpty else {
+            return ""
         }
         return workspaceRoot
             .appendingPathComponent("Projects", isDirectory: true)
@@ -235,6 +280,9 @@ struct ScaffoldProjectWizardDraft: Hashable {
         state.textValues["deliverable"] = deliverableText
         state.textValues["topics"] = topics.trimmingCharacters(in: .whitespacesAndNewlines)
         state.textValues["entities"] = entities.trimmingCharacters(in: .whitespacesAndNewlines)
+        state.textValues["section_answer_1"] = trimmedStructureAnswerOne
+        state.textValues["section_answer_2"] = trimmedStructureAnswerTwo
+        state.textValues["section_answer_3"] = trimmedStructureAnswerThree
         return state
     }
 
@@ -364,6 +412,9 @@ struct ScaffoldProjectWizardView: View {
         }
 
         if draft.hasPitch != nil {
+            if draft.requiresSummaryStructuring || currentWizardStep == .structure {
+                steps.append(.structure)
+            }
             steps.append(contentsOf: [.sourceMaterial, .priority, .review])
         }
 
@@ -414,6 +465,12 @@ struct ScaffoldProjectWizardView: View {
                 TextField("Working title", text: binding(\.workingTitle))
                     .textFieldStyle(.roundedBorder)
                     .focused($focusedField, equals: .workingTitle)
+
+                if !draft.trimmedTitle.isEmpty && !draft.hasUsableDerivedFolderName {
+                    Text("Use at least one letter or number so the app can derive a local folder name.")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
             }
         case .projectKind:
             promptLayout(
@@ -480,6 +537,26 @@ struct ScaffoldProjectWizardView: View {
                     .font(.system(.body, design: .rounded))
                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppPalette.border))
             }
+        case .structure:
+            promptLayout(
+                question: structurePromptSet.stepQuestion,
+                helper: structurePromptSet.stepHelper
+            ) {
+                VStack(alignment: .leading, spacing: 14) {
+                    ForEach(structurePromptSet.prompts) { prompt in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(prompt.title)
+                                .font(.headline)
+                                .foregroundStyle(AppPalette.title)
+                            Text(prompt.helper)
+                                .font(.caption)
+                                .foregroundStyle(AppPalette.subtle)
+                            TextField(prompt.placeholder, text: structureBinding(for: prompt.id))
+                                .textFieldStyle(.roundedBorder)
+                        }
+                    }
+                }
+            }
         case .sourceMaterial:
             promptLayout(
                 question: "Do you want to add source material now?",
@@ -528,6 +605,7 @@ struct ScaffoldProjectWizardView: View {
                 ("Title", draft.trimmedTitle),
                 ("Project kind", draft.projectKindLabel),
                 ("Summary source", summarySourceLabel),
+                ("Starter structure", starterStructureLabel),
                 ("Source material", draft.sourceMaterialChoice?.label ?? "Not set"),
                 ("Priority", draft.priority.label),
                 ("Create at", draft.derivedProjectRoot(workspaceRoot: store.workspaceRoot))
@@ -671,6 +749,13 @@ struct ScaffoldProjectWizardView: View {
         return "Missing"
     }
 
+    private var starterStructureLabel: String {
+        if !draft.requiresSummaryStructuring {
+            return "Derived from pitch"
+        }
+        return draft.hasCompletedSummaryStructuring ? "Explicit first structure" : "Missing"
+    }
+
     private var readmePreview: String {
         let summary = readmePreviewSummary
         let previewSections = readmePreviewSectionsData
@@ -699,7 +784,14 @@ struct ScaffoldProjectWizardView: View {
     }
 
     private var readmePreviewSectionsData: [ReadmePreviewSection] {
-        readmePreviewSections(for: draft.mappedProjectType)
+        readmePreviewSections(
+            for: draft.mappedProjectType,
+            structuredAnswers: [
+                draft.trimmedStructureAnswerOne,
+                draft.trimmedStructureAnswerTwo,
+                draft.trimmedStructureAnswerThree
+            ]
+        )
     }
 
     private func promptLayout<Content: View>(
@@ -722,7 +814,7 @@ struct ScaffoldProjectWizardView: View {
     private func primaryActionDisabled(for step: ScaffoldProjectWizardStep) -> Bool {
         switch step {
         case .workingTitle:
-            return draft.trimmedTitle.isEmpty
+            return draft.trimmedTitle.isEmpty || !draft.hasUsableDerivedFolderName
         case .projectKind:
             return false
         case .startingPoint:
@@ -731,6 +823,8 @@ struct ScaffoldProjectWizardView: View {
             return false
         case .summary:
             return draft.trimmedSummary.isEmpty
+        case .structure:
+            return draft.requiresSummaryStructuring && !draft.hasCompletedSummaryStructuring
         case .sourceMaterial:
             return draft.sourceMaterialChoice == nil
         case .priority:
@@ -752,6 +846,8 @@ struct ScaffoldProjectWizardView: View {
         case .pitch:
             store.scaffoldProjectWizardStep = draft.trimmedPitch.isEmpty ? .summary : .sourceMaterial
         case .summary:
+            store.scaffoldProjectWizardStep = draft.requiresSummaryStructuring ? .structure : .sourceMaterial
+        case .structure:
             store.scaffoldProjectWizardStep = .sourceMaterial
         case .sourceMaterial:
             store.scaffoldProjectWizardStep = .priority
@@ -774,8 +870,12 @@ struct ScaffoldProjectWizardView: View {
             store.scaffoldProjectWizardStep = .startingPoint
         case .summary:
             store.scaffoldProjectWizardStep = draft.hasPitch == true ? .pitch : .startingPoint
+        case .structure:
+            store.scaffoldProjectWizardStep = .summary
         case .sourceMaterial:
-            if draft.hasPitch == true && draft.trimmedPitch.isEmpty {
+            if currentWizardStep == .sourceMaterial && draft.requiresSummaryStructuring {
+                store.scaffoldProjectWizardStep = .structure
+            } else if draft.hasPitch == true && draft.trimmedPitch.isEmpty {
                 store.scaffoldProjectWizardStep = .summary
             } else if draft.hasPitch == true {
                 store.scaffoldProjectWizardStep = .pitch
@@ -824,6 +924,21 @@ struct ScaffoldProjectWizardView: View {
                 draft = updated
             }
         )
+    }
+
+    private func structureBinding(for promptID: String) -> Binding<String> {
+        switch promptID {
+        case "one":
+            return binding(\.structureAnswerOne)
+        case "two":
+            return binding(\.structureAnswerTwo)
+        default:
+            return binding(\.structureAnswerThree)
+        }
+    }
+
+    private var structurePromptSet: ScaffoldStructurePromptSet {
+        scaffoldStructurePromptSet(for: draft.mappedProjectType)
     }
 
     private func focusCurrentStep() {
@@ -890,7 +1005,7 @@ private struct WizardChoiceCard: View {
     }
 }
 
-private func slugifyProjectName(_ text: String) -> String {
+private func normalizedProjectSlug(_ text: String) -> String {
     let normalized = text
         .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
         .lowercased()
@@ -911,8 +1026,7 @@ private func slugifyProjectName(_ text: String) -> String {
         pieces.append(current)
     }
 
-    let slug = pieces.joined(separator: "_")
-    return slug.isEmpty ? "new_project" : slug
+    return pieces.joined(separator: "_")
 }
 
 private func currentProjectDate() -> String {
@@ -942,17 +1056,19 @@ private func defaultProjectOwner(existingValue: String?) -> String {
     return systemName.isEmpty ? "Workspace owner" : systemName
 }
 
-private func readmePreviewSections(for projectType: String) -> [ReadmePreviewSection] {
+private func readmePreviewSections(for projectType: String, structuredAnswers: [String]) -> [ReadmePreviewSection] {
+    let prompts = scaffoldStructurePromptSet(for: projectType).prompts
+    let firstSectionBullets = zip(prompts, structuredAnswers).map { prompt, answer in
+        let trimmed = answer.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? prompt.readmeLabel : "\(prompt.readmeLabel) \(trimmed)"
+    }
+
     switch projectType {
     case "journalism":
         return [
             .init(
                 title: "Reporting question",
-                bullets: [
-                    "Main reporting question:",
-                    "Working hypothesis:",
-                    "Why this matters now:"
-                ]
+                bullets: firstSectionBullets
             ),
             .init(
                 title: "Source status",
@@ -967,11 +1083,7 @@ private func readmePreviewSections(for projectType: String) -> [ReadmePreviewSec
         return [
             .init(
                 title: "Core question",
-                bullets: [
-                    "Main question:",
-                    "Expected pattern or claim:",
-                    "Why data is needed here:"
-                ]
+                bullets: firstSectionBullets
             ),
             .init(
                 title: "Data plan",
@@ -986,11 +1098,7 @@ private func readmePreviewSections(for projectType: String) -> [ReadmePreviewSec
         return [
             .init(
                 title: "Problem",
-                bullets: [
-                    "What this tool should unblock:",
-                    "Who it is for:",
-                    "Constraints or non-goals:"
-                ]
+                bullets: firstSectionBullets
             ),
             .init(
                 title: "Technical shape",
@@ -1005,11 +1113,7 @@ private func readmePreviewSections(for projectType: String) -> [ReadmePreviewSec
         return [
             .init(
                 title: "Scope",
-                bullets: [
-                    "What this project is:",
-                    "What it is not:",
-                    "Why it exists:"
-                ]
+                bullets: firstSectionBullets
             ),
             .init(
                 title: "Current context",
@@ -1023,10 +1127,69 @@ private func readmePreviewSections(for projectType: String) -> [ReadmePreviewSec
     }
 }
 
+private func scaffoldStructurePromptSet(for projectType: String) -> ScaffoldStructurePromptSet {
+    switch projectType {
+    case "journalism":
+        return ScaffoldStructurePromptSet(
+            stepQuestion: "Turn the short summary into a first reporting structure",
+            stepHelper: "Write the first reporting question, working hypothesis, and why this matters now. These answers stay editable and seed the README explicitly.",
+            prompts: [
+                .init(id: "one", title: "Main reporting question", placeholder: "What are you trying to find out?", helper: "Use one clear newsroom question.", readmeLabel: "Main reporting question:"),
+                .init(id: "two", title: "Working hypothesis", placeholder: "What do you currently suspect or expect?", helper: "This can be tentative.", readmeLabel: "Working hypothesis:"),
+                .init(id: "three", title: "Why this matters now", placeholder: "Why is this worth doing now?", helper: "Capture urgency, relevance, or public value.", readmeLabel: "Why this matters now:")
+            ]
+        )
+    case "data_journalism":
+        return ScaffoldStructurePromptSet(
+            stepQuestion: "Turn the short summary into a first analysis structure",
+            stepHelper: "Write the main question, the pattern or claim you expect, and why data is necessary here.",
+            prompts: [
+                .init(id: "one", title: "Main question", placeholder: "What should the data help answer?", helper: "Use one clear reporting or analytical question.", readmeLabel: "Main question:"),
+                .init(id: "two", title: "Expected pattern or claim", placeholder: "What pattern, gap, or claim do you expect to test?", helper: "This can still be provisional.", readmeLabel: "Expected pattern or claim:"),
+                .init(id: "three", title: "Why data is needed here", placeholder: "Why can’t this be answered well without data?", helper: "Anchor the role of the analysis explicitly.", readmeLabel: "Why data is needed here:")
+            ]
+        )
+    case "tooling":
+        return ScaffoldStructurePromptSet(
+            stepQuestion: "Turn the short summary into a first build structure",
+            stepHelper: "Clarify the main problem, who the tool is for, and the main constraint or non-goal before the scaffold becomes canonical.",
+            prompts: [
+                .init(id: "one", title: "What this should unblock", placeholder: "What should this tool make easier or possible?", helper: "Name the main problem it should solve.", readmeLabel: "What this tool should unblock:"),
+                .init(id: "two", title: "Who it is for", placeholder: "Who is the primary user?", helper: "It can still be just you.", readmeLabel: "Who it is for:"),
+                .init(id: "three", title: "Constraint or non-goal", placeholder: "What should this not turn into?", helper: "Keep scope and constraints visible early.", readmeLabel: "Constraints or non-goals:")
+            ]
+        )
+    default:
+        return ScaffoldStructurePromptSet(
+            stepQuestion: "Turn the short summary into a first project structure",
+            stepHelper: "Clarify what this project is, what it is not, and why it exists before the README is created.",
+            prompts: [
+                .init(id: "one", title: "What this project is", placeholder: "What is the project actually for?", helper: "Name the core scope plainly.", readmeLabel: "What this project is:"),
+                .init(id: "two", title: "What it is not", placeholder: "What is outside scope right now?", helper: "A short boundary is enough.", readmeLabel: "What it is not:"),
+                .init(id: "three", title: "Why it exists", placeholder: "Why is this worth capturing?", helper: "Make the purpose explicit.", readmeLabel: "Why it exists:")
+            ]
+        )
+    }
+}
+
 private struct ReadmePreviewSection: Identifiable {
     let id = UUID()
     let title: String
     let bullets: [String]
+}
+
+private struct ScaffoldStructurePromptSet {
+    let stepQuestion: String
+    let stepHelper: String
+    let prompts: [ScaffoldStructurePrompt]
+}
+
+private struct ScaffoldStructurePrompt: Identifiable {
+    let id: String
+    let title: String
+    let placeholder: String
+    let helper: String
+    let readmeLabel: String
 }
 
 private struct ReadmePreviewPill: View {

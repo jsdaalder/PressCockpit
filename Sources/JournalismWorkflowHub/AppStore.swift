@@ -331,6 +331,11 @@ final class AppStore: ObservableObject {
         }
     }
 
+    func openPreferredDraft(for item: WorkspaceItem?) {
+        guard let item, let draft = item.canonicalDraftDocument else { return }
+        openDocument(draft)
+    }
+
     func openDocumentCache(_ document: WorkspaceDocument) {
         guard let cacheURL = document.cacheURL else { return }
         openURL(cacheURL)

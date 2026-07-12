@@ -168,6 +168,32 @@ final class WorkspaceScannerTests: XCTestCase {
         )
     }
 
+    func testSummarySkipsHtmlCommentsAndCommandLists() throws {
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let project = tmp.appendingPathComponent("Projects/2026/summary_cleanup_story")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true, attributes: nil)
+
+        try """
+        ---
+        type: project
+        project: Summary Cleanup Story
+        status: active
+        ---
+
+        <!-- publication_status:start -->
+        1. `python3 scripts/extract_knmi_sunrise_sundown.py`
+
+        This is the first real editorial summary paragraph and it should survive the scanner cleanup rules.
+        """.write(to: project.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
+        let item = try XCTUnwrap(WorkspaceScanner(workspaceRoot: tmp).scan().items.first)
+
+        XCTAssertEqual(
+            item.summary,
+            "This is the first real editorial summary paragraph and it should survive the scanner cleanup rules."
+        )
+    }
+
     func testParsesRootDocumentsAndGoogleDocCacheState() throws {
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let project = tmp.appendingPathComponent("Projects/2026/document_story")
