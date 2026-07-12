@@ -1,5 +1,34 @@
 import Foundation
 
+enum AppProfile: String, Codable, Hashable, CaseIterable {
+    case standard
+    case standalone
+
+    var label: String {
+        switch self {
+        case .standard:
+            return "Standard"
+        case .standalone:
+            return "Standalone"
+        }
+    }
+
+    var showsPlanCenter: Bool {
+        self == .standard
+    }
+}
+
+struct AppConfiguration {
+    let profile: AppProfile
+    let workspaceRoot: URL
+    let demoWorkspaceRoot: URL?
+
+    var isUsingDemoWorkspace: Bool {
+        guard let demoWorkspaceRoot else { return false }
+        return workspaceRoot.standardizedFileURL == demoWorkspaceRoot.standardizedFileURL
+    }
+}
+
 enum WorkspaceSection: String, Codable, CaseIterable {
     case projects
     case areas
@@ -18,7 +47,7 @@ enum WorkspaceSection: String, Codable, CaseIterable {
 
 enum WorkspaceProjectType: String, Codable, Hashable {
     case journalism
-    case dataJournalism
+    case dataJournalism = "data_journalism"
     case tooling
     case area
     case resource
@@ -39,17 +68,218 @@ enum WorkspaceProjectType: String, Codable, Hashable {
 }
 
 enum WorkspaceSafetyPosture: String, Codable, Hashable {
-    case publishable
-    case internalOnly
-    case localSensitive
+    case unknown
+    case internalOnly = "internal"
+    case localSensitive = "local_sensitive"
+    case publishableReviewed = "publishable_reviewed"
     case archival
 
     var label: String {
         switch self {
-        case .publishable: return "Publishable workflow"
+        case .unknown: return "Needs review"
         case .internalOnly: return "Internal workspace"
         case .localSensitive: return "Local-only / privacy check"
+        case .publishableReviewed: return "Publishable reviewed"
         case .archival: return "Archive reference"
+        }
+    }
+}
+
+enum WorkspaceDocumentProvider: String, Codable, Hashable {
+    case localFile = "local_file"
+    case googleDocPointer = "google_doc_pointer"
+
+    var label: String {
+        switch self {
+        case .localFile:
+            return "Local file"
+        case .googleDocPointer:
+            return "Google Doc"
+        }
+    }
+}
+
+enum WorkspaceDocumentRole: String, Codable, Hashable {
+    case draft
+    case pitch
+    case research
+    case interviews
+    case notes
+    case transcript
+    case source
+    case reference
+    case data
+    case general
+
+    var label: String {
+        switch self {
+        case .draft:
+            return "Draft"
+        case .pitch:
+            return "Pitch"
+        case .research:
+            return "Research"
+        case .interviews:
+            return "Interviews"
+        case .notes:
+            return "Notes"
+        case .transcript:
+            return "Transcript"
+        case .source:
+            return "Source"
+        case .reference:
+            return "Reference"
+        case .data:
+            return "Data"
+        case .general:
+            return "General"
+        }
+    }
+}
+
+enum WorkspaceDocumentCacheState: String, Codable, Hashable {
+    case localFile = "local_file"
+    case notCached = "not_cached"
+    case placeholder
+    case titleStub = "title_stub"
+    case cachedSummary = "cached_summary"
+    case cachedText = "cached_text"
+    case unknown
+
+    var label: String {
+        switch self {
+        case .localFile:
+            return "Local"
+        case .notCached:
+            return "Not cached"
+        case .placeholder:
+            return "Placeholder cache"
+        case .titleStub:
+            return "Stub cached"
+        case .cachedSummary:
+            return "Summary cached"
+        case .cachedText:
+            return "Text cached"
+        case .unknown:
+            return "Status unknown"
+        }
+    }
+}
+
+enum WorkspaceDocumentFreshness: String, Hashable {
+    case localFile = "local_file"
+    case needsFetch = "needs_fetch"
+    case fresh
+    case aging
+    case stale
+    case undated
+
+    var label: String {
+        switch self {
+        case .localFile:
+            return "Local"
+        case .needsFetch:
+            return "Needs fetch"
+        case .fresh:
+            return "Fresh"
+        case .aging:
+            return "Aging"
+        case .stale:
+            return "Stale"
+        case .undated:
+            return "Undated"
+        }
+    }
+}
+
+struct WorkspaceDocument: Identifiable, Hashable, Codable {
+    let id: String
+    let path: String
+    let title: String
+    let fileExtension: String
+    let provider: WorkspaceDocumentProvider
+    let role: WorkspaceDocumentRole
+    let cacheState: WorkspaceDocumentCacheState
+    let externalURL: String?
+    let docID: String?
+    let cachePath: String?
+    let cachedOn: String?
+
+    var url: URL { URL(fileURLWithPath: path) }
+    var cacheURL: URL? { cachePath.map(URL.init(fileURLWithPath:)) }
+
+    func freshness(referenceDate: Date = .now) -> WorkspaceDocumentFreshness {
+        switch provider {
+        case .localFile:
+            return .localFile
+        case .googleDocPointer:
+            break
+        }
+
+        switch cacheState {
+        case .notCached, .placeholder:
+            return .needsFetch
+        case .titleStub, .cachedSummary, .cachedText, .unknown, .localFile:
+            break
+        }
+
+        guard let cachedOnDate = cachedOnDate else {
+            return .undated
+        }
+
+        let calendar = Calendar(identifier: .gregorian)
+        let startOfReferenceDate = calendar.startOfDay(for: referenceDate)
+        let startOfCachedDate = calendar.startOfDay(for: cachedOnDate)
+        let days = calendar.dateComponents([.day], from: startOfCachedDate, to: startOfReferenceDate).day ?? 0
+
+        switch days {
+        case ..<0:
+            return .fresh
+        case 0...3:
+            return .fresh
+        case 4...14:
+            return .aging
+        default:
+            return .stale
+        }
+    }
+
+    private var cachedOnDate: Date? {
+        guard let cachedOn, !cachedOn.isEmpty else { return nil }
+        return Self.cachedOnFormatter.date(from: cachedOn)
+    }
+
+    private static let cachedOnFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    var overviewIconName: String {
+        switch role {
+        case .draft:
+            return "doc.text"
+        case .pitch:
+            return "lightbulb"
+        case .research:
+            return "magnifyingglass"
+        case .interviews:
+            return "person.2"
+        case .notes:
+            return "note.text"
+        case .transcript:
+            return "text.alignleft"
+        case .source:
+            return "link"
+        case .reference:
+            return "bookmark"
+        case .data:
+            return "tablecells"
+        case .general:
+            return "doc"
         }
     }
 }
@@ -63,7 +293,7 @@ enum SidebarSelection: Hashable {
     case run(String)
 }
 
-struct WorkspaceItem: Identifiable, Hashable {
+struct WorkspaceItem: Identifiable, Hashable, Codable {
     let id: String
     let section: WorkspaceSection
     let path: String
@@ -73,6 +303,7 @@ struct WorkspaceItem: Identifiable, Hashable {
     let summary: String
     let agentsSummary: String
     let frontmatter: [String: String]
+    let googleDriveFolderURL: String?
     let projectType: WorkspaceProjectType
     let lifecycleStage: String
     let safetyPosture: WorkspaceSafetyPosture
@@ -83,10 +314,12 @@ struct WorkspaceItem: Identifiable, Hashable {
     let gdocFiles: Int
     let csvFiles: Int
     let xlsxFiles: Int
+    let documents: [WorkspaceDocument]
 
     var url: URL { URL(fileURLWithPath: path) }
     var readmeURL: URL? { readmePath.map(URL.init(fileURLWithPath:)) }
     var agentsURL: URL? { agentsPath.map(URL.init(fileURLWithPath:)) }
+    var googleDriveURL: URL? { googleDriveFolderURL.flatMap(URL.init(string:)) }
 
     var subtitle: String {
         if !summary.isEmpty {
@@ -129,9 +362,155 @@ struct WorkspaceItem: Identifiable, Hashable {
     var isProjectRoot: Bool {
         frontmatter["type"] == "project"
     }
+
+    var hasGoogleDocPointers: Bool {
+        documents.contains { $0.provider == .googleDocPointer }
+    }
+
+    var primaryDocuments: [WorkspaceDocument] {
+        var selected: [WorkspaceDocument] = []
+        var selectedRoles: Set<WorkspaceDocumentRole> = []
+        for role in Self.overviewDocumentRoles {
+            guard let document = preferredDocument(for: role), !selected.contains(document) else {
+                continue
+            }
+            selected.append(document)
+            selectedRoles.insert(document.role)
+            if selected.count == 3 {
+                return selected
+            }
+        }
+
+        for document in documents.sorted(by: Self.compareDocuments)
+        where !selected.contains(document) && !selectedRoles.contains(document.role) {
+            selected.append(document)
+            selectedRoles.insert(document.role)
+            if selected.count == 3 {
+                break
+            }
+        }
+        return selected
+    }
+
+    private func preferredDocument(for role: WorkspaceDocumentRole) -> WorkspaceDocument? {
+        documents
+            .filter { $0.role == role }
+            .sorted(by: Self.compareOverviewDocuments)
+            .first
+    }
+
+    private static let overviewDocumentRoles: [WorkspaceDocumentRole] = [
+        .draft, .pitch, .research, .interviews, .notes, .transcript, .source, .reference, .data, .general
+    ]
+
+    private static func compareDocuments(_ lhs: WorkspaceDocument, _ rhs: WorkspaceDocument) -> Bool {
+        let lhsRole = documentRolePriority(lhs.role)
+        let rhsRole = documentRolePriority(rhs.role)
+        if lhsRole != rhsRole {
+            return lhsRole < rhsRole
+        }
+
+        let lhsCache = documentCachePriority(lhs.cacheState)
+        let rhsCache = documentCachePriority(rhs.cacheState)
+        if lhsCache != rhsCache {
+            return lhsCache < rhsCache
+        }
+
+        return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+    }
+
+    private static func compareOverviewDocuments(_ lhs: WorkspaceDocument, _ rhs: WorkspaceDocument) -> Bool {
+        let lhsProvider = documentProviderPriority(lhs.provider)
+        let rhsProvider = documentProviderPriority(rhs.provider)
+        if lhsProvider != rhsProvider {
+            return lhsProvider < rhsProvider
+        }
+
+        let lhsFreshness = documentFreshnessPriority(lhs.freshness())
+        let rhsFreshness = documentFreshnessPriority(rhs.freshness())
+        if lhsFreshness != rhsFreshness {
+            return lhsFreshness < rhsFreshness
+        }
+
+        let lhsCache = documentCachePriority(lhs.cacheState)
+        let rhsCache = documentCachePriority(rhs.cacheState)
+        if lhsCache != rhsCache {
+            return lhsCache < rhsCache
+        }
+
+        return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+    }
+
+    private static func documentRolePriority(_ role: WorkspaceDocumentRole) -> Int {
+        switch role {
+        case .draft:
+            return 0
+        case .pitch:
+            return 1
+        case .research:
+            return 2
+        case .interviews:
+            return 3
+        case .notes:
+            return 4
+        case .transcript:
+            return 5
+        case .source:
+            return 6
+        case .reference:
+            return 7
+        case .data:
+            return 8
+        case .general:
+            return 9
+        }
+    }
+
+    private static func documentCachePriority(_ state: WorkspaceDocumentCacheState) -> Int {
+        switch state {
+        case .localFile:
+            return 0
+        case .cachedText:
+            return 1
+        case .cachedSummary:
+            return 2
+        case .titleStub:
+            return 3
+        case .placeholder:
+            return 4
+        case .notCached:
+            return 5
+        case .unknown:
+            return 6
+        }
+    }
+
+    private static func documentProviderPriority(_ provider: WorkspaceDocumentProvider) -> Int {
+        switch provider {
+        case .googleDocPointer:
+            return 0
+        case .localFile:
+            return 1
+        }
+    }
+
+    private static func documentFreshnessPriority(_ freshness: WorkspaceDocumentFreshness) -> Int {
+        switch freshness {
+        case .fresh, .localFile:
+            return 0
+        case .aging:
+            return 1
+        case .undated:
+            return 2
+        case .needsFetch:
+            return 3
+        case .stale:
+            return 4
+        }
+    }
 }
 
-struct PublicationStory: Identifiable, Hashable {
+struct PublicationStory: Identifiable, Hashable, Codable {
     let id: String
     let year: String
     let pdfTitle: String
@@ -149,7 +528,7 @@ struct PublicationStory: Identifiable, Hashable {
     var projectReadmeURL: URL { URL(fileURLWithPath: projectReadmePath) }
 }
 
-struct PublicationProject: Identifiable, Hashable {
+struct PublicationProject: Identifiable, Hashable, Codable {
     let id: String
     let year: String
     let slug: String
@@ -165,7 +544,7 @@ struct PublicationProject: Identifiable, Hashable {
     var readmeURL: URL { URL(fileURLWithPath: readmePath) }
 }
 
-struct PublicationSnapshot {
+struct PublicationSnapshot: Codable {
     let storiesByYear: [String: [PublicationStory]]
     let projectsByYear: [String: [PublicationProject]]
     let matchedCount: Int
@@ -182,6 +561,30 @@ struct PublicationSnapshot {
 enum WorkflowKind: String, Codable, CaseIterable {
     case direct
     case shell
+}
+
+enum WorkflowRuntimeKind: String, Codable, Hashable, CaseIterable {
+    case generic
+    case pythonScript = "python_script"
+    case pythonModule = "python_module"
+    case shell
+}
+
+enum WorkflowAvailability: String, Codable, Hashable, CaseIterable {
+    case portable
+    case optionalLocal = "optional_local"
+    case privateHidden = "private_hidden"
+
+    var label: String {
+        switch self {
+        case .portable:
+            return "Portable"
+        case .optionalLocal:
+            return "Local"
+        case .privateHidden:
+            return "Private"
+        }
+    }
 }
 
 enum WorkflowSelectionRequirement: String, Codable {
@@ -235,6 +638,8 @@ struct WorkflowDefinition: Identifiable, Hashable {
     let label: String
     let description: String
     let category: String
+    let availability: WorkflowAvailability
+    let runtimeKind: WorkflowRuntimeKind
     let workingDirectoryTemplate: String
     let kind: WorkflowKind
     let executableTemplate: String
@@ -244,6 +649,10 @@ struct WorkflowDefinition: Identifiable, Hashable {
     let selectionRequirement: WorkflowSelectionRequirement
     let isWriteAction: Bool
     let expectedArtifacts: [String]
+    let requiredExecutables: [String]
+    let requiredPaths: [String]
+    let requiredPythonModules: [String]
+    let setupHint: String?
     let note: String
 
     var commandPreview: String {
@@ -253,6 +662,47 @@ struct WorkflowDefinition: Identifiable, Hashable {
         case .shell:
             return shellCommandTemplate ?? ""
         }
+    }
+}
+
+enum WorkflowPreflightStatus: String, Hashable {
+    case ready
+    case needsSelection = "needs_selection"
+    case missingWorkingDirectory = "missing_working_directory"
+    case missingExecutable = "missing_executable"
+    case missingRequiredPath = "missing_required_path"
+    case missingPythonModule = "missing_python_module"
+    case invalidConfiguration = "invalid_configuration"
+
+    var label: String {
+        switch self {
+        case .ready:
+            return "Ready"
+        case .needsSelection:
+            return "Needs selection"
+        case .missingWorkingDirectory:
+            return "Missing folder"
+        case .missingExecutable:
+            return "Needs setup"
+        case .missingRequiredPath:
+            return "Missing files"
+        case .missingPythonModule:
+            return "Needs Python setup"
+        case .invalidConfiguration:
+            return "Invalid"
+        }
+    }
+}
+
+struct WorkflowPreflightReport: Hashable {
+    let status: WorkflowPreflightStatus
+    let summary: String
+    let checkedItems: [String]
+    let missingItems: [String]
+    let setupHint: String?
+
+    var isRunnable: Bool {
+        status == .ready
     }
 }
 
@@ -319,7 +769,39 @@ struct WorkflowRun: Identifiable, Codable, Hashable {
     let selectionPath: String?
 }
 
-struct WorkspaceSnapshot {
+enum ScaffoldPostCreateMode: String, Hashable {
+    case created
+    case reused
+}
+
+struct ScaffoldPostCreateState: Identifiable, Hashable {
+    let id: String
+    let mode: ScaffoldPostCreateMode
+    let projectTitle: String
+    let projectRoot: String
+    let readmePath: String
+    let sourceMaterialChoice: ScaffoldSourceMaterialChoice
+    let shouldAutoPromptForDocuments: Bool
+    var importedPaths: [String] = []
+
+    var importedItemCount: Int {
+        importedPaths.count
+    }
+
+    var projectURL: URL {
+        URL(fileURLWithPath: projectRoot)
+    }
+
+    var readmeURL: URL {
+        URL(fileURLWithPath: readmePath)
+    }
+
+    var docsURL: URL {
+        projectURL.appendingPathComponent("docs", isDirectory: true)
+    }
+}
+
+struct WorkspaceSnapshot: Codable {
     let scannedAt: Date
     let items: [WorkspaceItem]
     let publication: PublicationSnapshot
@@ -350,11 +832,17 @@ struct CustomWorkflowPreset: Codable, Hashable, Identifiable {
     var label: String
     var description: String
     var category: String
+    var availability: WorkflowAvailability?
     var workingDirectory: String
     var shellCommand: String
     var selectionRequirement: WorkflowSelectionRequirement
     var isWriteAction: Bool
     var expectedArtifacts: [String]
+    var runtimeKind: WorkflowRuntimeKind?
+    var requiredExecutables: [String]?
+    var requiredPaths: [String]?
+    var requiredPythonModules: [String]?
+    var setupHint: String?
     var note: String
 
     init(
@@ -362,22 +850,34 @@ struct CustomWorkflowPreset: Codable, Hashable, Identifiable {
         label: String,
         description: String,
         category: String = "Custom",
+        availability: WorkflowAvailability? = nil,
         workingDirectory: String,
         shellCommand: String,
         selectionRequirement: WorkflowSelectionRequirement = .none,
         isWriteAction: Bool = false,
         expectedArtifacts: [String] = [],
+        runtimeKind: WorkflowRuntimeKind? = nil,
+        requiredExecutables: [String]? = nil,
+        requiredPaths: [String]? = nil,
+        requiredPythonModules: [String]? = nil,
+        setupHint: String? = nil,
         note: String = ""
     ) {
         self.id = id
         self.label = label
         self.description = description
         self.category = category
+        self.availability = availability
         self.workingDirectory = workingDirectory
         self.shellCommand = shellCommand
         self.selectionRequirement = selectionRequirement
         self.isWriteAction = isWriteAction
         self.expectedArtifacts = expectedArtifacts
+        self.runtimeKind = runtimeKind
+        self.requiredExecutables = requiredExecutables
+        self.requiredPaths = requiredPaths
+        self.requiredPythonModules = requiredPythonModules
+        self.setupHint = setupHint
         self.note = note
     }
 }

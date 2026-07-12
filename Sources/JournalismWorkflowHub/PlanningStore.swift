@@ -2,9 +2,12 @@ import Foundation
 
 struct PlanningStore {
     let workspaceRoot: URL
+    let profile: AppProfile
 
     func load() -> PlanningSnapshot {
-        let projectRoot = planningProjectRoot()
+        guard profile.showsPlanCenter, let projectRoot = planningProjectRoot() else {
+            return .empty
+        }
         let docs = loadDocuments(from: projectRoot)
         let title = loadProjectTitle(from: projectRoot)
         return PlanningSnapshot(
@@ -14,11 +17,17 @@ struct PlanningStore {
         )
     }
 
-    private func planningProjectRoot() -> URL {
-        workspaceRoot
+    private func planningProjectRoot() -> URL? {
+        let candidate = workspaceRoot
             .appendingPathComponent("Projects", isDirectory: true)
             .appendingPathComponent("2026", isDirectory: true)
             .appendingPathComponent("journalism_workflow_hub_plan", isDirectory: true)
+
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            return nil
+        }
+        return candidate
     }
 
     private func loadDocuments(from projectRoot: URL) -> [PlanningDocument] {
@@ -31,7 +40,7 @@ struct PlanningStore {
             "current_priorities.md"
         ]
 
-        return orderedFiles.compactMap { fileName in
+        return orderedFiles.compactMap { fileName -> PlanningDocument? in
             let url = docsDirectory.appendingPathComponent(fileName)
             guard FileManager.default.fileExists(atPath: url.path) else { return nil }
             let body = (try? String(contentsOf: url, encoding: .utf8)) ?? ""

@@ -19,6 +19,15 @@ Delegation guidance:
 - Use swift_builder for focused code changes and test updates.
 - Use qa_reviewer for substantial reviews, regression checks, and findings-first verification.
 - Use privacy_security_reviewer for privacy, security, data-handling, export-safety, and unsafe-default reviews.
+- Use process_workflow_auditor for planning hygiene, workflow maturity, decision traceability, onboarding clarity, and future-proofing reviews.
+
+Planning lifecycle guardrail:
+- Apply this only to non-trivial work; skip it for tiny wording changes, obvious one-file fixes, and low-risk mechanical edits.
+- If the request is only a new idea or product question, capture or recommend capturing it in Projects/2026/journalism_workflow_hub_plan/docs/backlog.md.
+- If the work is a realistic near-term candidate, check whether it belongs in Projects/2026/journalism_workflow_hub_plan/docs/current_priorities.md.
+- Before implementation, check whether it touches data models, persistence, workflow execution, preflight behavior, permissions, privacy posture, document export safety, filesystem assumptions, sync/cloud/collaboration, or cross-cutting app boundaries. If yes, update or request an update to Projects/2026/journalism_workflow_hub_plan/docs/architecture.md before coding.
+- After implementation or review, verify appropriately with tests, focused review, or a clear statement of what could not be run.
+- Before closing, ensure planning docs still match reality or explicitly say no planning update was needed.
 
 Quality bar:
 - Keep changes minimal and auditable.

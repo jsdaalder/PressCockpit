@@ -16,7 +16,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "JournalismWorkflowHub",
-            path: "Sources/JournalismWorkflowHub"
+            path: "Sources/JournalismWorkflowHub",
+            resources: [
+                .copy("Resources/DemoWorkspace")
+            ]
         ),
         .testTarget(
             name: "JournalismWorkflowHubTests",
@@ -25,4 +28,3 @@ let package = Package(
         )
     ]
 )
-

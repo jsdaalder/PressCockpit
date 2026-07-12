@@ -44,6 +44,7 @@ The chief should use specialists as follows:
 - `swift_builder` for actual code changes
 - `qa_reviewer` for substantial reviews or verification before closing riskier work
 - `privacy_security_reviewer` for privacy, security, secrets, permissions, export safety, redaction risk, and unsafe-default review
+- `process_workflow_auditor` for planning hygiene, workflow maturity, decision traceability, onboarding clarity, and future-proofing review
 
 Built-in `explorer` is acceptable for lightweight read-heavy inspection when a full custom specialist is unnecessary.
 
@@ -56,9 +57,22 @@ When this skill routes through `chief_of_staff`, require the chief to:
 - spawn the minimum useful set of specialists
 - avoid broad fan-out
 - reconcile conflicting specialist outputs
+- apply the planning lifecycle guardrail for non-trivial work
 - return one merged recommendation, plan, implementation path, or review
 
 Never hand raw subagent output back to the user as the final result.
+
+## Planning lifecycle guardrail
+
+For non-trivial work, require the chief to check the planning lifecycle:
+
+1. If the request is only a new idea or product question, capture or recommend capturing it in `Projects/2026/journalism_workflow_hub_plan/docs/backlog.md`.
+2. If the work is a realistic near-term candidate, check whether it belongs in `Projects/2026/journalism_workflow_hub_plan/docs/current_priorities.md`.
+3. Before implementation, check whether it touches data models, persistence, workflow execution, preflight behavior, permissions, privacy posture, document export safety, filesystem assumptions, sync/cloud/collaboration, or cross-cutting app boundaries. If yes, update or request an update to `Projects/2026/journalism_workflow_hub_plan/docs/architecture.md` before coding.
+4. After implementation or review, verify appropriately with tests, focused review, or a clear statement of what could not be run.
+5. Before closing, ensure planning docs still match reality or explicitly say no planning update was needed.
+
+Skip this guardrail for trivial wording changes, obvious one-file fixes, and low-risk mechanical edits.
 
 ## Design separation
 

@@ -32,10 +32,20 @@ final class PlanningStoreTests: XCTestCase {
         - add automation reminders
         """.write(to: docs.appendingPathComponent("backlog.md"), atomically: true, encoding: .utf8)
 
-        let snapshot = PlanningStore(workspaceRoot: tmp).load()
+        let snapshot = PlanningStore(workspaceRoot: tmp, profile: .standard).load()
 
         XCTAssertEqual(snapshot.projectTitle, "Journalism Workflow Hub Plan")
         XCTAssertEqual(snapshot.docs.map(\.title), ["Roadmap", "Backlog"])
         XCTAssertEqual(snapshot.docs.first?.summary, "The planning center keeps roadmap, backlog, and decisions visible.")
+    }
+
+    func testStandaloneProfileSkipsPrivatePlanningWorkspace() {
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+
+        let snapshot = PlanningStore(workspaceRoot: tmp, profile: .standalone).load()
+
+        XCTAssertEqual(snapshot.projectTitle, "Plan Center")
+        XCTAssertTrue(snapshot.docs.isEmpty)
+        XCTAssertTrue(snapshot.projectPath.isEmpty)
     }
 }

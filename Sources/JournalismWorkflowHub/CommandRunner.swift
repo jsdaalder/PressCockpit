@@ -2,13 +2,14 @@ import Foundation
 
 struct CommandRunner {
     let workspaceRoot: URL
+    let appProfile: AppProfile
 
     func run(
         workflow: WorkflowDefinition,
         state: WorkflowParameterState,
         selection: WorkspaceItem?
     ) throws -> WorkflowRun {
-        let resolver = WorkflowRegistry(workspaceRoot: workspaceRoot)
+        let resolver = WorkflowRegistry(workspaceRoot: workspaceRoot, appProfile: appProfile)
         let command = try resolver.resolveCommand(workflow: workflow, state: state, selection: selection)
 
         let runsRoot = supportDirectory().appendingPathComponent("runs", isDirectory: true)
@@ -25,7 +26,10 @@ struct CommandRunner {
         let commandURL = runDirectory.appendingPathComponent("command.txt")
 
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: command.executable)
+        process.executableURL = try Self.resolveExecutableURL(
+            for: command.executable,
+            environment: ProcessInfo.processInfo.environment
+        )
         process.arguments = command.arguments
         process.currentDirectoryURL = URL(fileURLWithPath: command.workingDirectory)
         process.environment = ProcessInfo.processInfo.environment
@@ -142,10 +146,7 @@ struct CommandRunner {
     }
 
     private func supportDirectory() -> URL {
-        let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("JournalismWorkflowHub", isDirectory: true)
-        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
-        return url
+        journalismWorkflowHubSupportDirectory()
     }
 
     private func write(_ text: String, to url: URL) throws {
@@ -169,9 +170,34 @@ struct CommandRunner {
         return formatter.string(from: .now)
     }
 
+    static func resolveExecutableURL(
+        for executable: String,
+        environment: [String: String],
+        fileManager: FileManager = .default
+    ) throws -> URL {
+        if executable.contains("/") {
+            return URL(fileURLWithPath: executable)
+        }
+
+        let pathValue = environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin"
+        let directories = pathValue.split(separator: ":").map(String.init)
+
+        for directory in directories {
+            let candidate = URL(fileURLWithPath: directory).appendingPathComponent(executable)
+            if fileManager.isExecutableFile(atPath: candidate.path) {
+                return candidate
+            }
+        }
+
+        throw NSError(
+            domain: "JournalismWorkflowHub.CommandRunner",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Executable not found on PATH: \(executable)"]
+        )
+    }
 }
 
-private final class StreamBuffer {
+private final class StreamBuffer: @unchecked Sendable {
     private let lock = NSLock()
     private var data = Data()
 

@@ -1,0 +1,1552 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Journalism Workflow Hub - Overview Directions</title>
+  <style>
+    :root {
+      --page-bg: #ede7dd;
+      --page-ink: #182025;
+      --page-muted: #677279;
+      --page-line: rgba(32, 37, 41, 0.12);
+      --shadow: 0 18px 40px rgba(22, 24, 22, 0.12);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      --sans: "Avenir Next", "Segoe UI", sans-serif;
+      --serif: "Iowan Old Style", "Palatino Linotype", serif;
+      --mono: "SF Mono", "Menlo", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background:
+        radial-gradient(circle at top left, rgba(139, 84, 53, 0.10), transparent 24%),
+        radial-gradient(circle at bottom right, rgba(58, 83, 73, 0.08), transparent 22%),
+        var(--page-bg);
+      color: var(--page-ink);
+    }
+
+    .page {
+      width: min(1500px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 22px 0 56px;
+    }
+
+    .intro {
+      display: grid;
+      gap: 18px;
+      padding: 18px 0 26px;
+    }
+
+    .eyebrow {
+      color: #915332;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .intro h1 {
+      margin: 0;
+      font-family: var(--serif);
+      font-size: clamp(34px, 5vw, 56px);
+      line-height: 0.95;
+      max-width: 840px;
+    }
+
+    .intro p {
+      margin: 0;
+      max-width: 860px;
+      font-size: 16px;
+      line-height: 1.65;
+      color: var(--page-muted);
+    }
+
+    .jump {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .jump a {
+      text-decoration: none;
+      color: var(--page-ink);
+      border: 1px solid var(--page-line);
+      background: rgba(255, 255, 255, 0.72);
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: var(--shadow);
+    }
+
+    .section {
+      margin-top: 28px;
+      padding-top: 18px;
+    }
+
+    .section-head {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 18px;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.1;
+    }
+
+    .section-head p {
+      margin: 0;
+      color: var(--page-muted);
+      line-height: 1.6;
+      max-width: 850px;
+    }
+
+    .chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: rgba(255, 255, 255, 0.76);
+    }
+
+    .mockup {
+      overflow: hidden;
+      border-radius: 34px;
+      box-shadow: 0 26px 70px rgba(23, 23, 19, 0.16);
+      border: 1px solid rgba(22, 26, 30, 0.08);
+      min-height: 860px;
+    }
+
+    .shell {
+      min-height: 860px;
+      display: grid;
+      grid-template-columns: 284px 1fr;
+      gap: 18px;
+      padding: 20px;
+    }
+
+    .sidebar,
+    .main {
+      border-radius: 28px;
+    }
+
+    .sidebar {
+      padding: 22px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .brand {
+      padding: 10px 12px 16px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    .brand small {
+      display: block;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .brand h3 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.02;
+      font-family: var(--serif);
+    }
+
+    .brand p {
+      margin: 10px 0 0;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .nav-group h4 {
+      margin: 0 0 10px;
+      padding: 0 10px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .nav-item,
+    .mini-item {
+      margin-bottom: 8px;
+      padding: 12px;
+      border-radius: 16px;
+    }
+
+    .nav-item strong,
+    .mini-item strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .nav-item span,
+    .mini-item span {
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .main {
+      padding: 24px;
+      display: grid;
+      align-content: start;
+      gap: 18px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 18px;
+    }
+
+    .top-copy h5 {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .top-copy h6 {
+      margin: 10px 0 0;
+      font-size: 42px;
+      line-height: 0.96;
+      max-width: 760px;
+    }
+
+    .top-copy p {
+      margin: 12px 0 0;
+      max-width: 760px;
+      font-size: 15px;
+      line-height: 1.62;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 999px;
+      padding: 11px 15px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.01em;
+      cursor: default;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.55fr 0.95fr;
+      gap: 18px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 18px;
+    }
+
+    .card {
+      border-radius: 24px;
+      padding: 18px;
+    }
+
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .card-head small {
+      display: block;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .card-head strong {
+      display: block;
+      font-size: 22px;
+      line-height: 1.08;
+    }
+
+    .card-head p {
+      margin: 8px 0 0;
+      font-size: 13px;
+      line-height: 1.55;
+      max-width: 520px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .project-list,
+    .review-list,
+    .ops-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .project-card,
+    .review-item,
+    .ops-item {
+      border-radius: 18px;
+      padding: 14px;
+    }
+
+    .project-card {
+      display: grid;
+      grid-template-columns: 1fr 200px;
+      gap: 14px;
+    }
+
+    .project-meta,
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .tag,
+    .meta {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-size: 11px;
+      line-height: 1;
+    }
+
+    .project-card h6,
+    .review-item h6,
+    .ops-item h6 {
+      margin: 0 0 6px;
+      font-size: 17px;
+      line-height: 1.25;
+    }
+
+    .project-card p,
+    .review-item p,
+    .ops-item p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .next-step {
+      padding-left: 14px;
+      border-left: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    .next-step small,
+    .review-item small,
+    .ops-item small {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .next-step strong {
+      display: block;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .ops-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .count {
+      font-size: 24px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .capture-box {
+      margin-top: 12px;
+      border-radius: 18px;
+      padding: 14px;
+    }
+
+    .capture-box code {
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .capture-box p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .capture-box strong {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 15px;
+    }
+
+    .editorial {
+      background:
+        radial-gradient(circle at top left, rgba(167, 98, 62, 0.12), transparent 24%),
+        radial-gradient(circle at bottom right, rgba(85, 99, 78, 0.10), transparent 22%),
+        linear-gradient(180deg, #f6f0e4 0%, #eee6d8 100%);
+    }
+
+    .editorial .sidebar,
+    .editorial .main {
+      background: rgba(252, 247, 240, 0.84);
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(171, 157, 140, 0.34);
+    }
+
+    .editorial .brand small,
+    .editorial .top-copy h5,
+    .editorial .card-head small,
+    .editorial .nav-group h4 {
+      color: #9b5631;
+    }
+
+    .editorial .brand p,
+    .editorial .nav-item span,
+    .editorial .mini-item span,
+    .editorial .top-copy p,
+    .editorial .card-head p,
+    .editorial .project-card p,
+    .editorial .review-item p,
+    .editorial .ops-item p {
+      color: #667178;
+    }
+
+    .editorial .nav-item.active,
+    .editorial .mini-item.active {
+      background: linear-gradient(135deg, rgba(155, 86, 49, 0.12), rgba(155, 86, 49, 0.03));
+      border: 1px solid rgba(155, 86, 49, 0.16);
+    }
+
+    .editorial .btn.primary {
+      background: #1e2527;
+      color: white;
+    }
+
+    .editorial .btn.secondary {
+      background: #fffdfa;
+      color: #1e2527;
+      border: 1px solid rgba(30, 37, 39, 0.12);
+    }
+
+    .editorial .card,
+    .editorial .project-card,
+    .editorial .review-item,
+    .editorial .ops-item {
+      background: #fffdf8;
+      border: 1px solid rgba(39, 44, 47, 0.08);
+    }
+
+    .editorial .pill,
+    .editorial .tag,
+    .editorial .meta {
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(39, 44, 47, 0.09);
+      color: #5f6a70;
+    }
+
+    .editorial .pill.reco {
+      background: #f1ded0;
+      color: #9b5631;
+      border-color: transparent;
+    }
+
+    .editorial .tag.warn {
+      background: #f2e9c6;
+      color: #8a6500;
+      border: 0;
+    }
+
+    .editorial .tag.danger {
+      background: #efd7d2;
+      color: #8c3732;
+      border: 0;
+    }
+
+    .editorial .tag.good {
+      background: #dde6d6;
+      color: #55654d;
+      border: 0;
+    }
+
+    .editorial .capture-box {
+      background: linear-gradient(135deg, rgba(85, 99, 78, 0.09), rgba(85, 99, 78, 0.03));
+      border: 1px dashed rgba(85, 99, 78, 0.24);
+    }
+
+    .inspector {
+      background:
+        linear-gradient(180deg, #eceff1 0%, #dfe4e8 100%);
+    }
+
+    .inspector .shell {
+      gap: 14px;
+    }
+
+    .inspector .sidebar,
+    .inspector .main {
+      background: rgba(247, 249, 250, 0.94);
+      border: 1px solid rgba(24, 32, 37, 0.08);
+    }
+
+    .inspector .brand h3,
+    .inspector .top-copy h6 {
+      font-family: var(--sans);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+
+    .inspector .brand small,
+    .inspector .top-copy h5,
+    .inspector .card-head small,
+    .inspector .nav-group h4 {
+      color: #3d5970;
+    }
+
+    .inspector .brand p,
+    .inspector .nav-item span,
+    .inspector .mini-item span,
+    .inspector .top-copy p,
+    .inspector .card-head p,
+    .inspector .project-card p,
+    .inspector .review-item p,
+    .inspector .ops-item p {
+      color: #5f6c76;
+    }
+
+    .inspector .nav-item,
+    .inspector .mini-item {
+      border: 1px solid transparent;
+      border-radius: 12px;
+    }
+
+    .inspector .nav-item.active,
+    .inspector .mini-item.active {
+      background: rgba(61, 89, 112, 0.09);
+      border-color: rgba(61, 89, 112, 0.15);
+    }
+
+    .inspector .btn.primary {
+      background: #22303a;
+      color: white;
+      border-radius: 11px;
+    }
+
+    .inspector .btn.secondary {
+      background: #ffffff;
+      color: #22303a;
+      border: 1px solid rgba(34, 48, 58, 0.12);
+      border-radius: 11px;
+    }
+
+    .inspector .card,
+    .inspector .project-card,
+    .inspector .review-item,
+    .inspector .ops-item {
+      background: #ffffff;
+      border: 1px solid rgba(24, 32, 37, 0.08);
+      border-radius: 14px;
+      box-shadow: 0 6px 18px rgba(33, 44, 51, 0.05);
+    }
+
+    .inspector .pill,
+    .inspector .tag,
+    .inspector .meta {
+      background: #f6f8f9;
+      border: 1px solid rgba(34, 48, 58, 0.10);
+      color: #51616d;
+      border-radius: 10px;
+    }
+
+    .inspector .pill.reco,
+    .inspector .tag.accent {
+      background: #dce8f0;
+      color: #34526b;
+      border-color: transparent;
+    }
+
+    .inspector .tag.warn {
+      background: #f0ebd2;
+      color: #766203;
+      border-color: transparent;
+    }
+
+    .inspector .tag.danger {
+      background: #efd9d8;
+      color: #873f3f;
+      border-color: transparent;
+    }
+
+    .inspector .tag.good {
+      background: #dde7de;
+      color: #48604d;
+      border-color: transparent;
+    }
+
+    .inspector .capture-box {
+      background: #f5f8fa;
+      border: 1px solid rgba(34, 48, 58, 0.08);
+      border-radius: 14px;
+    }
+
+    .notebook {
+      background:
+        linear-gradient(180deg, #fbf4e8 0%, #f2e5d5 100%);
+    }
+
+    .notebook .sidebar,
+    .notebook .main {
+      background:
+        linear-gradient(180deg, rgba(255, 252, 247, 0.94) 0%, rgba(251, 247, 241, 0.94) 100%);
+      border: 1px solid rgba(104, 78, 55, 0.16);
+    }
+
+    .notebook .brand,
+    .notebook .card,
+    .notebook .project-card,
+    .notebook .review-item,
+    .notebook .ops-item,
+    .notebook .capture-box {
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    .notebook .brand small,
+    .notebook .top-copy h5,
+    .notebook .card-head small,
+    .notebook .nav-group h4 {
+      color: #a05e2f;
+    }
+
+    .notebook .brand p,
+    .notebook .nav-item span,
+    .notebook .mini-item span,
+    .notebook .top-copy p,
+    .notebook .card-head p,
+    .notebook .project-card p,
+    .notebook .review-item p,
+    .notebook .ops-item p {
+      color: #6d6256;
+    }
+
+    .notebook .brand h3,
+    .notebook .top-copy h6 {
+      font-family: "Georgia", var(--serif);
+    }
+
+    .notebook .nav-item,
+    .notebook .mini-item {
+      border: 1px solid transparent;
+    }
+
+    .notebook .nav-item.active,
+    .notebook .mini-item.active {
+      background: rgba(160, 94, 47, 0.08);
+      border-color: rgba(160, 94, 47, 0.16);
+    }
+
+    .notebook .btn.primary {
+      background: #7e4f2d;
+      color: white;
+    }
+
+    .notebook .btn.secondary {
+      background: #fffdf8;
+      color: #6a533c;
+      border: 1px solid rgba(122, 94, 66, 0.18);
+    }
+
+    .notebook .card,
+    .notebook .project-card,
+    .notebook .review-item,
+    .notebook .ops-item {
+      background:
+        linear-gradient(180deg, rgba(255, 253, 249, 0.96) 0%, rgba(252, 247, 239, 0.96) 100%);
+      border: 1px solid rgba(104, 78, 55, 0.14);
+    }
+
+    .notebook .pill,
+    .notebook .tag,
+    .notebook .meta {
+      background: rgba(255, 252, 248, 0.92);
+      border: 1px solid rgba(104, 78, 55, 0.14);
+      color: #705f50;
+    }
+
+    .notebook .pill.reco {
+      background: #f0dfcf;
+      color: #96552c;
+      border-color: transparent;
+    }
+
+    .notebook .tag.warn {
+      background: #f4e8bf;
+      color: #836100;
+      border-color: transparent;
+    }
+
+    .notebook .tag.danger {
+      background: #f0d8d3;
+      color: #8d3f39;
+      border-color: transparent;
+    }
+
+    .notebook .tag.good {
+      background: #e1e7d7;
+      color: #56634e;
+      border-color: transparent;
+    }
+
+    .notebook .capture-box {
+      background:
+        linear-gradient(180deg, rgba(255, 250, 244, 0.98) 0%, rgba(248, 238, 225, 0.98) 100%);
+      border: 1px dashed rgba(126, 79, 45, 0.28);
+    }
+
+    @media (max-width: 1220px) {
+      .shell,
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .page {
+        width: min(100vw - 20px, 100%);
+        padding-top: 10px;
+      }
+
+      .topbar,
+      .project-card {
+        grid-template-columns: 1fr;
+        flex-direction: column;
+      }
+
+      .next-step {
+        border-left: 0;
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+        padding-left: 0;
+        padding-top: 12px;
+      }
+
+      .mockup {
+        min-height: auto;
+      }
+
+      .shell {
+        min-height: auto;
+      }
+
+      .top-copy h6 {
+        font-size: 34px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="intro">
+      <span class="eyebrow">Overview Directions / 2026-07-06</span>
+      <h1>Three concrete mockups for the same Overview structure.</h1>
+      <p>
+        These mockups keep the same four building blocks: <strong>Active Projects</strong>, <strong>Suggested Next Actions</strong>,
+        <strong>Operations</strong>, and <strong>New Work</strong>. The deliberate variable is visual direction. Each version also
+        includes <strong>Quick Capture</strong> as the fast path for urgent notes, pasted text, and uploads that can be connected later.
+      </p>
+      <nav class="jump">
+        <a href="#editorial-desk">Editorial Desk</a>
+        <a href="#native-inspector">Native Inspector</a>
+        <a href="#field-notebook">Field Notebook</a>
+      </nav>
+    </header>
+
+    <section class="section" id="editorial-desk">
+      <div class="section-head">
+        <h2>1. Editorial Desk</h2>
+        <p>
+          The recommended direction. Warm-neutral, calm, serious, and project-first. This version treats active investigations as
+          the main object on screen and gives Quick Capture a useful but disciplined role.
+        </p>
+        <div class="chips">
+          <span class="chip">Recommended</span>
+          <span class="chip">Calm</span>
+          <span class="chip">Project-first</span>
+          <span class="chip">Editorial tone</span>
+        </div>
+      </div>
+
+      <div class="mockup editorial">
+        <div class="shell">
+          <aside class="sidebar">
+            <div class="brand">
+              <small>Morning Desk</small>
+              <h3>Journalism Workflow Hub</h3>
+              <p>A calm editorial control surface for active investigations, safe follow-up, and quick capture when something starts moving fast.</p>
+            </div>
+
+            <div class="nav-group">
+              <h4>Primary</h4>
+              <div class="nav-item active">
+                <strong>Overview</strong>
+                <span>Current stories, next moves, and what needs judgment.</span>
+              </div>
+              <div class="nav-item">
+                <strong>Workspace</strong>
+                <span>Open the right project, inspect local rules, and understand what a folder is.</span>
+              </div>
+              <div class="nav-item">
+                <strong>Workflows</strong>
+                <span>Run scripts safely with previews and explicit write review.</span>
+              </div>
+              <div class="nav-item">
+                <strong>Runs</strong>
+                <span>Inspect failures, artifacts, and output in one place.</span>
+              </div>
+              <div class="nav-item">
+                <strong>Plan</strong>
+                <span>Keep product decisions and implementation aligned.</span>
+              </div>
+            </div>
+
+            <div class="nav-group">
+              <h4>Current Projects</h4>
+              <div class="mini-item active">
+                <strong>Water quality exports</strong>
+                <span>Source review needed before anything broad gets shared.</span>
+              </div>
+              <div class="mini-item">
+                <strong>Housing permits</strong>
+                <span>Project basics need cleanup before the next reporting push.</span>
+              </div>
+              <div class="mini-item">
+                <strong>Agro lobby timeline</strong>
+                <span>Ready to move from collection into chronology.</span>
+              </div>
+              <div class="mini-item">
+                <strong>Methane enforcement</strong>
+                <span>One failed refresh run needs inspection.</span>
+              </div>
+            </div>
+          </aside>
+
+          <main class="main">
+            <div class="topbar">
+              <div class="top-copy">
+                <h5>Overview / Editorial Desk</h5>
+                <h6>The stories you are working on, what needs attention, and the next safe move.</h6>
+                <p>This version is about calm hierarchy. The active project list dominates. Operations stay visible but compressed. Quick Capture is close at hand for source-call moments, but does not overtake the screen.</p>
+              </div>
+              <div class="top-actions">
+                <button class="btn secondary">Refresh</button>
+                <button class="btn secondary">Quick Capture</button>
+                <button class="btn primary">Start New Project</button>
+              </div>
+            </div>
+
+            <div class="layout">
+              <div class="card">
+                <div class="card-head">
+                  <div>
+                    <small>Active Projects</small>
+                    <strong>What stories do I have cooking?</strong>
+                    <p>Only the projects that genuinely deserve attention right now. Each gets one plain-language signal and one next step.</p>
+                  </div>
+                  <span class="pill reco">3-4 by default</span>
+                </div>
+
+                <div class="project-list">
+                  <article class="project-card">
+                    <div>
+                      <div class="project-meta">
+                        <span class="tag warn">Needs review before sharing</span>
+                        <span class="meta">Investigative</span>
+                        <span class="meta">Source-heavy</span>
+                      </div>
+                      <h6>Water quality exports</h6>
+                      <p>Interview notes and export files are in place, but the material still needs a careful review pass before it should influence outward-facing workflows.</p>
+                    </div>
+                    <div class="next-step">
+                      <small>Next Step</small>
+                      <strong>Check the latest source notes against the export summary and mark what can safely circulate.</strong>
+                    </div>
+                  </article>
+
+                  <article class="project-card">
+                    <div>
+                      <div class="project-meta">
+                        <span class="tag danger">Project basics missing</span>
+                        <span class="meta">Active reporting</span>
+                      </div>
+                      <h6>Housing permits</h6>
+                      <p>The story is moving, but the project still lacks enough metadata and local guidance to stay legible and reproducible at a glance.</p>
+                    </div>
+                    <div class="next-step">
+                      <small>Next Step</small>
+                      <strong>Update the README, add the missing publication context, and keep the structure trustworthy.</strong>
+                    </div>
+                  </article>
+
+                  <article class="project-card">
+                    <div>
+                      <div class="project-meta">
+                        <span class="tag good">Ready to move</span>
+                        <span class="meta">Timeline work</span>
+                      </div>
+                      <h6>Agro lobby timeline</h6>
+                      <p>Collection feels stable enough to turn into a chronology. The main need is editorial momentum rather than cleanup.</p>
+                    </div>
+                    <div class="next-step">
+                      <small>Next Step</small>
+                      <strong>Draft the first chronology and tag the evidence gaps that still need confirming.</strong>
+                    </div>
+                  </article>
+
+                  <article class="project-card">
+                    <div>
+                      <div class="project-meta">
+                        <span class="tag danger">Workflow needs attention</span>
+                        <span class="meta">Refresh failed</span>
+                      </div>
+                      <h6>Methane enforcement</h6>
+                      <p>A recent refresh run failed. The story may still be fine, but generated state should not be trusted until that failure is inspected.</p>
+                    </div>
+                    <div class="next-step">
+                      <small>Next Step</small>
+                      <strong>Inspect the failed run output before rerunning or depending on any generated artifacts.</strong>
+                    </div>
+                  </article>
+                </div>
+              </div>
+
+              <div class="stack">
+                <div class="card">
+                  <div class="card-head">
+                    <div>
+                      <small>Suggested Next Actions</small>
+                      <strong>Three high-confidence moves</strong>
+                      <p>Simple wording, fixed count, and direct routes into the right filtered surface.</p>
+                    </div>
+                    <span class="pill">Locked v1</span>
+                  </div>
+
+                  <div class="review-list">
+                    <div class="review-item">
+                      <small>2 projects</small>
+                      <h6>Needs review before sharing</h6>
+                      <p>Projects still need a safety or publishability pass before broader sharing should be trusted.</p>
+                    </div>
+                    <div class="review-item">
+                      <small>1 run</small>
+                      <h6>Workflow needs attention</h6>
+                      <p>A recent failure affected project state and should be reviewed before it fades into the background.</p>
+                    </div>
+                    <div class="review-item">
+                      <small>2 projects</small>
+                      <h6>Project basics missing</h6>
+                      <p>Some active stories still need the guidance and metadata that keep the workspace reliable.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card">
+                  <div class="card-head">
+                    <div>
+                      <small>Operations</small>
+                      <strong>Important, but not the whole front page</strong>
+                      <p>Administrative work stays visible here without competing equally with active reporting.</p>
+                    </div>
+                    <span class="pill">Secondary</span>
+                  </div>
+
+                  <div class="ops-list">
+                    <div class="ops-item">
+                      <div>
+                        <small>Publishing</small>
+                        <h6>PDF and publication follow-up</h6>
+                        <p>Finished stories still waiting for archive-safe publication artifacts or metadata.</p>
+                      </div>
+                      <span class="count">3</span>
+                    </div>
+                    <div class="ops-item">
+                      <div>
+                        <small>Workflow</small>
+                        <h6>Git and run follow-up</h6>
+                        <p>Review recent write-related runs and repository maintenance prompts.</p>
+                      </div>
+                      <span class="count">2</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card">
+                  <div class="card-head">
+                    <div>
+                      <small>New Work</small>
+                      <strong>Start something new or capture it before it escapes.</strong>
+                      <p>Project creation and capture live near each other, but they are not the same thing.</p>
+                    </div>
+                    <span class="pill reco">Quick Capture</span>
+                  </div>
+
+                  <div class="button-row">
+                    <button class="btn primary">Start New Project</button>
+                    <button class="btn secondary">Brainstorm From Archive</button>
+                  </div>
+
+                  <div class="capture-box">
+                    <strong>Quick Capture</strong>
+                    <p>For source calls, pasted fragments, raw notes, or dropped-in files. Save first. Connect to a project, create a new project, or archive later.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="native-inspector">
+      <div class="section-head">
+        <h2>2. Native Inspector</h2>
+        <p>
+          The tighter, more utility-like alternative. This version leans into a flatter Mac structure, denser lists, and a more
+          operational tone. It feels precise and native, but colder.
+        </p>
+        <div class="chips">
+          <span class="chip">Alternative</span>
+          <span class="chip">Precise</span>
+          <span class="chip">Mac utility</span>
+          <span class="chip">Flatter</span>
+        </div>
+      </div>
+
+      <div class="mockup inspector">
+        <div class="shell">
+          <aside class="sidebar">
+            <div class="brand">
+              <small>Review Utility</small>
+              <h3>Journalism Workflow Hub</h3>
+              <p>A tighter, inspector-style Overview for project review, trusted operations, and quick note capture when context starts moving.</p>
+            </div>
+
+            <div class="nav-group">
+              <h4>Destinations</h4>
+              <div class="nav-item active">
+                <strong>Overview</strong>
+                <span>Active projects and review queues.</span>
+              </div>
+              <div class="nav-item">
+                <strong>Workspace</strong>
+                <span>Folders, rules, safety posture, related actions.</span>
+              </div>
+              <div class="nav-item">
+                <strong>Workflows</strong>
+                <span>Commands, target paths, explicit write review.</span>
+              </div>
+              <div class="nav-item">
+                <strong>Runs</strong>
+                <span>Result inspection, stdout, stderr, artifacts.</span>
+              </div>
+              <div class="nav-item">
+                <strong>Plan</strong>
+                <span>Canonical planning documents.</span>
+              </div>
+            </div>
+
+            <div class="nav-group">
+              <h4>Flagged Now</h4>
+              <div class="mini-item active">
+                <strong>Water quality exports</strong>
+                <span>Review before sharing.</span>
+              </div>
+              <div class="mini-item">
+                <strong>Methane enforcement</strong>
+                <span>Workflow follow-up required.</span>
+              </div>
+              <div class="mini-item">
+                <strong>Housing permits</strong>
+                <span>Project basics incomplete.</span>
+              </div>
+            </div>
+          </aside>
+
+          <main class="main">
+            <div class="topbar">
+              <div class="top-copy">
+                <h5>Overview / Native Inspector</h5>
+                <h6>Review the live work, clear the queues, and keep the workspace trustworthy.</h6>
+                <p>This direction prioritizes legibility through flatter surfaces, tighter rhythm, and a more utility-like tone. Quick Capture behaves like a toolbar-level action with a compact sheet behind it.</p>
+              </div>
+              <div class="top-actions">
+                <button class="btn secondary">Refresh</button>
+                <button class="btn secondary">Capture</button>
+                <button class="btn primary">New Project</button>
+              </div>
+            </div>
+
+            <div class="layout">
+              <div class="card">
+                <div class="card-head">
+                  <div>
+                    <small>Active Projects</small>
+                    <strong>Current reporting work</strong>
+                    <p>Presented more like a live review list than like case-file cards.</p>
+                  </div>
+                  <span class="pill reco">Default view</span>
+                </div>
+
+                <div class="project-list">
+                  <article class="project-card">
+                    <div>
+                      <div class="project-meta">
+                        <span class="tag warn">Review before sharing</span>
+                        <span class="meta">Investigative</span>
+                      </div>
+                      <h6>Water quality exports</h6>
+                      <p>Collected material is usable, but shareability judgment is still unresolved.</p>
+                    </div>
+                    <div class="next-step">
+                      <small>Next</small>
+                      <strong>Review source notes and mark export-safe material.</strong>
+                    </div>
+                  </article>
+
+                  <article class="project-card">
+                    <div>
+                      <div class="project-meta">
+                        <span class="tag danger">Basics missing</span>
+                        <span class="meta">Active</span>
+                      </div>
+                      <h6>Housing permits</h6>
+                      <p>Working story with missing metadata and incomplete local guidance.</p>
+                    </div>
+                    <div class="next-step">
+                      <small>Next</small>
+                      <strong>Update project context before the next reporting round.</strong>
+                    </div>
+                  </article>
+
+                  <article class="project-card">
+                    <div>
+                      <div class="project-meta">
+                        <span class="tag good">Ready to advance</span>
+                        <span class="meta">Timeline</span>
+                      </div>
+                      <h6>Agro lobby timeline</h6>
+                      <p>Collection is stable enough to move into structured chronology work.</p>
+                    </div>
+                    <div class="next-step">
+                      <small>Next</small>
+                      <strong>Draft chronology and mark unresolved fact gaps.</strong>
+                    </div>
+                  </article>
+
+                  <article class="project-card">
+                    <div>
+                      <div class="project-meta">
+                        <span class="tag danger">Run follow-up</span>
+                        <span class="meta">Refresh failed</span>
+                      </div>
+                      <h6>Methane enforcement</h6>
+                      <p>Recent generated state may be stale because the last refresh did not complete cleanly.</p>
+                    </div>
+                    <div class="next-step">
+                      <small>Next</small>
+                      <strong>Inspect run output before relying on derived files.</strong>
+                    </div>
+                  </article>
+                </div>
+              </div>
+
+              <div class="stack">
+                <div class="card">
+                  <div class="card-head">
+                    <div>
+                      <small>Review Queues</small>
+                      <strong>Actionable filters</strong>
+                      <p>A compact, inspector-like version of the same three core actions.</p>
+                    </div>
+                    <span class="pill">Fixed</span>
+                  </div>
+
+                  <div class="review-list">
+                    <div class="review-item">
+                      <small>2 items</small>
+                      <h6>Needs review before sharing</h6>
+                      <p>Open the filtered review list for projects with unresolved safety posture.</p>
+                    </div>
+                    <div class="review-item">
+                      <small>1 item</small>
+                      <h6>Workflow needs attention</h6>
+                      <p>Inspect failed or risky runs affecting current project state.</p>
+                    </div>
+                    <div class="review-item">
+                      <small>2 items</small>
+                      <h6>Project basics missing</h6>
+                      <p>Fix structural gaps that reduce trust in the workspace.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card">
+                  <div class="card-head">
+                    <div>
+                      <small>Operations</small>
+                      <strong>Compact grouped utilities</strong>
+                      <p>This direction absorbs operations naturally into grouped rows.</p>
+                    </div>
+                    <span class="pill">Utility rail</span>
+                  </div>
+
+                  <div class="ops-list">
+                    <div class="ops-item">
+                      <div>
+                        <small>Publishing</small>
+                        <h6>Publication follow-up</h6>
+                        <p>Missing PDFs or publication metadata on finished work.</p>
+                      </div>
+                      <span class="count">3</span>
+                    </div>
+                    <div class="ops-item">
+                      <div>
+                        <small>Maintenance</small>
+                        <h6>Git and workflow checks</h6>
+                        <p>Write review, repo hygiene, and stale-run prompts.</p>
+                      </div>
+                      <span class="count">2</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card">
+                  <div class="card-head">
+                    <div>
+                      <small>New Work</small>
+                      <strong>Launcher section</strong>
+                      <p>Smaller and more tool-like than the recommended direction.</p>
+                    </div>
+                    <span class="pill reco">Capture in toolbar</span>
+                  </div>
+
+                  <div class="button-row">
+                    <button class="btn primary">New Project</button>
+                    <button class="btn secondary">Archive Search</button>
+                  </div>
+
+                  <div class="capture-box">
+                    <strong>Capture</strong>
+                    <p>Toolbar action with a compact sheet for urgent note-taking, pasted text, and uploaded material.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="field-notebook">
+      <div class="section-head">
+        <h2>3. Field Notebook</h2>
+        <p>
+          The most journalist-specific and the riskiest. This version gives capture more personality and pushes the app slightly
+          closer to note-taking territory while still keeping the same Overview structure.
+        </p>
+        <div class="chips">
+          <span class="chip">Alternative</span>
+          <span class="chip">More personal</span>
+          <span class="chip">Capture-forward</span>
+          <span class="chip">Riskier</span>
+        </div>
+      </div>
+
+      <div class="mockup notebook">
+        <div class="shell">
+          <aside class="sidebar">
+            <div class="brand">
+              <small>Field Notebook</small>
+              <h3>Journalism Workflow Hub</h3>
+              <p>A more reporterly take on Overview, where active investigations still lead but capture feels closer to the surface.</p>
+            </div>
+
+            <div class="nav-group">
+              <h4>Home</h4>
+              <div class="nav-item active">
+                <strong>Overview</strong>
+                <span>Stories in motion, source material, and immediate next steps.</span>
+              </div>
+              <div class="nav-item">
+                <strong>Workspace</strong>
+                <span>Project folders, rules, and long-form context.</span>
+              </div>
+              <div class="nav-item">
+                <strong>Workflows</strong>
+                <span>Tooling and repeatable actions when structure matters.</span>
+              </div>
+              <div class="nav-item">
+                <strong>Runs</strong>
+                <span>Audit what actually happened under the hood.</span>
+              </div>
+              <div class="nav-item">
+                <strong>Plan</strong>
+                <span>Product direction, priorities, and architecture.</span>
+              </div>
+            </div>
+
+            <div class="nav-group">
+              <h4>On The Go</h4>
+              <div class="mini-item active">
+                <strong>Call notes waiting</strong>
+                <span>1 uncategorized capture from this morning.</span>
+              </div>
+              <div class="mini-item">
+                <strong>Water quality exports</strong>
+                <span>Source review still pending.</span>
+              </div>
+              <div class="mini-item">
+                <strong>Agro lobby timeline</strong>
+                <span>Chronology draft ready to start.</span>
+              </div>
+            </div>
+          </aside>
+
+          <main class="main">
+            <div class="topbar">
+              <div class="top-copy">
+                <h5>Overview / Field Notebook</h5>
+                <h6>Keep the active stories in view, but never miss the thing someone just told you.</h6>
+                <p>This direction is more tactile and capture-aware. It is the most aligned with the source-call use case, but also the easiest one to let drift into notes-app territory if left unchecked.</p>
+              </div>
+              <div class="top-actions">
+                <button class="btn secondary">Refresh</button>
+                <button class="btn primary">Quick Capture</button>
+                <button class="btn secondary">Start New Project</button>
+              </div>
+            </div>
+
+            <div class="layout">
+              <div class="card">
+                <div class="card-head">
+                  <div>
+                    <small>Active Projects</small>
+                    <strong>Stories in motion</strong>
+                    <p>Still the main object on screen, but rendered with slightly more note-like warmth and editorial character.</p>
+                  </div>
+                  <span class="pill reco">Capture-aware</span>
+                </div>
+
+                <div class="project-list">
+                  <article class="project-card">
+                    <div>
+                      <div class="project-meta">
+                        <span class="tag warn">Needs review before sharing</span>
+                        <span class="meta">Investigation</span>
+                        <span class="meta">Live source work</span>
+                      </div>
+                      <h6>Water quality exports</h6>
+                      <p>Recent notes suggest the export story may be moving. Material is rich, but the safety judgment is not settled yet.</p>
+                    </div>
+                    <div class="next-step">
+                      <small>Next Step</small>
+                      <strong>Read back the last source-call notes and mark what is corroborated.</strong>
+                    </div>
+                  </article>
+
+                  <article class="project-card">
+                    <div>
+                      <div class="project-meta">
+                        <span class="tag danger">Project basics missing</span>
+                        <span class="meta">Reporting</span>
+                      </div>
+                      <h6>Housing permits</h6>
+                      <p>The reporting thread is alive, but the project shell still needs a firmer structure so the work does not become harder to trust later.</p>
+                    </div>
+                    <div class="next-step">
+                      <small>Next Step</small>
+                      <strong>Fix the project frame before adding another batch of notes and documents.</strong>
+                    </div>
+                  </article>
+
+                  <article class="project-card">
+                    <div>
+                      <div class="project-meta">
+                        <span class="tag good">Ready to move</span>
+                        <span class="meta">Chronology</span>
+                      </div>
+                      <h6>Agro lobby timeline</h6>
+                      <p>You have enough collected detail to start shaping a timeline instead of just gathering more fragments.</p>
+                    </div>
+                    <div class="next-step">
+                      <small>Next Step</small>
+                      <strong>Draft the chronology and connect loose notes to dated evidence.</strong>
+                    </div>
+                  </article>
+
+                  <article class="project-card">
+                    <div>
+                      <div class="project-meta">
+                        <span class="tag danger">Workflow needs attention</span>
+                        <span class="meta">Generated state</span>
+                      </div>
+                      <h6>Methane enforcement</h6>
+                      <p>A failed refresh means the latest generated view of this project may be incomplete or stale.</p>
+                    </div>
+                    <div class="next-step">
+                      <small>Next Step</small>
+                      <strong>Read the failed run before trusting any summary produced after it.</strong>
+                    </div>
+                  </article>
+                </div>
+              </div>
+
+              <div class="stack">
+                <div class="card">
+                  <div class="card-head">
+                    <div>
+                      <small>Suggested Next Actions</small>
+                      <strong>What deserves judgment now</strong>
+                      <p>The same action logic, but framed a little more like editorial review prompts.</p>
+                    </div>
+                    <span class="pill">Fixed logic</span>
+                  </div>
+
+                  <div class="review-list">
+                    <div class="review-item">
+                      <small>2 projects</small>
+                      <h6>Needs review before sharing</h6>
+                      <p>Projects with active material that still should not be treated as ready for broader circulation.</p>
+                    </div>
+                    <div class="review-item">
+                      <small>1 run</small>
+                      <h6>Workflow needs attention</h6>
+                      <p>A failed workflow may have changed what you think is current.</p>
+                    </div>
+                    <div class="review-item">
+                      <small>2 projects</small>
+                      <h6>Project basics missing</h6>
+                      <p>Stories that need structure before another layer of reporting gets added on top.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card">
+                  <div class="card-head">
+                    <div>
+                      <small>Operations</small>
+                      <strong>Pushed further into the background</strong>
+                      <p>Still visible, but intentionally less present than in the other two directions.</p>
+                    </div>
+                    <span class="pill">Subdued</span>
+                  </div>
+
+                  <div class="ops-list">
+                    <div class="ops-item">
+                      <div>
+                        <small>Publishing</small>
+                        <h6>Archive and publication follow-up</h6>
+                        <p>Finished material that still needs the right final artifacts.</p>
+                      </div>
+                      <span class="count">3</span>
+                    </div>
+                    <div class="ops-item">
+                      <div>
+                        <small>Maintenance</small>
+                        <h6>Workflow and cleanup</h6>
+                        <p>Stale prompts and low-level follow-up work.</p>
+                      </div>
+                      <span class="count">2</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card">
+                  <div class="card-head">
+                    <div>
+                      <small>New Work</small>
+                      <strong>Project creation plus live capture</strong>
+                      <p>This is the direction where capture comes closest to becoming a personality trait of the app.</p>
+                    </div>
+                    <span class="pill reco">More visible capture</span>
+                  </div>
+
+                  <div class="button-row">
+                    <button class="btn primary">Quick Capture</button>
+                    <button class="btn secondary">Start New Project</button>
+                    <button class="btn secondary">Search Old Material</button>
+                  </div>
+
+                  <div class="capture-box">
+                    <strong>Quick Capture Draft</strong>
+                    <p><code>Call with municipal source: says permits may have been delayed after private meeting...</code></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

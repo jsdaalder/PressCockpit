@@ -11,8 +11,9 @@ final class WorkspaceScannerTests: XCTestCase {
         let text = """
         ---
         type: project
-        project: demo_story
+        project: Demo Story
         status: active
+        project_type: journalism
         started: 2026-07-05
         ---
 
@@ -30,7 +31,7 @@ final class WorkspaceScannerTests: XCTestCase {
         XCTAssertEqual(snapshot.items.first?.frontmatter["status"], "active")
         XCTAssertEqual(snapshot.items.first?.projectType, .journalism)
         XCTAssertEqual(snapshot.items.first?.lifecycleStage, "Active")
-        XCTAssertEqual(snapshot.items.first?.safetyPosture, .publishable)
+        XCTAssertEqual(snapshot.items.first?.safetyPosture, .unknown)
     }
 
     func testReadsAgentsAndClassifiesToolingProjects() throws {
@@ -61,7 +62,219 @@ final class WorkspaceScannerTests: XCTestCase {
         XCTAssertEqual(item.projectType, .tooling)
         XCTAssertEqual(item.safetyPosture, .localSensitive)
         XCTAssertEqual(item.agentsSummary, "Keep this repository local-first and privacy-aware before sharing exports.")
-        XCTAssertEqual(item.agentsPath, project.appendingPathComponent("AGENTS.md").path)
+        XCTAssertEqual(
+            URL(fileURLWithPath: item.agentsPath ?? "").standardizedFileURL.path,
+            project.appendingPathComponent("AGENTS.md").standardizedFileURL.path
+        )
+    }
+
+    func testExplicitFrontmatterOverridesHeuristicsAndNormalizesAliases() throws {
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let project = tmp.appendingPathComponent("Projects/2026/data_desk")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true, attributes: nil)
+
+        try """
+        ---
+        type: project
+        project: Data Desk
+        status: on_hold
+        project_type: data-journalism
+        safety: publishable
+        ---
+
+        # Data Desk
+
+        Native SwiftUI launcher for the reporting workspace.
+        """.write(to: project.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
+        try """
+        # AGENTS
+
+        Keep this repository local-first and privacy-aware before sharing exports.
+        """.write(to: project.appendingPathComponent("AGENTS.md"), atomically: true, encoding: .utf8)
+
+        let item = try XCTUnwrap(WorkspaceScanner(workspaceRoot: tmp).scan().items.first)
+
+        XCTAssertEqual(item.projectType, .dataJournalism)
+        XCTAssertEqual(item.lifecycleStage, "On Hold")
+        XCTAssertEqual(item.safetyPosture, .publishableReviewed)
+    }
+
+    func testHumanizesSlugLikeFrontmatterProjectTitle() throws {
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let project = tmp.appendingPathComponent("Projects/2026/olieprijzen_dalen_weer")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true, attributes: nil)
+
+        try """
+        ---
+        type: project
+        project: olieprijzen_dalen_weer
+        status: active
+        ---
+
+        # olieprijzen_dalen_weer
+
+        A short but valid project summary that should not become the title.
+        """.write(to: project.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
+        let item = try XCTUnwrap(WorkspaceScanner(workspaceRoot: tmp).scan().items.first)
+
+        XCTAssertEqual(item.title, "Olieprijzen dalen weer")
+    }
+
+    func testExtractsDriveFolderURLAndHumanizesFallbackSlug() throws {
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let project = tmp.appendingPathComponent("Projects/2026/wur_voedselzekerheid_rapport")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true, attributes: nil)
+
+        try """
+        ---
+        type: project
+        status: active
+        drive_folder_url: https://drive.google.com/drive/folders/abc123
+        ---
+        """.write(to: project.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
+        let item = try XCTUnwrap(WorkspaceScanner(workspaceRoot: tmp).scan().items.first)
+
+        XCTAssertEqual(item.title, "Wur voedselzekerheid rapport")
+        XCTAssertEqual(item.googleDriveFolderURL, "https://drive.google.com/drive/folders/abc123")
+    }
+
+    func testSummarySkipsMarkdownSubheadingAndUsesFirstParagraph() throws {
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let project = tmp.appendingPathComponent("Projects/2026/summary_story")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true, attributes: nil)
+
+        try """
+        ---
+        type: project
+        project: Summary Story
+        status: active
+        ---
+
+        # Summary Story
+
+        ## Short Summary / Intro
+
+        This is the real summary paragraph that should appear in the active project card instead of the markdown subheading.
+        """.write(to: project.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
+        let item = try XCTUnwrap(WorkspaceScanner(workspaceRoot: tmp).scan().items.first)
+
+        XCTAssertEqual(
+            item.summary,
+            "This is the real summary paragraph that should appear in the active project card instead of the markdown subheading."
+        )
+    }
+
+    func testParsesRootDocumentsAndGoogleDocCacheState() throws {
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let project = tmp.appendingPathComponent("Projects/2026/document_story")
+        let cacheRoot = project.appendingPathComponent("docs/_derived/google_docs")
+        try FileManager.default.createDirectory(at: cacheRoot, withIntermediateDirectories: true, attributes: nil)
+
+        try """
+        ---
+        type: project
+        project: Document Story
+        status: active
+        project_type: journalism
+        ---
+
+        # Document Story
+
+        A reporting project with a draft and local research note.
+        """.write(to: project.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
+        try """
+        {"doc_id":"abc123","resource_key":"","email":"jan@example.com"}
+        """.write(to: project.appendingPathComponent("Artikel.gdoc"), atomically: true, encoding: .utf8)
+
+        try """
+        ---
+        title: Artikel
+        doc_id: abc123
+        cached_on: 2026-07-06
+        cache_mode: fetched_body
+        ---
+
+        Cached draft body.
+        """.write(to: cacheRoot.appendingPathComponent("artikel.md"), atomically: true, encoding: .utf8)
+
+        try "Local reporting notes.".write(to: project.appendingPathComponent("Research.md"), atomically: true, encoding: .utf8)
+
+        let item = try XCTUnwrap(WorkspaceScanner(workspaceRoot: tmp).scan().items.first)
+        XCTAssertEqual(item.documents.count, 2)
+
+        let draft = try XCTUnwrap(item.documents.first(where: { $0.fileExtension == "gdoc" }))
+        XCTAssertEqual(draft.provider, .googleDocPointer)
+        XCTAssertEqual(draft.role, .draft)
+        XCTAssertEqual(draft.cacheState, .cachedText)
+        XCTAssertEqual(draft.cachedOn, "2026-07-06")
+        XCTAssertEqual(draft.docID, "abc123")
+        XCTAssertEqual(draft.freshness(referenceDate: fixedDate("2026-07-08")), .fresh)
+
+        let research = try XCTUnwrap(item.documents.first(where: { $0.title == "Research" }))
+        XCTAssertEqual(research.provider, .localFile)
+        XCTAssertEqual(research.role, .research)
+        XCTAssertEqual(research.cacheState, .localFile)
+        XCTAssertEqual(research.freshness(referenceDate: fixedDate("2026-07-08")), .localFile)
+    }
+
+    func testDocumentFreshnessFlagsNeedsFetchAndStaleCache() {
+        let stale = WorkspaceDocument(
+            id: "stale",
+            path: "/tmp/Artikel.gdoc",
+            title: "Artikel",
+            fileExtension: "gdoc",
+            provider: .googleDocPointer,
+            role: .draft,
+            cacheState: .cachedText,
+            externalURL: nil,
+            docID: "abc",
+            cachePath: "/tmp/artikel.md",
+            cachedOn: "2026-06-01"
+        )
+        let needsFetch = WorkspaceDocument(
+            id: "missing",
+            path: "/tmp/Research.gdoc",
+            title: "Research",
+            fileExtension: "gdoc",
+            provider: .googleDocPointer,
+            role: .research,
+            cacheState: .placeholder,
+            externalURL: nil,
+            docID: "def",
+            cachePath: "/tmp/research.md",
+            cachedOn: "2026-07-06"
+        )
+
+        XCTAssertEqual(stale.freshness(referenceDate: fixedDate("2026-07-06")), .stale)
+        XCTAssertEqual(needsFetch.freshness(referenceDate: fixedDate("2026-07-06")), .needsFetch)
+    }
+
+    func testLegacyProjectWithoutExplicitSafetyFallsBackConservatively() throws {
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let project = tmp.appendingPathComponent("Projects/2026/legacy_story")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true, attributes: nil)
+
+        try """
+        ---
+        type: project
+        project: Legacy Story
+        status: active
+        ---
+
+        # Legacy Story
+
+        Journalism project for a reporting workspace with a deliverable.
+        """.write(to: project.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
+        let item = try XCTUnwrap(WorkspaceScanner(workspaceRoot: tmp).scan().items.first)
+
+        XCTAssertEqual(item.projectType, .journalism)
+        XCTAssertEqual(item.safetyPosture, .unknown)
     }
 
     func testClassifiesAreasAsOngoingInternalWork() throws {
@@ -90,7 +303,7 @@ final class WorkspaceScannerTests: XCTestCase {
 
         let tracker = """
         pdf_title,pdf_path,published_year,published_year_source,date_line,headline,article_note_path,match_status,matched_project_year,matched_project_slug,matched_project_path,matched_project_readme,matched_project_title,match_score,match_basis,match_candidate,candidate_2_slug,candidate_2_score,candidate_3_slug,candidate_3_score,exists_in_legacy_corpus,review_decision,review_confirmed_project_slug,review_notes,review_year_override
-        Demo PDF,/tmp/demo.pdf,2026,filesystem,,,matched,2026,demo,/tmp/project,/tmp/project/README.md,Demo Project,1.0,manual_confirmed,Demo Project,,,,,yes,confirmed,,
+        Demo PDF,/tmp/demo.pdf,2026,filesystem,,,,matched,2026,demo,/tmp/project,/tmp/project/README.md,Demo Project,1.0,manual_confirmed,,,,,,,yes,confirmed,,,
         """
         try tracker.write(to: index.appendingPathComponent("publication_tracker.csv"), atomically: true, encoding: .utf8)
 
@@ -106,5 +319,14 @@ final class WorkspaceScannerTests: XCTestCase {
         XCTAssertEqual(snapshot.matchedCount, 1)
         XCTAssertEqual(snapshot.missingCount, 0)
         XCTAssertEqual(snapshot.storiesByYear["2026"]?.first?.pdfTitle, "Demo PDF")
+    }
+
+    private func fixedDate(_ value: String) -> Date {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: value) ?? .distantPast
     }
 }

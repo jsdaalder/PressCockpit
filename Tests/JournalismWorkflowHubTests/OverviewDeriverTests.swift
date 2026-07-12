@@ -1,0 +1,389 @@
+import XCTest
+@testable import JournalismWorkflowHub
+
+final class OverviewDeriverTests: XCTestCase {
+    func testActiveProjectsExcludeToolingAndInactiveStatusesAndCapAtFour() {
+        let activeUnknown = makeProject(
+            id: "active-unknown",
+            title: "Active Unknown",
+            projectType: .journalism,
+            status: "active",
+            safety: .unknown,
+            deliverable: "Story",
+            hasAgents: true,
+            started: "2026-07-06"
+        )
+        let activeClear = makeProject(
+            id: "active-clear",
+            title: "Active Clear",
+            projectType: .dataJournalism,
+            status: "active",
+            safety: .internalOnly,
+            deliverable: "Dataset",
+            hasAgents: true,
+            started: "2026-07-05"
+        )
+        let activeNeedsBasics = makeProject(
+            id: "active-basics",
+            title: "Active Basics",
+            projectType: .journalism,
+            status: "active",
+            safety: .internalOnly,
+            deliverable: "",
+            hasAgents: true,
+            started: "2026-07-04"
+        )
+        let activeNoStarted = makeProject(
+            id: "active-no-started",
+            title: "Active No Started",
+            projectType: .journalism,
+            status: "active",
+            safety: .internalOnly,
+            deliverable: "Story",
+            hasAgents: true,
+            started: ""
+        )
+        let activeFifth = makeProject(
+            id: "active-fifth",
+            title: "Active Fifth",
+            projectType: .journalism,
+            status: "active",
+            safety: .internalOnly,
+            deliverable: "Story",
+            hasAgents: true,
+            started: "2026-07-03"
+        )
+        let toolingProject = makeProject(
+            id: "tooling",
+            title: "Tooling",
+            projectType: .tooling,
+            status: "active",
+            safety: .localSensitive,
+            deliverable: "Tool",
+            hasAgents: true,
+            started: "2026-07-07"
+        )
+        let onHoldProject = makeProject(
+            id: "on-hold",
+            title: "On Hold",
+            projectType: .journalism,
+            status: "on_hold",
+            safety: .unknown,
+            deliverable: "Story",
+            hasAgents: true,
+            started: "2026-07-08"
+        )
+
+        let snapshot = WorkspaceSnapshot(
+            scannedAt: .now,
+            items: [activeClear, toolingProject, onHoldProject, activeUnknown, activeNeedsBasics, activeNoStarted, activeFifth],
+            publication: .empty
+        )
+
+        let summaries = OverviewDeriver.projectSummaries(from: snapshot, runs: [])
+
+        XCTAssertEqual(summaries.count, 4)
+        XCTAssertEqual(summaries.map(\.item.id), ["active-basics", "active-no-started", "active-unknown", "active-clear"])
+    }
+
+    func testFlagPrecedencePrefersLatestFailedRunOverOtherIssues() throws {
+        let project = makeProject(
+            id: "review",
+            title: "Review Project",
+            projectType: .journalism,
+            status: "active",
+            safety: .unknown,
+            deliverable: "",
+            hasAgents: false,
+            started: "2026-07-06"
+        )
+        let snapshot = WorkspaceSnapshot(
+            scannedAt: .now,
+            items: [project],
+            publication: .empty
+        )
+        let failedRun = WorkflowRun(
+            id: "run-1",
+            workflowID: "refresh-knowledge-ops",
+            workflowLabel: "Refresh knowledge ops",
+            startedAt: "2026-07-06T10-00-00Z",
+            finishedAt: "2026-07-06T10-01-00Z",
+            exitCode: 1,
+            commandPreview: "cmd",
+            workingDirectory: "/tmp",
+            stdoutPath: "/tmp/stdout",
+            stderrPath: "/tmp/stderr",
+            manifestPath: "/tmp/manifest",
+            artifactPaths: [],
+            selectionPath: project.path
+        )
+
+        let summary = try XCTUnwrap(OverviewDeriver.projectSummaries(from: snapshot, runs: [failedRun]).first)
+
+        XCTAssertEqual(summary.primaryFlag, "Workflow needs attention")
+        XCTAssertEqual(summary.flags, [
+            "Workflow needs attention",
+            "Project setup incomplete",
+            "Needs review before sharing"
+        ])
+        XCTAssertEqual(summary.primaryTarget, .run("run-1"))
+    }
+
+    func testSuggestedActionsAndOperationsDeduplicateLatestFailedRunScopes() {
+        let reviewProject = makeProject(
+            id: "review",
+            title: "Review",
+            projectType: .journalism,
+            status: "active",
+            safety: .unknown,
+            deliverable: "",
+            hasAgents: false,
+            started: "2026-07-06"
+        )
+        let clearProject = makeProject(
+            id: "clear",
+            title: "Clear",
+            projectType: .journalism,
+            status: "active",
+            safety: .internalOnly,
+            deliverable: "Story",
+            hasAgents: true,
+            started: "2026-07-05"
+        )
+        let publication = PublicationSnapshot(
+            storiesByYear: [:],
+            projectsByYear: [:],
+            matchedCount: 0,
+            missingCount: 3
+        )
+        let snapshot = WorkspaceSnapshot(
+            scannedAt: .now,
+            items: [reviewProject, clearProject],
+            publication: publication
+        )
+
+        let olderFailedRun = WorkflowRun(
+            id: "run-older",
+            workflowID: "refresh-knowledge-ops",
+            workflowLabel: "Refresh knowledge ops",
+            startedAt: "2026-07-06T09-00-00Z",
+            finishedAt: "2026-07-06T09-01-00Z",
+            exitCode: 1,
+            commandPreview: "cmd",
+            workingDirectory: "/tmp",
+            stdoutPath: "/tmp/stdout",
+            stderrPath: "/tmp/stderr",
+            manifestPath: "/tmp/manifest",
+            artifactPaths: [],
+            selectionPath: reviewProject.path
+        )
+        let newerSuccessfulRun = WorkflowRun(
+            id: "run-newer",
+            workflowID: "refresh-knowledge-ops",
+            workflowLabel: "Refresh knowledge ops",
+            startedAt: "2026-07-06T10-00-00Z",
+            finishedAt: "2026-07-06T10-01-00Z",
+            exitCode: 0,
+            commandPreview: "cmd",
+            workingDirectory: "/tmp",
+            stdoutPath: "/tmp/stdout",
+            stderrPath: "/tmp/stderr",
+            manifestPath: "/tmp/manifest",
+            artifactPaths: [],
+            selectionPath: reviewProject.path
+        )
+        let workflowFailedRun = WorkflowRun(
+            id: "run-global",
+            workflowID: "build-publication-tracker",
+            workflowLabel: "Build publication tracker",
+            startedAt: "2026-07-06T11-00-00Z",
+            finishedAt: "2026-07-06T11-01-00Z",
+            exitCode: 1,
+            commandPreview: "cmd",
+            workingDirectory: "/tmp",
+            stdoutPath: "/tmp/stdout",
+            stderrPath: "/tmp/stderr",
+            manifestPath: "/tmp/manifest",
+            artifactPaths: [],
+            selectionPath: nil
+        )
+
+        let actions = OverviewDeriver.suggestedActions(
+            from: snapshot,
+            runs: [olderFailedRun, newerSuccessfulRun, workflowFailedRun]
+        )
+        let operations = OverviewDeriver.operationSummaries(
+            from: snapshot,
+            runs: [olderFailedRun, newerSuccessfulRun, workflowFailedRun]
+        )
+
+        XCTAssertEqual(actions.map(\.count), [1, 1, 1])
+        XCTAssertEqual(operations.map(\.count), [1, 1, 3])
+    }
+
+    func testProjectSummariesCarryPrimaryDocuments() throws {
+        let project = makeProject(
+            id: "docs",
+            title: "Docs Project",
+            projectType: .journalism,
+            status: "active",
+            safety: .internalOnly,
+            deliverable: "Story",
+            hasAgents: true,
+            started: "2026-07-06"
+        )
+        let draft = WorkspaceDocument(
+            id: "/tmp/docs/Artikel.gdoc",
+            path: "/tmp/docs/Artikel.gdoc",
+            title: "Artikel",
+            fileExtension: "gdoc",
+            provider: .googleDocPointer,
+            role: .draft,
+            cacheState: .cachedText,
+            externalURL: "https://docs.google.com/document/d/abc/edit",
+            docID: "abc",
+            cachePath: "/tmp/docs/_derived/google_docs/artikel.md",
+            cachedOn: "2026-07-06"
+        )
+        let draftSnapshot = WorkspaceDocument(
+            id: "/tmp/docs/Artikel.md",
+            path: "/tmp/docs/Artikel.md",
+            title: "Artikel Snapshot",
+            fileExtension: "md",
+            provider: .localFile,
+            role: .draft,
+            cacheState: .localFile,
+            externalURL: nil,
+            docID: nil,
+            cachePath: nil,
+            cachedOn: nil
+        )
+        let research = WorkspaceDocument(
+            id: "/tmp/docs/Research.md",
+            path: "/tmp/docs/Research.md",
+            title: "Research",
+            fileExtension: "md",
+            provider: .localFile,
+            role: .research,
+            cacheState: .localFile,
+            externalURL: nil,
+            docID: nil,
+            cachePath: nil,
+            cachedOn: nil
+        )
+        let item = WorkspaceItem(
+            id: project.id,
+            section: project.section,
+            path: project.path,
+            readmePath: project.readmePath,
+            agentsPath: project.agentsPath,
+            title: project.title,
+            summary: project.summary,
+            agentsSummary: project.agentsSummary,
+            frontmatter: project.frontmatter,
+            googleDriveFolderURL: "https://drive.google.com/drive/folders/project-folder",
+            projectType: project.projectType,
+            lifecycleStage: project.lifecycleStage,
+            safetyPosture: project.safetyPosture,
+            directFileCount: project.directFileCount,
+            directFolderCount: project.directFolderCount,
+            markdownFiles: project.markdownFiles,
+            pdfFiles: project.pdfFiles,
+            gdocFiles: 1,
+            csvFiles: project.csvFiles,
+            xlsxFiles: project.xlsxFiles,
+            documents: [research, draftSnapshot, draft]
+        )
+
+        let summary = try XCTUnwrap(OverviewDeriver.projectSummaries(
+            from: WorkspaceSnapshot(scannedAt: .now, items: [item], publication: .empty),
+            runs: []
+        ).first)
+
+        XCTAssertEqual(summary.primaryDocuments.map(\.title), ["Artikel", "Research"])
+    }
+
+    func testProjectSummariesHideWorkflowAndSetupFlagsFromCards() throws {
+        let project = makeProject(
+            id: "review",
+            title: "Review Project",
+            projectType: .journalism,
+            status: "active",
+            safety: .unknown,
+            deliverable: "",
+            hasAgents: false,
+            started: "2026-07-06"
+        )
+        let failedRun = WorkflowRun(
+            id: "run-1",
+            workflowID: "refresh-knowledge-ops",
+            workflowLabel: "Refresh knowledge ops",
+            startedAt: "2026-07-06T10-00-00Z",
+            finishedAt: "2026-07-06T10-01-00Z",
+            exitCode: 1,
+            commandPreview: "cmd",
+            workingDirectory: "/tmp",
+            stdoutPath: "/tmp/stdout",
+            stderrPath: "/tmp/stderr",
+            manifestPath: "/tmp/manifest",
+            artifactPaths: [],
+            selectionPath: project.path
+        )
+
+        let summary = try XCTUnwrap(OverviewDeriver.projectSummaries(
+            from: WorkspaceSnapshot(scannedAt: .now, items: [project], publication: .empty),
+            runs: [failedRun]
+        ).first)
+
+        XCTAssertEqual(summary.flags, [
+            "Workflow needs attention",
+            "Project setup incomplete",
+            "Needs review before sharing"
+        ])
+        XCTAssertEqual(summary.displayFlags, ["Needs review before sharing"])
+    }
+
+    private func makeProject(
+        id: String,
+        title: String,
+        projectType: WorkspaceProjectType,
+        status: String,
+        safety: WorkspaceSafetyPosture,
+        deliverable: String,
+        hasAgents: Bool,
+        started: String
+    ) -> WorkspaceItem {
+        let frontmatter = [
+            "type": "project",
+            "project": title,
+            "status": status,
+            "started": started,
+            "owner": "Jan",
+            "deliverable": deliverable
+        ].filter { !$0.value.isEmpty }
+
+        return WorkspaceItem(
+            id: id,
+            section: .projects,
+            path: "/tmp/\(id)",
+            readmePath: "/tmp/\(id)/README.md",
+            agentsPath: hasAgents ? "/tmp/\(id)/AGENTS.md" : nil,
+            title: title,
+            summary: "Summary for \(title)",
+            agentsSummary: hasAgents ? "Local rules" : "",
+            frontmatter: frontmatter,
+            googleDriveFolderURL: nil,
+            projectType: projectType,
+            lifecycleStage: status.capitalized,
+            safetyPosture: safety,
+            directFileCount: 1,
+            directFolderCount: 1,
+            markdownFiles: 1,
+            pdfFiles: 0,
+            gdocFiles: 0,
+            csvFiles: 0,
+            xlsxFiles: 0,
+            documents: []
+        )
+    }
+}

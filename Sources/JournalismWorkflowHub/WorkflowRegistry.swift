@@ -2,12 +2,17 @@ import Foundation
 
 struct WorkflowRegistry {
     let workspaceRoot: URL
+    let appProfile: AppProfile
 
     func loadWorkflows(selection: WorkspaceItem?) -> [WorkflowDefinition] {
-        var workflows = builtInWorkflows()
-        workflows.append(contentsOf: loadCustomWorkflows())
-
-        return workflows.sorted {
+        allWorkflows().filter { workflow in
+            switch appProfile {
+            case .standard:
+                return true
+            case .standalone:
+                return workflow.availability == .portable
+            }
+        }.sorted {
             if $0.category != $1.category {
                 return $0.category < $1.category
             }
@@ -15,13 +20,67 @@ struct WorkflowRegistry {
         }
     }
 
-    private func builtInWorkflows() -> [WorkflowDefinition] {
+    func allWorkflows() -> [WorkflowDefinition] {
+        var workflows = portableBuiltInWorkflows()
+        workflows.append(contentsOf: localBuiltInWorkflows())
+        workflows.append(contentsOf: loadCustomWorkflows())
+        return workflows
+    }
+
+    private func portableBuiltInWorkflows() -> [WorkflowDefinition] {
+        [
+            WorkflowDefinition(
+                id: "open-workspace-root",
+                label: "Open workspace root",
+                description: "Reveal the current workspace root in Finder.",
+                category: "Utilities",
+                availability: .portable,
+                runtimeKind: .shell,
+                workingDirectoryTemplate: "{{workspace_root}}",
+                kind: .direct,
+                executableTemplate: "/usr/bin/open",
+                argumentsTemplate: ["{{workspace_root}}"],
+                shellCommandTemplate: nil,
+                parameters: [],
+                selectionRequirement: .none,
+                isWriteAction: false,
+                expectedArtifacts: [],
+                requiredExecutables: ["/usr/bin/open"],
+                requiredPaths: ["{{workspace_root}}"],
+                requiredPythonModules: [],
+                setupHint: "This utility works in both standard and standalone mode.",
+                note: "Useful for checking the sample workspace or the current root on another Mac."
+            ),
+            WorkflowDefinition(
+                id: "open-selected-folder",
+                label: "Open selected folder",
+                description: "Reveal the selected workspace item in Finder.",
+                category: "Utilities",
+                availability: .portable,
+                runtimeKind: .shell,
+                workingDirectoryTemplate: "{{workspace_root}}",
+                kind: .direct,
+                executableTemplate: "/usr/bin/open",
+                argumentsTemplate: ["{{selected_path}}"],
+                shellCommandTemplate: nil,
+                parameters: [],
+                selectionRequirement: .workspaceItem,
+                isWriteAction: false,
+                expectedArtifacts: [],
+                requiredExecutables: ["/usr/bin/open"],
+                requiredPaths: ["{{selected_path}}"],
+                requiredPythonModules: [],
+                setupHint: "Select a workspace item before running this utility.",
+                note: "A portable navigation helper for the standalone pilot."
+            )
+        ]
+    }
+
+    private func localBuiltInWorkflows() -> [WorkflowDefinition] {
         let root = workspaceRoot.path
         let knowledgeOps = "Resources/knowledge_ops/scripts"
-        let articleBrain = "Resources/article_brain"
-        let traces = "Projects/2026/traces/traces_analysis"
-        let voedselcrisis = "Areas/voedselcrisis_2027"
-        let eventScanner = "Projects/event-scanner"
+        let defaultProjectPath = "\(root)/Projects/\(isoYear())/untitled_project"
+        let defaultOwner = nonEmpty(NSFullUserName()) ?? "Workspace owner"
 
         return [
             WorkflowDefinition(
@@ -29,6 +88,8 @@ struct WorkflowRegistry {
                 label: "Scaffold project",
                 description: "Create a new reporting project with README, AGENTS, and docs overview.",
                 category: "Workspace",
+                availability: .optionalLocal,
+                runtimeKind: .pythonScript,
                 workingDirectoryTemplate: root,
                 kind: .direct,
                 executableTemplate: "python3",
@@ -38,6 +99,7 @@ struct WorkflowRegistry {
                     "--title", "{{title}}",
                     "--owner", "{{owner}}",
                     "--status", "{{status}}",
+                    "--project-type", "{{project_type}}",
                     "--started", "{{started}}",
                     "--deliverable", "{{deliverable}}",
                     "--topics", "{{topics}}",
@@ -45,10 +107,11 @@ struct WorkflowRegistry {
                 ],
                 shellCommandTemplate: nil,
                 parameters: [
-                    .init(id: "project_root", label: "Project root", kind: .path, helpText: "Absolute path to the new project folder.", defaultValue: "\(root)/Projects/2026/new_story", required: true),
+                    .init(id: "project_root", label: "Project root", kind: .path, helpText: "Absolute path to the new project folder.", defaultValue: defaultProjectPath, required: true),
                     .init(id: "title", label: "Title", kind: .text, helpText: "Human-facing project title.", defaultValue: "New story", required: true),
-                    .init(id: "owner", label: "Owner", kind: .text, helpText: "Project owner.", defaultValue: "Jan Daalder"),
+                    .init(id: "owner", label: "Owner", kind: .text, helpText: "Project owner.", defaultValue: defaultOwner),
                     .init(id: "status", label: "Status", kind: .choice, helpText: "Project state.", defaultValue: "active", choices: ["active", "scaffold_demo", "published", "paused"]),
+                    .init(id: "project_type", label: "Project type", kind: .choice, helpText: "Project classification written into README frontmatter.", defaultValue: "journalism", choices: ["journalism", "data_journalism", "tooling", "general"]),
                     .init(id: "started", label: "Started", kind: .text, helpText: "Date in YYYY-MM-DD.", defaultValue: isoDate()),
                     .init(id: "deliverable", label: "Deliverable", kind: .text, helpText: "Story or product description.", defaultValue: ""),
                     .init(id: "topics", label: "Topics", kind: .multiline, helpText: "Space or comma separated topic slugs.", defaultValue: "", expandsToMultipleArguments: true),
@@ -61,6 +124,12 @@ struct WorkflowRegistry {
                     "{{project_root}}/AGENTS.md",
                     "{{project_root}}/docs/docs_overview.md"
                 ],
+                requiredExecutables: ["python3"],
+                requiredPaths: [
+                    "Resources/knowledge_ops/scripts/scaffold_project.py"
+                ],
+                requiredPythonModules: [],
+                setupHint: "Install the local Python workflow dependencies and make sure the knowledge-ops scripts are present in the workspace.",
                 note: "Creates a clean starter structure for a new investigation."
             ),
             WorkflowDefinition(
@@ -68,6 +137,8 @@ struct WorkflowRegistry {
                 label: "Refresh knowledge ops",
                 description: "Rebuild queues, project READMEs, publication trackers, dashboards, and the vault note index.",
                 category: "Workspace",
+                availability: .optionalLocal,
+                runtimeKind: .pythonScript,
                 workingDirectoryTemplate: root,
                 kind: .direct,
                 executableTemplate: "python3",
@@ -88,6 +159,12 @@ struct WorkflowRegistry {
                     "Resources/knowledge_ops/index/publication_tracker.csv",
                     "Resources/knowledge_ops/index/publication_index.md"
                 ],
+                requiredExecutables: ["python3"],
+                requiredPaths: [
+                    "Resources/knowledge_ops/scripts/refresh_knowledge_ops.py"
+                ],
+                requiredPythonModules: [],
+                setupHint: "This workflow depends on the knowledge-ops Python environment and scripts being available inside the workspace.",
                 note: "Best used after publication syncs or when project READMEs need a rebuild."
             ),
             WorkflowDefinition(
@@ -95,6 +172,8 @@ struct WorkflowRegistry {
                 label: "Build project README",
                 description: "Refresh one project README from local evidence and cached Google Docs.",
                 category: "Project",
+                availability: .optionalLocal,
+                runtimeKind: .pythonScript,
                 workingDirectoryTemplate: root,
                 kind: .direct,
                 executableTemplate: "python3",
@@ -110,13 +189,93 @@ struct WorkflowRegistry {
                 expectedArtifacts: [
                     "{{selected_readme_path}}"
                 ],
+                requiredExecutables: ["python3"],
+                requiredPaths: [
+                    "Resources/knowledge_ops/scripts/build_project_readme.py",
+                    "{{selected_path}}"
+                ],
+                requiredPythonModules: [],
+                setupHint: "Select a project root and make sure the knowledge-ops README builder script exists in the workspace.",
                 note: "Requires a selected project or dossier folder."
+            ),
+            WorkflowDefinition(
+                id: "refresh-project-google-doc-prep",
+                label: "Refresh project Google Doc prep",
+                description: "Refresh the selected project README, ensure Google Doc cache placeholders exist, and update the global fetch backlog.",
+                category: "Documents",
+                availability: .optionalLocal,
+                runtimeKind: .pythonScript,
+                workingDirectoryTemplate: root,
+                kind: .direct,
+                executableTemplate: "python3",
+                argumentsTemplate: [
+                    "\(knowledgeOps)/refresh_knowledge_ops.py",
+                    "--project-root", "{{selected_path}}",
+                    "--overwrite",
+                    "--skip-publication-tracker",
+                    "--skip-publication-artifacts",
+                    "--skip-publication-metadata",
+                    "--skip-note-index"
+                ],
+                shellCommandTemplate: nil,
+                parameters: [],
+                selectionRequirement: .projectRoot,
+                isWriteAction: true,
+                expectedArtifacts: [
+                    "{{selected_readme_path}}",
+                    "Resources/knowledge_ops/index/gdoc_fetch_queue.csv",
+                    "Resources/knowledge_ops/index/gdoc_fetch_queue.json",
+                    "Resources/knowledge_ops/index/refresh_knowledge_ops_summary.json"
+                ],
+                requiredExecutables: ["python3"],
+                requiredPaths: [
+                    "Resources/knowledge_ops/scripts/refresh_knowledge_ops.py",
+                    "{{selected_path}}"
+                ],
+                requiredPythonModules: [],
+                setupHint: "This prepares local cache placeholders and updates the Google Doc fetch backlog, but it does not fetch Google Docs from the network by itself.",
+                note: "Best used after adding new root `.gdoc` pointers or when cache status looks out of date."
+            ),
+            WorkflowDefinition(
+                id: "build-gdoc-fetch-queue",
+                label: "Build Google Doc fetch queue",
+                description: "Rebuild the backlog of root Google Doc pointers that still need local cache content.",
+                category: "Documents",
+                availability: .optionalLocal,
+                runtimeKind: .pythonScript,
+                workingDirectoryTemplate: root,
+                kind: .direct,
+                executableTemplate: "python3",
+                argumentsTemplate: [
+                    "\(knowledgeOps)/build_gdoc_fetch_queue.py",
+                    "--years", "{{years}}",
+                    "--write-index"
+                ],
+                shellCommandTemplate: nil,
+                parameters: [
+                    .init(id: "years", label: "Years", kind: .multiline, helpText: "Space separated years to include in the fetch backlog.", defaultValue: "2022 2023 2024 2025 2026", required: true, expandsToMultipleArguments: true)
+                ],
+                selectionRequirement: .none,
+                isWriteAction: true,
+                expectedArtifacts: [
+                    "Resources/knowledge_ops/index/gdoc_fetch_queue.csv",
+                    "Resources/knowledge_ops/index/gdoc_fetch_queue.json"
+                ],
+                requiredExecutables: ["python3"],
+                requiredPaths: [
+                    "Resources/knowledge_ops/scripts/build_gdoc_fetch_queue.py"
+                ],
+                requiredPythonModules: [],
+                setupHint: "This workflow needs the knowledge-ops scripts in the workspace. It rebuilds the fetch backlog only; it does not export Google Docs itself.",
+                note: "Useful when you want a current list of uncached or placeholder-only root Google Docs."
             ),
             WorkflowDefinition(
                 id: "build-publication-tracker",
                 label: "Build publication tracker",
                 description: "Rebuild the PDF-to-project publication mapping and dashboards.",
                 category: "Archive",
+                availability: .optionalLocal,
+                runtimeKind: .pythonScript,
                 workingDirectoryTemplate: root,
                 kind: .direct,
                 executableTemplate: "python3",
@@ -132,6 +291,12 @@ struct WorkflowRegistry {
                     "Resources/knowledge_ops/index/project_publication_coverage.csv",
                     "Areas/knowledge_base/dashboards/publication_index.md"
                 ],
+                requiredExecutables: ["python3"],
+                requiredPaths: [
+                    "Resources/knowledge_ops/scripts/build_publication_tracker.py"
+                ],
+                requiredPythonModules: [],
+                setupHint: "This workflow depends on the local knowledge-ops publication scripts being installed in the workspace.",
                 note: "Use this when published PDFs or project links have changed."
             ),
             WorkflowDefinition(
@@ -139,6 +304,8 @@ struct WorkflowRegistry {
                 label: "Article Brain brief",
                 description: "Generate a story briefing from the PDF corpus.",
                 category: "Research",
+                availability: .privateHidden,
+                runtimeKind: .pythonModule,
                 workingDirectoryTemplate: "\(root)/Resources/article_brain",
                 kind: .direct,
                 executableTemplate: "python3",
@@ -153,6 +320,12 @@ struct WorkflowRegistry {
                 selectionRequirement: .none,
                 isWriteAction: false,
                 expectedArtifacts: [],
+                requiredExecutables: ["python3"],
+                requiredPaths: [
+                    "Resources/article_brain"
+                ],
+                requiredPythonModules: ["article_brain"],
+                setupHint: "Make sure the local article-brain package and its Python dependencies are installed inside the workspace environment.",
                 note: "Works from the local article corpus index."
             ),
             WorkflowDefinition(
@@ -160,6 +333,8 @@ struct WorkflowRegistry {
                 label: "Article Brain headlines",
                 description: "Generate corpus-grounded headline options.",
                 category: "Research",
+                availability: .privateHidden,
+                runtimeKind: .pythonModule,
                 workingDirectoryTemplate: "\(root)/Resources/article_brain",
                 kind: .direct,
                 executableTemplate: "python3",
@@ -175,6 +350,12 @@ struct WorkflowRegistry {
                 selectionRequirement: .none,
                 isWriteAction: false,
                 expectedArtifacts: [],
+                requiredExecutables: ["python3"],
+                requiredPaths: [
+                    "Resources/article_brain"
+                ],
+                requiredPythonModules: ["article_brain"],
+                setupHint: "Make sure the local article-brain package and its Python dependencies are installed inside the workspace environment.",
                 note: "Useful for iterative headline exploration."
             ),
             WorkflowDefinition(
@@ -182,6 +363,8 @@ struct WorkflowRegistry {
                 label: "TRACES ask",
                 description: "Ask a natural-language question against the TRACES workspace.",
                 category: "Research",
+                availability: .privateHidden,
+                runtimeKind: .pythonScript,
                 workingDirectoryTemplate: "\(root)/Projects/2026/traces/traces_analysis",
                 kind: .direct,
                 executableTemplate: "python3",
@@ -199,6 +382,12 @@ struct WorkflowRegistry {
                     "Projects/2026/traces/traces_analysis/outputs/tables",
                     "Projects/2026/traces/traces_analysis/outputs/queries"
                 ],
+                requiredExecutables: ["python3"],
+                requiredPaths: [
+                    "Projects/2026/traces/traces_analysis/scripts/ask.py"
+                ],
+                requiredPythonModules: [],
+                setupHint: "Make sure the TRACES analysis project and its Python environment are available in the workspace.",
                 note: "Best for newsroom-style queries over the TRACES data product."
             ),
             WorkflowDefinition(
@@ -206,6 +395,8 @@ struct WorkflowRegistry {
                 label: "TRACES run query",
                 description: "Run a named TRACES query spec.",
                 category: "Research",
+                availability: .privateHidden,
+                runtimeKind: .pythonScript,
                 workingDirectoryTemplate: "\(root)/Projects/2026/traces/traces_analysis",
                 kind: .direct,
                 executableTemplate: "python3",
@@ -224,6 +415,12 @@ struct WorkflowRegistry {
                     "Projects/2026/traces/traces_analysis/outputs/tables",
                     "Projects/2026/traces/traces_analysis/outputs/queries"
                 ],
+                requiredExecutables: ["python3"],
+                requiredPaths: [
+                    "Projects/2026/traces/traces_analysis/scripts/run_query.py"
+                ],
+                requiredPythonModules: [],
+                setupHint: "Make sure the TRACES analysis project and its Python environment are available in the workspace.",
                 note: "Use when you already know the structured query you want."
             ),
             WorkflowDefinition(
@@ -231,6 +428,8 @@ struct WorkflowRegistry {
                 label: "Evidence query",
                 description: "Query the dossier evidence database.",
                 category: "Dossier",
+                availability: .privateHidden,
+                runtimeKind: .pythonScript,
                 workingDirectoryTemplate: "\(root)/Areas/voedselcrisis_2027",
                 kind: .direct,
                 executableTemplate: "python3",
@@ -252,6 +451,12 @@ struct WorkflowRegistry {
                     "Areas/voedselcrisis_2027/data/indices",
                     "Areas/voedselcrisis_2027/analysis"
                 ],
+                requiredExecutables: ["python3"],
+                requiredPaths: [
+                    "Areas/voedselcrisis_2027/scripts/query_evidence.py"
+                ],
+                requiredPythonModules: [],
+                setupHint: "This dossier workflow needs the local dossier scripts and Python environment in place.",
                 note: "Useful for cross-source reporting questions."
             ),
             WorkflowDefinition(
@@ -259,6 +464,8 @@ struct WorkflowRegistry {
                 label: "Event scanner report",
                 description: "Inspect the local event scanner database and generate a report.",
                 category: "Utilities",
+                availability: .privateHidden,
+                runtimeKind: .pythonScript,
                 workingDirectoryTemplate: "\(root)/Projects/event-scanner",
                 kind: .direct,
                 executableTemplate: "python3",
@@ -272,6 +479,13 @@ struct WorkflowRegistry {
                 expectedArtifacts: [
                     "Projects/event-scanner/data/outputs"
                 ],
+                requiredExecutables: ["python3"],
+                requiredPaths: [
+                    "Projects/event-scanner/tools/run_event_scanner.py",
+                    "Projects/event-scanner/data/db/event_scanner.sqlite"
+                ],
+                requiredPythonModules: [],
+                setupHint: "Make sure the event-scanner project and its local database exist before running this report.",
                 note: "Quick status check for the event-scanner tool."
             )
         ]
@@ -296,6 +510,8 @@ struct WorkflowRegistry {
                     label: preset.label,
                     description: preset.description,
                     category: preset.category,
+                    availability: preset.availability ?? .optionalLocal,
+                    runtimeKind: preset.runtimeKind ?? .shell,
                     workingDirectoryTemplate: preset.workingDirectory,
                     kind: .shell,
                     executableTemplate: "/bin/zsh",
@@ -305,6 +521,10 @@ struct WorkflowRegistry {
                     selectionRequirement: preset.selectionRequirement,
                     isWriteAction: preset.isWriteAction,
                     expectedArtifacts: preset.expectedArtifacts,
+                    requiredExecutables: preset.requiredExecutables ?? ["/bin/zsh"],
+                    requiredPaths: preset.requiredPaths ?? [],
+                    requiredPythonModules: preset.requiredPythonModules ?? [],
+                    setupHint: preset.setupHint,
                     note: preset.note
                 )
             })
@@ -331,27 +551,25 @@ struct WorkflowRegistry {
             }
         }
 
-        let context = TokenContext(
-            workspaceRoot: workspaceRoot.path,
-            selectedPath: selection?.path,
-            selectedReadmePath: selection?.readmePath,
-            selectedTitle: selection?.title,
+        let context = Self.makeTokenContext(
+            workspaceRoot: workspaceRoot,
+            selection: selection,
             state: state
         )
 
-        let workingDirectory = substitute(workflow.workingDirectoryTemplate, context: context, shellMode: false)
+        let workingDirectory = Self.substitute(workflow.workingDirectoryTemplate, context: context, shellMode: false)
         let parameterLookup = Dictionary(uniqueKeysWithValues: workflow.parameters.map { ($0.id, $0) })
 
         switch workflow.kind {
         case .direct:
-            let executable = substitute(workflow.executableTemplate, context: context, shellMode: false)
+            let executable = Self.substitute(workflow.executableTemplate, context: context, shellMode: false)
             let arguments = resolvedArguments(
                 workflow.argumentsTemplate,
                 context: context,
                 parameterLookup: parameterLookup
             )
-            let preview = ([executable] + arguments).map(shellEscape).joined(separator: " ")
-            let artifacts = workflow.expectedArtifacts.map { substitute($0, context: context, shellMode: false) }
+            let preview = ([executable] + arguments).map(Self.shellEscape).joined(separator: " ")
+            let artifacts = workflow.expectedArtifacts.map { Self.substitute($0, context: context, shellMode: false) }
             return ResolvedWorkflowCommand(
                 executable: executable,
                 arguments: arguments,
@@ -363,9 +581,9 @@ struct WorkflowRegistry {
             guard let template = workflow.shellCommandTemplate else {
                 throw WorkflowError.invalidConfiguration("Shell workflow is missing a shell command.")
             }
-            let command = substitute(template, context: context, shellMode: true)
-            let preview = "/bin/zsh -lc \(shellEscape(command))"
-            let artifacts = workflow.expectedArtifacts.map { substitute($0, context: context, shellMode: false) }
+            let command = Self.substitute(template, context: context, shellMode: true)
+            let preview = "/bin/zsh -lc \(Self.shellEscape(command))"
+            let artifacts = workflow.expectedArtifacts.map { Self.substitute($0, context: context, shellMode: false) }
             return ResolvedWorkflowCommand(
                 executable: "/bin/zsh",
                 arguments: ["-lc", command],
@@ -376,7 +594,21 @@ struct WorkflowRegistry {
         }
     }
 
-    private func substitute(_ template: String, context: TokenContext, shellMode: Bool) -> String {
+    static func makeTokenContext(
+        workspaceRoot: URL,
+        selection: WorkspaceItem?,
+        state: WorkflowParameterState
+    ) -> TokenContext {
+        TokenContext(
+            workspaceRoot: workspaceRoot.path,
+            selectedPath: selection?.path,
+            selectedReadmePath: selection?.readmePath,
+            selectedTitle: selection?.title,
+            state: state
+        )
+    }
+
+    static func substitute(_ template: String, context: TokenContext, shellMode: Bool) -> String {
         var result = template
         let replacements: [String: String] = [
             "{{workspace_root}}": context.workspaceRoot,
@@ -386,11 +618,11 @@ struct WorkflowRegistry {
         ]
 
         for (token, value) in replacements {
-            result = result.replacingOccurrences(of: token, with: shellMode ? shellEscape(value) : value)
+            result = result.replacingOccurrences(of: token, with: shellMode ? Self.shellEscape(value) : value)
         }
 
         for (key, value) in context.state.textValues {
-            result = result.replacingOccurrences(of: "{{\(key)}}", with: shellMode ? shellEscape(value) : value)
+            result = result.replacingOccurrences(of: "{{\(key)}}", with: shellMode ? Self.shellEscape(value) : value)
         }
         for (key, value) in context.state.booleanValues {
             result = result.replacingOccurrences(of: "{{\(key)}}", with: value ? "true" : "false")
@@ -408,11 +640,11 @@ struct WorkflowRegistry {
         for template in templates {
             guard let token = exactTokenIdentifier(in: template),
                   let spec = parameterLookup[token] else {
-                arguments.append(substitute(template, context: context, shellMode: false))
+                arguments.append(Self.substitute(template, context: context, shellMode: false))
                 continue
             }
 
-            let value = substitute(template, context: context, shellMode: false)
+            let value = Self.substitute(template, context: context, shellMode: false)
             if spec.expandsToMultipleArguments {
                 let pieces = splitList(value)
                 if pieces.isEmpty {
@@ -440,7 +672,7 @@ struct WorkflowRegistry {
             .filter { !$0.isEmpty }
     }
 
-    private func shellEscape(_ string: String) -> String {
+    private static func shellEscape(_ string: String) -> String {
         if string.isEmpty { return "''" }
         let safe = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./-:=,@")
         if string.unicodeScalars.allSatisfy({ safe.contains($0) }) {
@@ -450,8 +682,7 @@ struct WorkflowRegistry {
     }
 
     private func appSupportDirectory() -> URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("JournalismWorkflowHub", isDirectory: true)
+        journalismWorkflowHubSupportDirectory()
     }
 }
 
@@ -472,7 +703,7 @@ enum WorkflowError: LocalizedError {
     }
 }
 
-private struct TokenContext {
+struct TokenContext {
     let workspaceRoot: String
     let selectedPath: String?
     let selectedReadmePath: String?
@@ -487,4 +718,19 @@ private func isoDate() -> String {
     formatter.timeZone = TimeZone(secondsFromGMT: 0)
     formatter.dateFormat = "yyyy-MM-dd"
     return formatter.string(from: .now)
+}
+
+private func isoYear() -> String {
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(secondsFromGMT: 0)
+    formatter.dateFormat = "yyyy"
+    return formatter.string(from: .now)
+}
+
+private func nonEmpty(_ value: String?) -> String? {
+    guard let value else { return nil }
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
 }
