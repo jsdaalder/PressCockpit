@@ -24,7 +24,8 @@ final class WorkflowPreflightEvaluatorTests: XCTestCase {
             fileExists: { _ in false },
             directoryExists: { path in path == "/tmp/workspace" },
             executableAvailable: { _ in true },
-            pythonModuleAvailable: { _, _, _ in true }
+            pythonModuleAvailable: { _, _, _ in true },
+            readTextFile: { _ in nil }
         )
 
         let report = WorkflowPreflightEvaluator.evaluate(
@@ -50,7 +51,8 @@ final class WorkflowPreflightEvaluatorTests: XCTestCase {
             fileExists: { _ in true },
             directoryExists: { _ in true },
             executableAvailable: { _ in true },
-            pythonModuleAvailable: { _, _, _ in false }
+            pythonModuleAvailable: { _, _, _ in false },
+            readTextFile: { _ in nil }
         )
 
         let report = WorkflowPreflightEvaluator.evaluate(
@@ -75,7 +77,8 @@ final class WorkflowPreflightEvaluatorTests: XCTestCase {
             fileExists: { path in path == "/tmp/workspace/Resources/tool.py" },
             directoryExists: { path in path == "/tmp/workspace" },
             executableAvailable: { executable in executable == "python3" },
-            pythonModuleAvailable: { _, _, _ in true }
+            pythonModuleAvailable: { _, _, _ in true },
+            readTextFile: { _ in nil }
         )
 
         let report = WorkflowPreflightEvaluator.evaluate(
@@ -90,7 +93,41 @@ final class WorkflowPreflightEvaluatorTests: XCTestCase {
         XCTAssertTrue(report.isRunnable)
     }
 
+    func testOutdatedScaffoldScriptBlocksWorkflowBeforeRun() {
+        let workflow = makeWorkflow(
+            id: "scaffold-project",
+            requiredPaths: ["{{workspace_root}}/Resources/knowledge_ops/scripts/scaffold_project.py"]
+        )
+
+        let environment = WorkflowRuntimeEnvironment(
+            fileExists: { path in path == "/tmp/workspace/Resources/knowledge_ops/scripts/scaffold_project.py" },
+            directoryExists: { _ in true },
+            executableAvailable: { _ in true },
+            pythonModuleAvailable: { _, _, _ in true },
+            readTextFile: { _ in
+                """
+                parser.add_argument("--project-type")
+                parser.add_argument("--draft")
+                """
+            }
+        )
+
+        let report = WorkflowPreflightEvaluator.evaluate(
+            workflow: workflow,
+            workspaceRoot: URL(fileURLWithPath: "/tmp/workspace"),
+            selection: nil,
+            state: WorkflowParameterState(),
+            environment: environment
+        )
+
+        XCTAssertEqual(report.status, .invalidConfiguration)
+        XCTAssertEqual(report.summary, "The bundled scaffold script is outdated.")
+        XCTAssertEqual(report.missingItems, ["--section-answer-1", "--section-answer-2", "--section-answer-3"])
+        XCTAssertFalse(report.isRunnable)
+    }
+
     private func makeWorkflow(
+        id: String = "demo",
         runtimeKind: WorkflowRuntimeKind = .pythonScript,
         selectionRequirement: WorkflowSelectionRequirement = .none,
         requiredExecutables: [String] = ["python3"],
@@ -98,7 +135,7 @@ final class WorkflowPreflightEvaluatorTests: XCTestCase {
         requiredPythonModules: [String] = []
     ) -> WorkflowDefinition {
         WorkflowDefinition(
-            id: "demo",
+            id: id,
             label: "Demo workflow",
             description: "Test workflow",
             category: "Tests",
@@ -127,6 +164,7 @@ private extension WorkflowRuntimeEnvironment {
         fileExists: { _ in true },
         directoryExists: { _ in true },
         executableAvailable: { _ in true },
-        pythonModuleAvailable: { _, _, _ in true }
+        pythonModuleAvailable: { _, _, _ in true },
+        readTextFile: { _ in nil }
     )
 }

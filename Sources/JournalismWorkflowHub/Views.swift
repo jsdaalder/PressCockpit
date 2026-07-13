@@ -14,6 +14,13 @@ struct SidebarView: View {
                 }
                 .buttonStyle(.plain)
 
+                Button {
+                    store.select(.capture)
+                } label: {
+                    Label("Capture", systemImage: "tray.and.arrow.down")
+                }
+                .buttonStyle(.plain)
+
                 if store.appProfile.showsPlanCenter {
                     Button {
                         store.select(.planCenter)
@@ -138,9 +145,8 @@ struct DetailView: View {
                     .textSelection(.enabled)
             }
             Spacer()
-            HStack(spacing: 12) {
+            if showsHeaderActionMenu {
                 primaryActionMenu
-                statusChip
             }
         }
     }
@@ -150,6 +156,8 @@ struct DetailView: View {
         switch store.selection {
         case .overview:
             OverviewView()
+        case .capture:
+            CaptureView()
         case .planCenter:
             PlanningCenterView()
         case .publication:
@@ -179,6 +187,8 @@ struct DetailView: View {
         switch store.selection {
         case .overview:
             return "Overview"
+        case .capture:
+            return "Capture"
         case .planCenter:
             return "Plan center"
         case .publication:
@@ -198,6 +208,8 @@ struct DetailView: View {
             return store.isStandaloneMode
                 ? "Standalone audit view over a demo or external workspace."
                 : "Current reporting work, next actions, and operational follow-up."
+        case .capture:
+            return "A dedicated intake surface for unassigned reporting material. Add files, folders, or a quick note now; review and project assignment come next."
         case .planCenter:
             return "Roadmap, backlog, architecture notes, and automation ideas."
         case .publication:
@@ -209,17 +221,6 @@ struct DetailView: View {
         case .run(let id):
             return store.runs.first(where: { $0.id == id })?.commandPreview ?? ""
         }
-    }
-
-    @ViewBuilder
-    private var statusChip: some View {
-        let text = store.statusMessage
-        Text(text)
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(AppPalette.card.opacity(0.85), in: Capsule())
-            .foregroundStyle(AppPalette.subtle)
     }
 
     @ViewBuilder
@@ -262,6 +263,344 @@ struct DetailView: View {
             }
         }
     }
+
+    private var showsHeaderActionMenu: Bool {
+        switch store.selection {
+        case .overview, .capture:
+            return false
+        default:
+            return true
+        }
+    }
+}
+
+struct CaptureView: View {
+    @EnvironmentObject private var store: AppStore
+    @State private var quickNoteText: String = ""
+    @State private var isDropTargeted: Bool = false
+    @State private var selectedRecordID: String?
+    @State private var reviewNoteText: String = ""
+    @State private var selectedProjectPath: String = ""
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 18) {
+            VStack(alignment: .leading, spacing: 18) {
+                captureIntakeSection
+                captureQueueSection
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 18) {
+                captureReviewSection
+                assignedHistorySection
+                quickNoteSection
+                captureStorageSection
+            }
+            .frame(width: 300, alignment: .leading)
+        }
+        .frame(maxWidth: 1080, alignment: .leading)
+        .onAppear(perform: syncSelectionWithQueue)
+        .onChange(of: store.captureRecords) { _, _ in
+            syncSelectionWithQueue()
+        }
+        .onChange(of: selectedRecordID) { _, _ in
+            syncReviewStateWithSelection()
+        }
+    }
+
+    private var captureIntakeSection: some View {
+        SectionCard(title: "Add material") {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Drop files or one folder here, or use the picker buttons below. New material stays unassigned until you review it.")
+                    .foregroundStyle(AppPalette.subtle)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Label(
+                        isDropTargeted ? "Release to add this material to Capture" : "Drag files or a folder here",
+                        systemImage: isDropTargeted ? "arrow.down.circle.fill" : "tray.and.arrow.down"
+                    )
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(AppPalette.title)
+
+                    Text("Works well for PDFs, Markdown, HTML, JSON, CSV, XLSX, text files, interview transcripts, and folders.")
+                        .font(.caption)
+                        .foregroundStyle(AppPalette.subtle)
+                }
+                .frame(maxWidth: .infinity, minHeight: 120, alignment: .leading)
+                .padding(18)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(AppPalette.card.opacity(isDropTargeted ? 1 : 0.92))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(
+                            isDropTargeted ? AppPalette.title : AppPalette.border,
+                            style: StrokeStyle(lineWidth: isDropTargeted ? 1.5 : 1, dash: [8, 6])
+                        )
+                )
+                .dropDestination(for: URL.self) { items, _ in
+                    Task { await store.importCaptureItems(from: items) }
+                    return !items.isEmpty
+                } isTargeted: { isTargeted in
+                    isDropTargeted = isTargeted
+                }
+
+                HStack(spacing: 10) {
+                    Button("Add files") {
+                        store.addCaptureFiles()
+                    }
+                    Button("Add folder") {
+                        store.addCaptureFolder()
+                    }
+                }
+
+                Text("Queued items will appear below with their current state and source path.")
+                    .font(.caption)
+                    .foregroundStyle(AppPalette.subtle)
+            }
+        }
+    }
+
+    private var captureQueueSection: some View {
+        SectionCard(title: "Unassigned queue") {
+            if store.captureQueueRecords.isEmpty {
+                EmptyStateView(
+                    title: "Nothing waiting yet",
+                    message: "Add a file, folder, or quick note. New items will stay here until they are reviewed and assigned."
+                )
+                .frame(minHeight: 160)
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Newest items first. Failed imports stay visible here so you can see what happened.")
+                        .font(.caption)
+                        .foregroundStyle(AppPalette.subtle)
+
+                    ForEach(store.captureQueueRecords) { record in
+                        Button {
+                            selectedRecordID = record.id
+                        } label: {
+                            CaptureRecordRow(
+                                record: record,
+                                isSelected: selectedCaptureRecord?.id == record.id
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private var captureReviewSection: some View {
+        SectionCard(title: "Review and assign") {
+            if let selectedCaptureRecord {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(selectedCaptureRecord.displayTitle)
+                        .font(.headline)
+                        .foregroundStyle(AppPalette.title)
+                        .textSelection(.enabled)
+
+                    Text("Check the source, add a short note if useful, then file this item into one project.")
+                        .foregroundStyle(AppPalette.subtle)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        reviewMetaRow(label: "State", value: selectedCaptureRecord.state.label)
+                        reviewMetaRow(label: "Type", value: selectedCaptureRecord.typeCue)
+                        reviewMetaRow(label: "Captured", value: selectedCaptureRecord.capturedAtLabel)
+                        reviewMetaRow(label: "Source", value: selectedCaptureRecord.sourceLabel)
+                        if let importedStoragePath = selectedCaptureRecord.importedStoragePath, !importedStoragePath.isEmpty {
+                            reviewMetaRow(label: "Stored copy", value: importedStoragePath)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Why this matters")
+                            .font(.subheadline.weight(.semibold))
+
+                        TextEditor(text: $reviewNoteText)
+                            .font(.body)
+                            .frame(minHeight: 84)
+                            .scrollContentBackground(.hidden)
+                            .padding(6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(AppPalette.card.opacity(0.9))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(AppPalette.border)
+                            )
+
+                        Button("Save note") {
+                            store.setCaptureUserNote(reviewNoteText, for: selectedCaptureRecord.id)
+                        }
+                        .disabled(normalizedReviewNote == (selectedCaptureRecord.userNote ?? ""))
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Assign to project")
+                            .font(.subheadline.weight(.semibold))
+
+                        Picker("Project", selection: $selectedProjectPath) {
+                            Text("Choose project").tag("")
+                            ForEach(store.captureAssignableProjects, id: \.path) { project in
+                                Text(project.title).tag(project.path)
+                            }
+                        }
+                        .labelsHidden()
+
+                        Button("Assign to project") {
+                            guard let project = store.captureAssignableProjects.first(where: { $0.path == selectedProjectPath }) else { return }
+                            Task { await store.assignCaptureRecord(selectedCaptureRecord.id, to: project, note: reviewNoteText) }
+                        }
+                        .disabled(!canAssignSelectedRecord)
+                    }
+                }
+            } else {
+                EmptyStateView(
+                    title: "Select something to review",
+                    message: "Pick an item from the queue to inspect its source, add context, and assign it into one project's docs folder."
+                )
+                .frame(minHeight: 180)
+            }
+        }
+    }
+
+    private var assignedHistorySection: some View {
+        SectionCard(title: "Recently assigned") {
+            if store.captureAssignedRecords.isEmpty {
+                Text("Assigned items will show up here so you can confirm where they went.")
+                    .foregroundStyle(AppPalette.subtle)
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(store.captureAssignedRecords.prefix(5))) { record in
+                        CaptureAssignedRecordRow(record: record)
+                    }
+                }
+            }
+        }
+    }
+
+    private var quickNoteSection: some View {
+        SectionCard(title: "Quick note") {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Use this for a short thought or reminder. It saves as a Markdown capture item and stays secondary to file intake.")
+                    .foregroundStyle(AppPalette.subtle)
+
+                ZStack(alignment: .topLeading) {
+                    if quickNoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text("Jot down a short thought...")
+                            .foregroundStyle(AppPalette.subtle)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 8)
+                    }
+
+                    TextEditor(text: $quickNoteText)
+                        .font(.body)
+                        .frame(minHeight: 110)
+                        .scrollContentBackground(.hidden)
+                        .padding(2)
+                }
+                .padding(8)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(AppPalette.card.opacity(0.9))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(AppPalette.border)
+                )
+
+                Button("Save note to Capture") {
+                    let note = quickNoteText
+                    quickNoteText = ""
+                    Task { await store.saveQuickCaptureNote(note) }
+                }
+                .disabled(quickNoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+    }
+
+    private var captureStorageSection: some View {
+        SectionCard(title: "Capture storage") {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Imported items are copied into app support storage first so they remain separate from project docs until you file them.")
+                    .foregroundStyle(AppPalette.subtle)
+
+                Text(store.captureStorageDirectory.path)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(AppPalette.subtle)
+                    .textSelection(.enabled)
+            }
+        }
+    }
+
+    private var selectedCaptureRecord: CaptureRecord? {
+        let records = store.captureQueueRecords
+        if let selectedRecordID, let record = records.first(where: { $0.id == selectedRecordID }) {
+            return record
+        }
+        return records.first
+    }
+
+    private var normalizedReviewNote: String {
+        reviewNoteText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var canAssignSelectedRecord: Bool {
+        guard let selectedCaptureRecord else { return false }
+        guard selectedCaptureRecord.state == .needsReview else { return false }
+        guard selectedCaptureRecord.importedStoragePath != nil else { return false }
+        return !selectedProjectPath.isEmpty
+    }
+
+    private func syncSelectionWithQueue() {
+        let queue = store.captureQueueRecords
+        if queue.isEmpty {
+            selectedRecordID = nil
+            reviewNoteText = ""
+            selectedProjectPath = ""
+            return
+        }
+
+        if let selectedRecordID, queue.contains(where: { $0.id == selectedRecordID }) {
+            syncReviewStateWithSelection()
+            return
+        }
+
+        selectedRecordID = queue.first?.id
+        syncReviewStateWithSelection()
+    }
+
+    private func syncReviewStateWithSelection() {
+        guard let selectedCaptureRecord else {
+            reviewNoteText = ""
+            selectedProjectPath = ""
+            return
+        }
+
+        reviewNoteText = selectedCaptureRecord.userNote ?? ""
+        if let assignedProjectPath = selectedCaptureRecord.assignedProjectPath,
+           store.captureAssignableProjects.contains(where: { $0.path == assignedProjectPath }) {
+            selectedProjectPath = assignedProjectPath
+        } else if selectedProjectPath.isEmpty || !store.captureAssignableProjects.contains(where: { $0.path == selectedProjectPath }) {
+            selectedProjectPath = ""
+        }
+    }
+
+    @ViewBuilder
+    private func reviewMetaRow(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppPalette.subtle)
+            Text(value)
+                .font(.caption)
+                .foregroundStyle(AppPalette.title)
+                .textSelection(.enabled)
+        }
+    }
 }
 
 struct OverviewView: View {
@@ -274,16 +613,74 @@ struct OverviewView: View {
             if store.isStandaloneMode {
                 standaloneAuditSection
             }
-            overviewPrimaryBand
+            activeProjectsSection
             lowerSections
         }
         .frame(maxWidth: 900, alignment: .leading)
     }
 
     private var overviewHeader: some View {
-        Text("Active reporting projects first, then the next actions and follow-up work that should not surprise you later.")
-            .font(.body)
-            .foregroundStyle(AppPalette.subtle)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 14) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Active reporting projects first, then the next actions and follow-up work that should not surprise you later.")
+                        .font(.body)
+                        .foregroundStyle(AppPalette.subtle)
+
+                    overviewActionMenu
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Active reporting projects first, then the next actions and follow-up work that should not surprise you later.")
+                    .font(.body)
+                    .foregroundStyle(AppPalette.subtle)
+
+                overviewActionMenu
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var overviewActionMenu: some View {
+        if store.isStandaloneMode {
+            Menu {
+                Button("Open workspace root") {
+                    store.select(.workflow("open-workspace-root"))
+                }
+
+                Button("Inspect sample project") {
+                    if let firstItem = store.firstWorkspaceItem {
+                        store.select(.workspace(firstItem.id))
+                    }
+                }
+                .disabled(store.firstWorkspaceItem == nil)
+            } label: {
+                HeaderActionMenuLabel(
+                    title: "Audit actions",
+                    systemImage: "plus",
+                    prominence: .secondary
+                )
+            }
+        } else {
+            Menu {
+                Button("New project") {
+                    store.select(.workflow("scaffold-project"))
+                }
+
+                Button("Brainstorm from archive") {
+                    store.select(.workflow("article-brain-brief"))
+                }
+                .disabled(!store.workflows.contains(where: { $0.id == "article-brain-brief" }))
+            } label: {
+                HeaderActionMenuLabel(
+                    title: "New work",
+                    systemImage: "plus",
+                    prominence: .primary
+                )
+            }
+        }
     }
 
     private var standaloneAuditSection: some View {
@@ -301,84 +698,6 @@ struct OverviewView: View {
                         .font(.caption)
                         .foregroundStyle(AppPalette.title)
                 }
-            }
-        }
-    }
-
-    private var refreshWorkspaceButton: some View {
-        Button {
-            store.reloadAll()
-        } label: {
-            Label("Refresh workspace", systemImage: "arrow.clockwise")
-        }
-        .help("Rescan the workspace, reload plan docs, refresh workflows, and reload saved runs.")
-    }
-
-    @ViewBuilder
-    private var overviewPrimaryBand: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 18) {
-                overviewWorkbenchSection
-                    .frame(minWidth: 250, idealWidth: 272, maxWidth: 292, alignment: .topLeading)
-
-                activeProjectsSection
-                    .frame(minWidth: 0, idealWidth: 530, maxWidth: 560, alignment: .topLeading)
-
-                Spacer(minLength: 0)
-            }
-
-            VStack(alignment: .leading, spacing: 18) {
-                overviewWorkbenchSection
-                activeProjectsSection
-            }
-        }
-    }
-
-    private var overviewWorkbenchSection: some View {
-        SectionCard(title: store.isStandaloneMode ? "Audit actions" : "New work") {
-            VStack(alignment: .leading, spacing: 14) {
-                Text(
-                    store.isStandaloneMode
-                        ? "Keep the audit obvious: open the sample root or jump into the first project without digging through the sidebar."
-                        : "Keep intake obvious: starting a project should read as the clearest action on the home screen."
-                )
-                .font(.subheadline)
-                .foregroundStyle(AppPalette.subtle)
-
-                Menu {
-                    if store.isStandaloneMode {
-                        Button("Open workspace root") {
-                            store.select(.workflow("open-workspace-root"))
-                        }
-
-                        Button("Inspect sample project") {
-                            if let firstItem = store.firstWorkspaceItem {
-                                store.select(.workspace(firstItem.id))
-                            }
-                        }
-                        .disabled(store.firstWorkspaceItem == nil)
-                    } else {
-                        Button("New project") {
-                            store.select(.workflow("scaffold-project"))
-                        }
-
-                        Button("Brainstorm from archive") {
-                            store.select(.workflow("article-brain-brief"))
-                        }
-                        .disabled(!store.workflows.contains(where: { $0.id == "article-brain-brief" }))
-                    }
-                } label: {
-                    OverviewPrimaryMenuLabel(
-                        title: store.isStandaloneMode ? "Open audit actions" : "Start new work",
-                        detail: store.isStandaloneMode
-                            ? "Inspect the sample workspace from a single clear entry point."
-                            : "Create a fresh project with the guided scaffold or start from archive research.",
-                        systemImage: store.isStandaloneMode ? "compass.drawing" : "plus.circle.fill"
-                    )
-                }
-
-                refreshWorkspaceButton
-                    .controlSize(.small)
             }
         }
     }
@@ -423,9 +742,9 @@ struct OverviewView: View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .top, spacing: 18) {
                 suggestedActionsSection
-                    .frame(minWidth: 236, idealWidth: 266, maxWidth: 292, alignment: .topLeading)
+                    .frame(minWidth: 220, idealWidth: 238, maxWidth: 252, alignment: .topLeading)
                 operationsSection
-                    .frame(minWidth: 236, idealWidth: 266, maxWidth: 292, alignment: .topLeading)
+                    .frame(minWidth: 220, idealWidth: 238, maxWidth: 252, alignment: .topLeading)
                 Spacer(minLength: 0)
             }
 
@@ -437,40 +756,60 @@ struct OverviewView: View {
     }
 
     private var suggestedActionsSection: some View {
-        SectionCard(title: "Editorial next actions") {
+        SectionCard(title: "Reporting next") {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Project-facing follow-up that should change reporting work now, not background maintenance.")
+                Text("Project-facing follow-up that changes the reporting itself, not background maintenance.")
                     .font(.subheadline)
                     .foregroundStyle(AppPalette.subtle)
 
-                ForEach(store.overviewActions) { action in
-                    SuggestedActionRow(
-                        title: action.title,
-                        summary: action.body,
-                        buttonTitle: action.buttonTitle,
-                        count: action.count,
-                        action: { store.openOverviewTarget(action.target) }
-                    )
+                if visibleOverviewActions.isEmpty {
+                    Text("No reporting follow-up is waiting right now.")
+                        .font(.body)
+                        .foregroundStyle(AppPalette.subtle)
+                } else {
+                    ForEach(visibleOverviewActions) { action in
+                        SuggestedActionRow(
+                            title: action.title,
+                            summary: action.body,
+                            buttonTitle: action.buttonTitle,
+                            count: action.count,
+                            action: { store.openOverviewTarget(action.target) }
+                        )
+                    }
                 }
             }
         }
     }
 
     private var operationsSection: some View {
-        SectionCard(title: "Operations follow-up") {
+        SectionCard(title: "Workspace maintenance") {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Workflow failures, publication hygiene, and metadata cleanup stay visible here without pretending to be editorial next steps.")
+                Text("Workflow failures, publication hygiene, and admin cleanup stay visible here without pretending to be reporting next steps.")
                     .font(.subheadline)
                     .foregroundStyle(AppPalette.subtle)
 
-                ForEach(store.overviewOperations) { operation in
-                    OverviewOperationRow(
-                        operation: operation,
-                        action: { store.openOverviewTarget(operation.target) }
-                    )
+                if visibleOverviewOperations.isEmpty {
+                    Text("No maintenance follow-up is waiting right now.")
+                        .font(.body)
+                        .foregroundStyle(AppPalette.subtle)
+                } else {
+                    ForEach(visibleOverviewOperations) { operation in
+                        OverviewOperationRow(
+                            operation: operation,
+                            action: { store.openOverviewTarget(operation.target) }
+                        )
+                    }
                 }
             }
         }
+    }
+
+    private var visibleOverviewActions: [OverviewActionSummary] {
+        store.overviewActions.filter { $0.count > 0 }
+    }
+
+    private var visibleOverviewOperations: [OverviewOperationSummary] {
+        store.overviewOperations.filter { $0.count > 0 }
     }
 
     private func toggleExpanded(for id: String) {
@@ -502,17 +841,9 @@ struct WorkspaceDetailView: View {
                             Button("Open folder") {
                                 store.openFolder(for: item)
                             }
-                            if draft.cachePath != nil {
-                                Button("Open local cache") {
-                                    store.openDocumentCache(draft)
-                                }
-                            }
-                            if let googleDriveURL = item.googleDriveURL {
-                                Button("Open Drive folder") {
-                                    store.openURL(googleDriveURL)
-                                }
-                            }
                         }
+
+                        auxiliaryProjectLinks(draft: draft)
                     } else {
                         Text("No canonical draft target is clear yet. The project folder is still available below.")
                             .font(.subheadline)
@@ -525,6 +856,11 @@ struct WorkspaceDetailView: View {
                             if let googleDriveURL = item.googleDriveURL {
                                 Button("Open Drive folder") {
                                     store.openURL(googleDriveURL)
+                                }
+                            }
+                            if store.shouldOfferGoogleDraftPromotion(for: item) {
+                                Button("Promote Google draft…") {
+                                    store.promoteGoogleDraft(for: item)
                                 }
                             }
                         }
@@ -677,6 +1013,30 @@ struct WorkspaceDetailView: View {
         let allMatches = store.snapshot.publication.storiesByYear.values.flatMap { $0 }
         let selected = allMatches.filter { $0.projectPath == item.path }
         return selected.isEmpty ? nil : selected.sorted { $0.pdfTitle < $1.pdfTitle }
+    }
+
+    @ViewBuilder
+    private func auxiliaryProjectLinks(draft: WorkspaceDocument) -> some View {
+        if draft.cachePath != nil || item.googleDriveURL != nil || store.shouldOfferGoogleDraftPromotion(for: item) {
+            HStack {
+                if draft.cachePath != nil {
+                    Button("Open cached copy") {
+                        store.openDocumentCache(draft)
+                    }
+                }
+                if let googleDriveURL = item.googleDriveURL {
+                    Button("Open Drive folder") {
+                        store.openURL(googleDriveURL)
+                    }
+                }
+                if store.shouldOfferGoogleDraftPromotion(for: item) {
+                    Button("Promote Google draft…") {
+                        store.promoteGoogleDraft(for: item)
+                    }
+                }
+            }
+            .buttonStyle(.borderless)
+        }
     }
 }
 
@@ -943,35 +1303,60 @@ private struct ScaffoldPostCreateSheet: View {
                 ("Project", state.projectTitle),
                 ("Folder", state.projectRoot),
                 ("Docs folder", state.docsURL.path),
+                ("Draft", draftStatusText),
                 ("Imported", state.importedItemCount == 0 ? "Nothing added yet" : "\(state.importedItemCount) item(s)")
             ])
 
             HStack {
+                Button(draftButtonTitle) {
+                    store.createScaffoldDraft()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(store.isFinishingScaffoldPostCreate)
+
                 Button(primaryButtonTitle) {
                     store.addDocumentsToScaffoldProject()
                 }
-                .buttonStyle(.borderedProminent)
+                .disabled(store.isFinishingScaffoldPostCreate)
 
                 Button("Show in app") {
                     store.openScaffoldPostCreateProject()
                 }
+                .disabled(store.isFinishingScaffoldPostCreate)
 
                 Button("Open README") {
                     store.openScaffoldPostCreateReadme()
                 }
+                .disabled(store.isFinishingScaffoldPostCreate)
 
                 if state.importedItemCount > 0 {
                     Button("Open docs folder") {
                         store.openScaffoldPostCreateDocsFolder()
                     }
+                    .disabled(store.isFinishingScaffoldPostCreate)
                 }
+            }
+
+            if store.isFinishingScaffoldPostCreate {
+                ProgressView("Summarizing imported docs into `docs/docs_overview.md`…")
+                    .controlSize(.small)
             }
 
             HStack {
                 Spacer()
-                Button("Done") {
-                    store.dismissScaffoldPostCreate()
+                if state.importedItemCount > 0 {
+                    Button("Close without summary") {
+                        store.dismissScaffoldPostCreate()
+                    }
+                    .disabled(store.isFinishingScaffoldPostCreate)
                 }
+
+                Button(doneButtonTitle) {
+                    Task {
+                        await store.completeScaffoldPostCreate()
+                    }
+                }
+                .disabled(store.isFinishingScaffoldPostCreate)
             }
         }
         .padding(24)
@@ -995,6 +1380,24 @@ private struct ScaffoldPostCreateSheet: View {
         return "Add documents"
     }
 
+    private var draftButtonTitle: String {
+        if store.scaffoldPostCreateDraftDocument() != nil {
+            return "Open draft"
+        }
+        return store.documentMode == .googleDocs ? "Create local draft" : "Create draft"
+    }
+
+    private var doneButtonTitle: String {
+        state.importedItemCount > 0 ? "Summarize and close" : "Done"
+    }
+
+    private var draftStatusText: String {
+        if let draft = store.scaffoldPostCreateDraftDocument() {
+            return draft.title
+        }
+        return store.documentMode == .googleDocs ? "No draft yet. Local `.docx` baseline recommended first." : "No draft yet"
+    }
+
     private var titleText: String {
         switch state.mode {
         case .created:
@@ -1005,24 +1408,28 @@ private struct ScaffoldPostCreateSheet: View {
     }
 
     private var summaryText: String {
+        let draftLine = store.documentMode == .googleDocs
+            ? "Create a local draft now, then promote a Google Doc later if that becomes the canonical version."
+            : "Create a local draft now so the project starts with a real editable draft target."
+
         if state.sourceMaterialChoice == .now {
             switch state.mode {
             case .created:
                 return state.importedItemCount == 0
-                    ? "The project is ready. Add source material now and the app will copy it into this project's docs folder."
-                    : "The project is ready and source material has started landing in docs. You can add more, show it in the app, or jump into the README."
+                    ? "The project is ready. \(draftLine) Add source material now and the app will copy it into this project's docs folder."
+                    : "The project is ready and source material has started landing in docs. You can add more, create or open the draft, show it in the app, or jump into the README."
             case .reused:
                 return state.importedItemCount == 0
-                    ? "The existing project is ready. Add source material now and the app will copy it into this project's docs folder."
-                    : "The existing project is active and source material has started landing in docs. You can add more, show it in the app, or jump into the README."
+                    ? "The existing project is ready. \(draftLine) Add source material now and the app will copy it into this project's docs folder."
+                    : "The existing project is active and source material has started landing in docs. You can add more, create or open the draft, show it in the app, or jump into the README."
             }
         }
 
         switch state.mode {
         case .created:
-            return "The project is ready. You can show it in the app now, inspect the README, or add source material whenever you are ready."
+            return "The project is ready. \(draftLine) You can also show it in the app now, inspect the README, or add source material whenever you are ready."
         case .reused:
-            return "The existing project is ready. You can show it in the app now, inspect the README, or add source material whenever you are ready."
+            return "The existing project is ready. \(draftLine) You can also show it in the app now, inspect the README, or add source material whenever you are ready."
         }
     }
 }
@@ -1562,13 +1969,17 @@ struct OverviewProjectRow: View {
     }
 
     private var collapsedShortcuts: [OverviewProjectShortcut] {
-        var shortcuts = summary.item.overviewShortcutDocuments.map { document in
-            OverviewProjectShortcut(
-                id: document.id,
-                label: document.role == .draft ? "Draft" : document.role.label,
-                iconName: document.overviewIconName,
-                helpText: document.title,
-                action: { store.openDocument(document) }
+        var shortcuts: [OverviewProjectShortcut] = []
+
+        if summary.item.canonicalDraftDocument != nil {
+            shortcuts.append(
+                OverviewProjectShortcut(
+                    id: "\(summary.id)-draft",
+                    label: "Draft",
+                    iconName: "doc.text",
+                    helpText: "Open the canonical draft target",
+                    action: { store.openPreferredDraft(for: summary.item) }
+                )
             )
         }
 
@@ -1581,18 +1992,6 @@ struct OverviewProjectRow: View {
                 action: { store.openFolder(for: summary.item) }
             )
         )
-
-        if let googleDriveURL = summary.item.googleDriveURL, shortcuts.count < 3 {
-            shortcuts.append(
-                OverviewProjectShortcut(
-                    id: "\(summary.id)-drive",
-                    label: "Drive",
-                    iconName: "folder",
-                    helpText: "Open Drive folder",
-                    action: { store.openURL(googleDriveURL) }
-                )
-            )
-        }
 
         return shortcuts
     }
@@ -1643,6 +2042,96 @@ struct EmptyStateView: View {
                 .foregroundStyle(AppPalette.subtle)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+struct CaptureRecordRow: View {
+    let record: CaptureRecord
+    var isSelected: Bool = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .top, spacing: 8) {
+                    Text(record.displayTitle)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(AppPalette.title)
+                        .textSelection(.enabled)
+
+                    Spacer(minLength: 8)
+
+                    Text(record.capturedAtLabel)
+                        .font(.caption)
+                        .foregroundStyle(AppPalette.subtle)
+                        .textSelection(.enabled)
+                }
+
+                Text(record.state == .failed ? (record.failureDescription ?? record.sourceLabel) : record.sourceLabel)
+                    .font(.caption)
+                    .foregroundStyle(record.state == .failed ? Color.red.opacity(0.9) : AppPalette.subtle)
+                    .textSelection(.enabled)
+                    .lineLimit(3)
+
+                HStack(spacing: 8) {
+                    WorkspaceBadge(text: record.typeCue)
+                    WorkspaceBadge(text: record.state.label)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(12)
+        .background(
+            (isSelected ? AppPalette.card.opacity(0.98) : AppPalette.card.opacity(0.65)),
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(
+                    record.state == .failed
+                        ? Color.red.opacity(0.35)
+                        : (isSelected ? AppPalette.title : AppPalette.border),
+                    lineWidth: isSelected ? 1.5 : 1
+                )
+        )
+    }
+}
+
+struct CaptureAssignedRecordRow: View {
+    let record: CaptureRecord
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(record.displayTitle)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(AppPalette.title)
+                .textSelection(.enabled)
+
+            if let assignedProjectPath = record.assignedProjectPath {
+                Text(assignedProjectTitle(from: assignedProjectPath))
+                    .font(.caption)
+                    .foregroundStyle(AppPalette.subtle)
+                    .textSelection(.enabled)
+            }
+
+            HStack(spacing: 8) {
+                WorkspaceBadge(text: record.typeCue)
+                WorkspaceBadge(text: record.state.label)
+            }
+
+            if let assignedDestinationPath = record.assignedDestinationPath, !assignedDestinationPath.isEmpty {
+                Text(assignedDestinationPath)
+                    .font(.caption2)
+                    .foregroundStyle(AppPalette.subtle)
+                    .textSelection(.enabled)
+                    .lineLimit(2)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func assignedProjectTitle(from path: String) -> String {
+        URL(fileURLWithPath: path).lastPathComponent
     }
 }
 
@@ -1741,12 +2230,17 @@ private struct HeaderActionMenuLabel: View {
 
     var body: some View {
         Label(title, systemImage: systemImage)
-            .font(.callout.weight(.semibold))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 9)
+            .font(prominence == .primary ? .body.weight(.semibold) : .callout.weight(.semibold))
+            .padding(.horizontal, prominence == .primary ? 16 : 14)
+            .padding(.vertical, prominence == .primary ? 11 : 9)
             .background(background, in: Capsule())
             .overlay(Capsule().stroke(border, lineWidth: 1))
             .foregroundStyle(foreground)
+            .shadow(
+                color: prominence == .primary ? AppPalette.title.opacity(0.16) : .clear,
+                radius: prominence == .primary ? 10 : 0,
+                y: prominence == .primary ? 4 : 0
+            )
     }
 
     private var background: Color {
@@ -1774,51 +2268,6 @@ private struct HeaderActionMenuLabel: View {
         case .secondary:
             return AppPalette.border
         }
-    }
-}
-
-private struct OverviewPrimaryMenuLabel: View {
-    let title: String
-    let detail: String
-    let systemImage: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(Color.white)
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(Color.white.opacity(0.86))
-                    .multilineTextAlignment(.leading)
-            }
-
-            Spacer(minLength: 12)
-
-            Image(systemName: systemImage)
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(Color.white)
-                .padding(10)
-                .background(Color.white.opacity(0.16), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [
-                    AppPalette.title,
-                    Color(red: 0.30, green: 0.43, blue: 0.39)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.white.opacity(0.18))
-        )
     }
 }
 

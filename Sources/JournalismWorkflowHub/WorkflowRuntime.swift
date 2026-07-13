@@ -5,6 +5,7 @@ struct WorkflowRuntimeEnvironment: Sendable {
     let directoryExists: @Sendable (String) -> Bool
     let executableAvailable: @Sendable (String) -> Bool
     let pythonModuleAvailable: @Sendable (_ executable: String, _ module: String, _ workingDirectory: String) -> Bool
+    let readTextFile: @Sendable (_ path: String) -> String?
 
     static let live = WorkflowRuntimeEnvironment(
         fileExists: { FileManager.default.fileExists(atPath: $0) },
@@ -43,6 +44,9 @@ struct WorkflowRuntimeEnvironment: Sendable {
             } catch {
                 return false
             }
+        },
+        readTextFile: { path in
+            try? String(contentsOfFile: path, encoding: .utf8)
         }
     )
 }
@@ -137,6 +141,14 @@ enum WorkflowPreflightEvaluator {
             )
         }
 
+        if let compatibilityReport = scaffoldCompatibilityReportIfNeeded(
+            workflow: workflow,
+            requiredPaths: requiredPaths,
+            environment: environment
+        ) {
+            return compatibilityReport
+        }
+
         if let missingModule = workflow.requiredPythonModules.first(where: {
             !environment.pythonModuleAvailable(resolvedExecutable, $0, workingDirectory)
         }) {
@@ -157,6 +169,36 @@ enum WorkflowPreflightEvaluator {
             ] + executablesToCheck.map { "Executable: \($0)" } + requiredPaths.map { "Path: \($0)" } + workflow.requiredPythonModules.map { "Python module: \($0)" },
             missingItems: [],
             setupHint: workflow.setupHint
+        )
+    }
+
+    private static func scaffoldCompatibilityReportIfNeeded(
+        workflow: WorkflowDefinition,
+        requiredPaths: [String],
+        environment: WorkflowRuntimeEnvironment
+    ) -> WorkflowPreflightReport? {
+        guard workflow.id == "scaffold-project",
+              let scriptPath = requiredPaths.first(where: { $0.hasSuffix("scaffold_project.py") }),
+              let scriptContents = environment.readTextFile(scriptPath) else {
+            return nil
+        }
+
+        let requiredFlags = [
+            "--section-answer-1",
+            "--section-answer-2",
+            "--section-answer-3"
+        ]
+        let missingFlags = requiredFlags.filter { !scriptContents.contains($0) }
+        guard !missingFlags.isEmpty else {
+            return nil
+        }
+
+        return report(
+            status: .invalidConfiguration,
+            summary: "The bundled scaffold script is outdated.",
+            checkedItems: ["Path: \(scriptPath)"],
+            missingItems: missingFlags,
+            setupHint: "Rebuild or reinstall the app so the bundled scaffold script matches the current workflow contract."
         )
     }
 

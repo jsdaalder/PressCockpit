@@ -44,13 +44,24 @@ final class ScaffoldProjectWizardDraftTests: XCTestCase {
         XCTAssertFalse(draft.hasUsableDerivedFolderName)
     }
 
-    func testSummaryOnlyDraftRequiresExplicitStructureStep() {
+    func testSummaryOnlyDraftCanSkipStructureStepByDefault() {
         var draft = ScaffoldProjectWizardDraft()
         draft.hasPitch = false
         draft.summaryText = "A short project summary."
 
         XCTAssertTrue(draft.requiresSummaryStructuring)
+        XCTAssertFalse(draft.wantsSummaryStructuring)
+        XCTAssertFalse(draft.shouldShowSummaryStructuringStep)
         XCTAssertFalse(draft.hasCompletedSummaryStructuring)
+    }
+
+    func testSummaryOnlyDraftCanOptIntoExplicitStructureStep() {
+        var draft = ScaffoldProjectWizardDraft()
+        draft.hasPitch = false
+        draft.summaryText = "A short project summary."
+        draft.wantsSummaryStructuring = true
+
+        XCTAssertTrue(draft.shouldShowSummaryStructuringStep)
 
         draft.structureAnswerOne = "Main question"
         draft.structureAnswerTwo = "Working hypothesis"
@@ -59,10 +70,31 @@ final class ScaffoldProjectWizardDraftTests: XCTestCase {
         XCTAssertTrue(draft.hasCompletedSummaryStructuring)
     }
 
+    func testMappedStateLeavesStructuredAnswersEmptyWhenStepIsSkipped() throws {
+        var draft = ScaffoldProjectWizardDraft()
+        draft.updateWorkingTitle("Climate Story", workspaceRoot: URL(fileURLWithPath: "/tmp/workspace"))
+        draft.summaryText = "A short project summary."
+
+        let workflow = WorkflowRegistry(
+            workspaceRoot: URL(fileURLWithPath: "/tmp/workspace"),
+            appProfile: .standard
+        ).allWorkflows().first(where: { $0.id == "scaffold-project" })
+
+        let state = draft.mappedState(
+            for: try XCTUnwrap(workflow),
+            workspaceRoot: URL(fileURLWithPath: "/tmp/workspace")
+        )
+
+        XCTAssertEqual(state.textValues["section_answer_1"], "")
+        XCTAssertEqual(state.textValues["section_answer_2"], "")
+        XCTAssertEqual(state.textValues["section_answer_3"], "")
+    }
+
     func testMappedStateIncludesStructuredAnswers() throws {
         var draft = ScaffoldProjectWizardDraft()
         draft.updateWorkingTitle("Climate Story", workspaceRoot: URL(fileURLWithPath: "/tmp/workspace"))
         draft.summaryText = "A short project summary."
+        draft.wantsSummaryStructuring = true
         draft.structureAnswerOne = "Main reporting question"
         draft.structureAnswerTwo = "Working hypothesis"
         draft.structureAnswerThree = "Why this matters now"

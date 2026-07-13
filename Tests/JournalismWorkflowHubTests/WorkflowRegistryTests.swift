@@ -75,5 +75,19 @@ final class WorkflowRegistryTests: XCTestCase {
         XCTAssertTrue(resolved.arguments.contains("Expected pattern"))
         XCTAssertTrue(resolved.arguments.contains("--section-answer-3"))
         XCTAssertTrue(resolved.arguments.contains("Why data is needed"))
+        XCTAssertEqual(resolved.arguments.first, bundledKnowledgeOpsScriptPath("scaffold_project.py"))
+        XCTAssertFalse(resolved.arguments.first?.contains("/tmp/workspace/Resources/knowledge_ops/scripts") ?? true)
+    }
+
+    func testRefreshKnowledgeOpsUsesBundledScriptPath() throws {
+        let registry = WorkflowRegistry(
+            workspaceRoot: URL(fileURLWithPath: "/tmp/workspace"),
+            appProfile: .standard
+        )
+
+        let workflow = try XCTUnwrap(registry.allWorkflows().first(where: { $0.id == "refresh-knowledge-ops" }))
+
+        XCTAssertEqual(workflow.argumentsTemplate.first, bundledKnowledgeOpsScriptPath("refresh_knowledge_ops.py"))
+        XCTAssertEqual(workflow.requiredPaths.first, bundledKnowledgeOpsScriptPath("refresh_knowledge_ops.py"))
     }
 }

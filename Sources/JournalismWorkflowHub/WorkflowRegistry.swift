@@ -78,9 +78,12 @@ struct WorkflowRegistry {
 
     private func localBuiltInWorkflows() -> [WorkflowDefinition] {
         let root = workspaceRoot.path
-        let knowledgeOps = "Resources/knowledge_ops/scripts"
         let defaultProjectPath = "\(root)/Projects/\(isoYear())/untitled_project"
         let defaultOwner = nonEmpty(NSFullUserName()) ?? "Workspace owner"
+        let missingBundledScriptRoot = "__missing_bundle__/knowledge_ops/scripts"
+        let bundledScriptPath: (String) -> String = { name in
+            bundledKnowledgeOpsScriptPath(name) ?? "\(missingBundledScriptRoot)/\(name)"
+        }
 
         return [
             WorkflowDefinition(
@@ -94,7 +97,7 @@ struct WorkflowRegistry {
                 kind: .direct,
                 executableTemplate: "python3",
                 argumentsTemplate: [
-                    "\(knowledgeOps)/scaffold_project.py",
+                    bundledScriptPath("scaffold_project.py"),
                     "--project-root", "{{project_root}}",
                     "--title", "{{title}}",
                     "--owner", "{{owner}}",
@@ -132,10 +135,10 @@ struct WorkflowRegistry {
                 ],
                 requiredExecutables: ["python3"],
                 requiredPaths: [
-                    "Resources/knowledge_ops/scripts/scaffold_project.py"
+                    bundledScriptPath("scaffold_project.py")
                 ],
                 requiredPythonModules: [],
-                setupHint: "Install the local Python workflow dependencies and make sure the knowledge-ops scripts are present in the workspace.",
+                setupHint: "Rebuild or reinstall the app so the bundled knowledge-ops scripts are available.",
                 note: "Creates a clean starter structure for a new investigation."
             ),
             WorkflowDefinition(
@@ -149,7 +152,7 @@ struct WorkflowRegistry {
                 kind: .direct,
                 executableTemplate: "python3",
                 argumentsTemplate: [
-                    "\(knowledgeOps)/refresh_knowledge_ops.py",
+                    bundledScriptPath("refresh_knowledge_ops.py"),
                     "--years", "{{years}}",
                     "--backfill-title-stubs",
                     "--overwrite"
@@ -167,10 +170,10 @@ struct WorkflowRegistry {
                 ],
                 requiredExecutables: ["python3"],
                 requiredPaths: [
-                    "Resources/knowledge_ops/scripts/refresh_knowledge_ops.py"
+                    bundledScriptPath("refresh_knowledge_ops.py")
                 ],
                 requiredPythonModules: [],
-                setupHint: "This workflow depends on the knowledge-ops Python environment and scripts being available inside the workspace.",
+                setupHint: "Rebuild or reinstall the app so the bundled knowledge-ops scripts are available.",
                 note: "Best used after publication syncs or when project READMEs need a rebuild."
             ),
             WorkflowDefinition(
@@ -184,7 +187,7 @@ struct WorkflowRegistry {
                 kind: .direct,
                 executableTemplate: "python3",
                 argumentsTemplate: [
-                    "\(knowledgeOps)/build_project_readme.py",
+                    bundledScriptPath("build_project_readme.py"),
                     "--project-root", "{{selected_path}}",
                     "--write-readme"
                 ],
@@ -197,11 +200,11 @@ struct WorkflowRegistry {
                 ],
                 requiredExecutables: ["python3"],
                 requiredPaths: [
-                    "Resources/knowledge_ops/scripts/build_project_readme.py",
+                    bundledScriptPath("build_project_readme.py"),
                     "{{selected_path}}"
                 ],
                 requiredPythonModules: [],
-                setupHint: "Select a project root and make sure the knowledge-ops README builder script exists in the workspace.",
+                setupHint: "Select a project root and make sure the bundled knowledge-ops scripts are present in the app build.",
                 note: "Requires a selected project or dossier folder."
             ),
             WorkflowDefinition(
@@ -215,7 +218,7 @@ struct WorkflowRegistry {
                 kind: .direct,
                 executableTemplate: "python3",
                 argumentsTemplate: [
-                    "\(knowledgeOps)/refresh_knowledge_ops.py",
+                    bundledScriptPath("refresh_knowledge_ops.py"),
                     "--project-root", "{{selected_path}}",
                     "--overwrite",
                     "--skip-publication-tracker",
@@ -235,7 +238,7 @@ struct WorkflowRegistry {
                 ],
                 requiredExecutables: ["python3"],
                 requiredPaths: [
-                    "Resources/knowledge_ops/scripts/refresh_knowledge_ops.py",
+                    bundledScriptPath("refresh_knowledge_ops.py"),
                     "{{selected_path}}"
                 ],
                 requiredPythonModules: [],
@@ -253,7 +256,7 @@ struct WorkflowRegistry {
                 kind: .direct,
                 executableTemplate: "python3",
                 argumentsTemplate: [
-                    "\(knowledgeOps)/build_gdoc_fetch_queue.py",
+                    bundledScriptPath("build_gdoc_fetch_queue.py"),
                     "--years", "{{years}}",
                     "--write-index"
                 ],
@@ -269,10 +272,10 @@ struct WorkflowRegistry {
                 ],
                 requiredExecutables: ["python3"],
                 requiredPaths: [
-                    "Resources/knowledge_ops/scripts/build_gdoc_fetch_queue.py"
+                    bundledScriptPath("build_gdoc_fetch_queue.py")
                 ],
                 requiredPythonModules: [],
-                setupHint: "This workflow needs the knowledge-ops scripts in the workspace. It rebuilds the fetch backlog only; it does not export Google Docs itself.",
+                setupHint: "This workflow uses the app’s bundled knowledge-ops scripts. It rebuilds the fetch backlog only; it does not export Google Docs itself.",
                 note: "Useful when you want a current list of uncached or placeholder-only root Google Docs."
             ),
             WorkflowDefinition(
@@ -286,7 +289,7 @@ struct WorkflowRegistry {
                 kind: .direct,
                 executableTemplate: "python3",
                 argumentsTemplate: [
-                    "\(knowledgeOps)/build_publication_tracker.py"
+                    bundledScriptPath("build_publication_tracker.py")
                 ],
                 shellCommandTemplate: nil,
                 parameters: [],
@@ -299,10 +302,10 @@ struct WorkflowRegistry {
                 ],
                 requiredExecutables: ["python3"],
                 requiredPaths: [
-                    "Resources/knowledge_ops/scripts/build_publication_tracker.py"
+                    bundledScriptPath("build_publication_tracker.py")
                 ],
                 requiredPythonModules: [],
-                setupHint: "This workflow depends on the local knowledge-ops publication scripts being installed in the workspace.",
+                setupHint: "This workflow uses the app’s bundled publication scripts. Rebuild or reinstall the app if they are missing.",
                 note: "Use this when published PDFs or project links have changed."
             ),
             WorkflowDefinition(

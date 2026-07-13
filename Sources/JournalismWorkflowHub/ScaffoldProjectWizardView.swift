@@ -120,6 +120,7 @@ struct ScaffoldProjectWizardDraft: Hashable {
     var hasPitch: Bool?
     var pitchText: String = ""
     var summaryText: String = ""
+    var wantsSummaryStructuring: Bool = false
     var sourceMaterialChoice: ScaffoldSourceMaterialChoice?
     var priority: ScaffoldProjectPriority = .normal
     var folderNameOverride: String = ""
@@ -224,6 +225,10 @@ struct ScaffoldProjectWizardDraft: Hashable {
         !trimmedStructureAnswerOne.isEmpty
             && !trimmedStructureAnswerTwo.isEmpty
             && !trimmedStructureAnswerThree.isEmpty
+    }
+
+    var shouldShowSummaryStructuringStep: Bool {
+        requiresSummaryStructuring && (wantsSummaryStructuring || hasCompletedSummaryStructuring)
     }
 
     var hasUsableDerivedFolderName: Bool {
@@ -412,7 +417,7 @@ struct ScaffoldProjectWizardView: View {
         }
 
         if draft.hasPitch != nil {
-            if draft.requiresSummaryStructuring || currentWizardStep == .structure {
+            if draft.shouldShowSummaryStructuringStep || currentWizardStep == .structure {
                 steps.append(.structure)
             }
             steps.append(contentsOf: [.sourceMaterial, .priority, .review])
@@ -532,10 +537,32 @@ struct ScaffoldProjectWizardView: View {
                 question: "What is this project about?",
                 helper: "Describe it in 2 to 4 sentences so the scaffold can seed the project README."
             ) {
-                TextEditor(text: binding(\.summaryText))
-                    .frame(minHeight: 180)
-                    .font(.system(.body, design: .rounded))
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppPalette.border))
+                VStack(alignment: .leading, spacing: 14) {
+                    TextEditor(text: binding(\.summaryText))
+                        .frame(minHeight: 180)
+                        .font(.system(.body, design: .rounded))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppPalette.border))
+
+                    if draft.requiresSummaryStructuring {
+                        Toggle(isOn: Binding(
+                            get: { draft.wantsSummaryStructuring },
+                            set: { newValue in
+                                var updated = draft
+                                updated.wantsSummaryStructuring = newValue
+                                draft = updated
+                            }
+                        )) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Add a first reporting structure now")
+                                    .foregroundStyle(AppPalette.title)
+                                Text("Optional. Leave this off when you want to scaffold quickly and refine the README later.")
+                                    .font(.caption)
+                                    .foregroundStyle(AppPalette.subtle)
+                            }
+                        }
+                        .toggleStyle(.switch)
+                    }
+                }
             }
         case .structure:
             promptLayout(
@@ -753,7 +780,10 @@ struct ScaffoldProjectWizardView: View {
         if !draft.requiresSummaryStructuring {
             return "Derived from pitch"
         }
-        return draft.hasCompletedSummaryStructuring ? "Explicit first structure" : "Missing"
+        if draft.hasCompletedSummaryStructuring {
+            return "Explicit first structure"
+        }
+        return draft.wantsSummaryStructuring ? "Pending" : "Skipped for now"
     }
 
     private var readmePreview: String {
@@ -824,7 +854,7 @@ struct ScaffoldProjectWizardView: View {
         case .summary:
             return draft.trimmedSummary.isEmpty
         case .structure:
-            return draft.requiresSummaryStructuring && !draft.hasCompletedSummaryStructuring
+            return draft.wantsSummaryStructuring && !draft.hasCompletedSummaryStructuring
         case .sourceMaterial:
             return draft.sourceMaterialChoice == nil
         case .priority:
@@ -846,7 +876,7 @@ struct ScaffoldProjectWizardView: View {
         case .pitch:
             store.scaffoldProjectWizardStep = draft.trimmedPitch.isEmpty ? .summary : .sourceMaterial
         case .summary:
-            store.scaffoldProjectWizardStep = draft.requiresSummaryStructuring ? .structure : .sourceMaterial
+            store.scaffoldProjectWizardStep = draft.shouldShowSummaryStructuringStep ? .structure : .sourceMaterial
         case .structure:
             store.scaffoldProjectWizardStep = .sourceMaterial
         case .sourceMaterial:
@@ -873,7 +903,7 @@ struct ScaffoldProjectWizardView: View {
         case .structure:
             store.scaffoldProjectWizardStep = .summary
         case .sourceMaterial:
-            if currentWizardStep == .sourceMaterial && draft.requiresSummaryStructuring {
+            if currentWizardStep == .sourceMaterial && draft.shouldShowSummaryStructuringStep {
                 store.scaffoldProjectWizardStep = .structure
             } else if draft.hasPitch == true && draft.trimmedPitch.isEmpty {
                 store.scaffoldProjectWizardStep = .summary

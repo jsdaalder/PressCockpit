@@ -74,4 +74,17 @@ final class OnboardingSupportTests: XCTestCase {
 
         XCTAssertTrue(WorkspaceStructureValidator.looksLikeExistingWorkspace(at: tmp))
     }
+
+    func testOnboardingPreferencesPersistAndReadDocumentMode() {
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        var draft = OnboardingDraft.initial(defaultNewWorkspacePath: "/tmp/workspace")
+        draft.documentMode = .googleDocs
+
+        OnboardingPreferences.persist(draft: draft, defaults: defaults)
+
+        XCTAssertEqual(OnboardingPreferences.documentMode(defaults: defaults), .googleDocs)
+    }
 }

@@ -18,7 +18,8 @@ let package = Package(
             name: "JournalismWorkflowHub",
             path: "Sources/JournalismWorkflowHub",
             resources: [
-                .copy("Resources/DemoWorkspace")
+                .copy("Resources/DemoWorkspace"),
+                .copy("Resources/knowledge_ops")
             ]
         ),
         .testTarget(

@@ -113,6 +113,17 @@ Screen contract:
 - Operational and bureaucratic tasks should be visible but clearly secondary to story work.
 - Future brainstorming and intake directions may start here, but should move out if they create clutter.
 
+Future additions worth validating:
+
+- The per-project `More` expansion may need lightweight lifecycle controls such as:
+  - lower priority or standard priority
+  - archive because the work is finished
+  - archive because the work is discontinued
+- A "finished" path should not behave like a silent archive. It should start a small offboarding flow that confirms the project is ready to leave the active list and captures publication handoff tasks such as linking or uploading the published PDF.
+- Overview may also need soft housekeeping prompts at project level for gaps like missing pitch, missing draft, missing folder structure, or missing README.
+- Those prompts should stay advisory, not punitive. A missing pitch is sometimes acceptable, so the user should be able to dismiss or snooze a housekeeping suggestion without making the project look broken.
+- If these prompts are added, they should explain exactly what is missing and offer one direct action, rather than sending the user into a generic maintenance area.
+
 ### 2. Workspace
 
 Purpose:

@@ -369,6 +369,70 @@ final class OverviewDeriverTests: XCTestCase {
         XCTAssertEqual(item.overviewShortcutDocuments.map(\.title), ["Artikel"])
     }
 
+    func testCanonicalDraftPrefersPromotedGoogleDocOverLocalDocxDraft() {
+        let project = makeProject(
+            id: "promoted-google-draft",
+            title: "Promoted Google Draft",
+            projectType: .journalism,
+            status: "active",
+            safety: .internalOnly,
+            deliverable: "Story",
+            hasAgents: true,
+            started: "2026-07-06"
+        )
+        let localDraft = WorkspaceDocument(
+            id: "/tmp/promoted-google-draft/Draft - Promoted Google Draft.docx",
+            path: "/tmp/promoted-google-draft/Draft - Promoted Google Draft.docx",
+            title: "Draft - Promoted Google Draft",
+            fileExtension: "docx",
+            provider: .localFile,
+            role: .draft,
+            cacheState: .localFile,
+            externalURL: nil,
+            docID: nil,
+            cachePath: nil,
+            cachedOn: nil
+        )
+        let promotedGoogleDraft = WorkspaceDocument(
+            id: "/tmp/promoted-google-draft/Draft.gdoc",
+            path: "/tmp/promoted-google-draft/Draft.gdoc",
+            title: "Draft",
+            fileExtension: "gdoc",
+            provider: .googleDocPointer,
+            role: .draft,
+            cacheState: .cachedText,
+            externalURL: "https://docs.google.com/document/d/abc/edit",
+            docID: "abc",
+            cachePath: "/tmp/promoted-google-draft/docs/_derived/google_docs/draft.md",
+            cachedOn: "2026-07-06"
+        )
+        let item = WorkspaceItem(
+            id: project.id,
+            section: project.section,
+            path: project.path,
+            readmePath: project.readmePath,
+            agentsPath: project.agentsPath,
+            title: project.title,
+            summary: project.summary,
+            agentsSummary: project.agentsSummary,
+            frontmatter: project.frontmatter,
+            googleDriveFolderURL: nil,
+            projectType: project.projectType,
+            lifecycleStage: project.lifecycleStage,
+            safetyPosture: project.safetyPosture,
+            directFileCount: project.directFileCount,
+            directFolderCount: project.directFolderCount,
+            markdownFiles: project.markdownFiles,
+            pdfFiles: project.pdfFiles,
+            gdocFiles: 1,
+            csvFiles: project.csvFiles,
+            xlsxFiles: project.xlsxFiles,
+            documents: [localDraft, promotedGoogleDraft]
+        )
+
+        XCTAssertEqual(item.canonicalDraftDocument?.id, promotedGoogleDraft.id)
+    }
+
     func testCanonicalDraftPrefersLocalAuthoredDraftWhenNoGoogleDraftPointerExists() {
         let project = makeProject(
             id: "local-draft",

@@ -79,7 +79,7 @@ enum OverviewDeriver {
                 body: reviewProjects.isEmpty
                     ? "No active reporting projects currently need a sharing review."
                     : "\(reviewProjects.count) active \(pluralized("project", count: reviewProjects.count)) still need review before sharing or export.",
-                buttonTitle: reviewProjects.isEmpty ? "View" : "Review",
+                buttonTitle: reviewProjects.isEmpty ? "View" : "Open project",
                 count: reviewProjects.count,
                 target: reviewProjects.first.map { .workspace($0.id) } ?? activeProjects.first.map { .workspace($0.id) } ?? .overview
             ),
@@ -89,7 +89,7 @@ enum OverviewDeriver {
                 body: basicsProjects.isEmpty
                     ? "Active reporting projects currently have the expected basics in place."
                     : "\(basicsProjects.count) active \(pluralized("project", count: basicsProjects.count)) still need clearer setup such as local rules, owner, or deliverable.",
-                buttonTitle: basicsProjects.isEmpty ? "View" : "Fix",
+                buttonTitle: basicsProjects.isEmpty ? "View" : "Open project",
                 count: basicsProjects.count,
                 target: basicsProjects.first.map { .workspace($0.id) } ?? activeProjects.first.map { .workspace($0.id) } ?? .overview
             )
@@ -108,7 +108,7 @@ enum OverviewDeriver {
                 detail: failedRuns.isEmpty
                     ? "No failed runs are waiting."
                     : "\(failedRuns.count) saved \(pluralized("run", count: failedRuns.count)) need review.",
-                buttonTitle: failedRuns.isEmpty ? "View" : "Inspect",
+                buttonTitle: failedRuns.isEmpty ? "View" : "Review run",
                 count: failedRuns.count,
                 target: failedRuns.first.map { .run($0.id) } ?? .overview
             ),
@@ -118,7 +118,7 @@ enum OverviewDeriver {
                 detail: adminProjects.isEmpty
                     ? "No project roots are missing local rules."
                     : "\(adminProjects.count) project \(pluralized("root", count: adminProjects.count)) still need an `AGENTS.md` file.",
-                buttonTitle: "Review",
+                buttonTitle: "Open project",
                 count: adminProjects.count,
                 target: adminProjects.first.map { .workspace($0.id) } ?? activeProjects.first.map { .workspace($0.id) } ?? .overview
             ),
@@ -128,7 +128,7 @@ enum OverviewDeriver {
                 detail: snapshot.publication.missingCount == 0
                     ? "No publication mapping gaps are currently tracked."
                     : "\(snapshot.publication.missingCount) project \(pluralized("folder", count: snapshot.publication.missingCount)) still lack a linked PDF match.",
-                buttonTitle: "Open",
+                buttonTitle: "Open index",
                 count: snapshot.publication.missingCount,
                 target: .publication
             )

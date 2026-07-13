@@ -286,11 +286,139 @@ struct WorkspaceDocument: Identifiable, Hashable, Codable {
 
 enum SidebarSelection: Hashable {
     case overview
+    case capture
     case planCenter
     case workspace(String)
     case workflow(String)
     case publication
     case run(String)
+}
+
+enum CaptureRecordState: String, Codable, Hashable, CaseIterable {
+    case queued
+    case processing
+    case needsReview = "needs_review"
+    case assigned
+    case failed
+
+    var label: String {
+        switch self {
+        case .queued:
+            return "Queued"
+        case .processing:
+            return "Processing"
+        case .needsReview:
+            return "Needs review"
+        case .assigned:
+            return "Assigned"
+        case .failed:
+            return "Failed"
+        }
+    }
+}
+
+enum CaptureRecordType: String, Codable, Hashable, CaseIterable {
+    case file
+    case folder
+    case note
+    case link
+
+    var label: String {
+        switch self {
+        case .file:
+            return "File"
+        case .folder:
+            return "Folder"
+        case .note:
+            return "Note"
+        case .link:
+            return "Link"
+        }
+    }
+}
+
+struct CaptureRecord: Identifiable, Codable, Hashable {
+    let id: String
+    let displayName: String?
+    let originalSourcePath: String?
+    let importedStoragePath: String?
+    let capturedAt: Date
+    let captureType: CaptureRecordType
+    let state: CaptureRecordState
+    let failureDescription: String?
+    let userNote: String?
+    let assignedProjectPath: String?
+    let assignedAt: Date?
+    let assignedDestinationPath: String?
+
+    var displayTitle: String {
+        if let displayName, !displayName.isEmpty {
+            return displayName
+        }
+        if let importedStoragePath, !importedStoragePath.isEmpty {
+            return URL(fileURLWithPath: importedStoragePath).lastPathComponent
+        }
+        if let originalSourcePath, !originalSourcePath.isEmpty {
+            return URL(fileURLWithPath: originalSourcePath).lastPathComponent
+        }
+        return captureType.label
+    }
+
+    var sourceDescription: String {
+        if let originalSourcePath, !originalSourcePath.isEmpty {
+            return originalSourcePath
+        }
+        if let importedStoragePath, !importedStoragePath.isEmpty {
+            return importedStoragePath
+        }
+        return "No source path recorded yet."
+    }
+
+    var sourceLabel: String {
+        switch captureType {
+        case .note:
+            return "Saved in Capture storage"
+        case .folder:
+            if let originalSourcePath, !originalSourcePath.isEmpty {
+                return originalSourcePath
+            }
+            return "Imported folder"
+        case .file, .link:
+            if let originalSourcePath, !originalSourcePath.isEmpty {
+                return originalSourcePath
+            }
+            return sourceDescription
+        }
+    }
+
+    var typeCue: String {
+        switch captureType {
+        case .folder:
+            return "Folder"
+        case .note:
+            return "Markdown"
+        case .link:
+            return "Link"
+        case .file:
+            let candidate = importedStoragePath ?? originalSourcePath ?? ""
+            let ext = URL(fileURLWithPath: candidate).pathExtension.trimmingCharacters(in: .whitespacesAndNewlines)
+            if ext.isEmpty {
+                return "File"
+            }
+            return ext.uppercased()
+        }
+    }
+
+    var capturedAtLabel: String {
+        Self.captureTimestampFormatter.string(from: capturedAt)
+    }
+
+    private static let captureTimestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
 }
 
 struct WorkspaceItem: Identifiable, Hashable, Codable {
@@ -437,9 +565,9 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
 
     func draftTargetExplanation(for document: WorkspaceDocument) -> String {
         if document.provider == .localFile {
-            return "This project uses a local draft file as the main draft target."
+            return "Open draft will use the local draft file first. Snapshot exports stay listed below, but they do not replace the main draft target."
         }
-        return "This project uses the root Google Doc pointer as the main draft target."
+        return "Open draft will open the main Google Doc in the browser. Local snapshot copies stay secondary and do not replace the main draft target."
     }
 
     private func preferredCanonicalDocument(for role: WorkspaceDocumentRole) -> WorkspaceDocument? {

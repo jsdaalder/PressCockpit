@@ -13,6 +13,23 @@ struct JournalismWorkflowHubApp: App {
         .windowStyle(.titleBar)
         .commands {
             CommandGroup(replacing: .newItem) { }
+
+            CommandMenu("Workspace") {
+                Button("Refresh workspace") {
+                    store.reloadWorkspace()
+                }
+                .keyboardShortcut("r", modifiers: .command)
+
+                Button("Refresh plan docs") {
+                    store.reloadPlanning()
+                }
+
+                Divider()
+
+                Button("Reopen setup…") {
+                    store.reopenOnboarding()
+                }
+            }
         }
     }
 }
@@ -38,10 +55,7 @@ struct AppRootView: View {
                     phase = .app
                 })
             case .app:
-                MainShellView(onOpenSetup: {
-                    store.reopenOnboarding()
-                    phase = .onboarding
-                })
+                MainShellView()
             }
         }
         .background(AppPalette.background.ignoresSafeArea())
@@ -50,6 +64,11 @@ struct AppRootView: View {
         }
         .onChange(of: phase, initial: false) { _, _ in
             activateApplicationWindow()
+        }
+        .onChange(of: store.hasCompletedOnboarding, initial: false) { _, hasCompletedOnboarding in
+            if !hasCompletedOnboarding {
+                phase = .onboarding
+            }
         }
         .task {
             guard !didBootstrap else { return }
@@ -70,7 +89,6 @@ struct AppRootView: View {
 
 struct MainShellView: View {
     @EnvironmentObject private var store: AppStore
-    let onOpenSetup: () -> Void
 
     var body: some View {
         NavigationSplitView {
@@ -97,20 +115,6 @@ struct MainShellView: View {
                 .help("Go to the next page")
             }
 
-            ToolbarItemGroup(placement: .automatic) {
-                Button("Refresh") {
-                    store.reloadAll()
-                }
-
-                Button("Setup") {
-                    onOpenSetup()
-                }
-
-                Button("Run") {
-                    store.runSelectedWorkflow()
-                }
-                .disabled(store.selectedWorkflow == nil || store.isRunning)
-            }
         }
     }
 }

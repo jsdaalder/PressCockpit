@@ -189,6 +189,14 @@ struct OnboardingPreferences {
         defaults.set(draft.firstAction.rawValue, forKey: firstActionKey)
     }
 
+    static func documentMode(defaults: UserDefaults = .standard) -> OnboardingDocumentMode {
+        guard let rawValue = defaults.string(forKey: documentModeKey),
+              let mode = OnboardingDocumentMode(rawValue: rawValue) else {
+            return .localOnly
+        }
+        return mode
+    }
+
     static func reset(defaults: UserDefaults = .standard) {
         defaults.removeObject(forKey: completedKey)
         defaults.removeObject(forKey: documentModeKey)
