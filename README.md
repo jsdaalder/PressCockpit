@@ -1,16 +1,89 @@
-# Journalism Workflow Hub
+# PressCockpit
 
-Native SwiftUI launcher for a local journalism workspace.
+`PressCockpit` is the current product name for the macOS app in this repo.  
+The codebase and package name are still `JournalismWorkflowHub` for now.
 
-## What it does
+PressCockpit is a local-first app for journalists who organize reporting work in ordinary folders.
 
-- Scans `Projects/`, `Areas/`, `Resources/`, and `Archives/`
-- Reads project README metadata and local publication trackers
-- Launches the existing Python workflows from a single macOS interface
-- Stores run history and logs locally in Application Support
-- Lets you add custom command presets without changing Swift code
+It gives you a trustworthy view over your real workspace, helps you see what is active, open the right project fast, and run local workflows with clear write boundaries. It is not a parallel CMS or a hidden cloud system.
 
-## Run
+## What It Helps With
+
+- See active reporting projects first
+- Open project folders, README files, drafts, and docs quickly
+- Create a new project scaffold and a usable first draft
+- Review project state without digging through Finder
+- Capture incoming material and route it into the right project
+- Run local workflows from one app instead of from scattered terminal commands
+
+## How It Works
+
+PressCockpit reads a normal workspace on disk. It works best when your reporting setup follows a simple folder structure such as:
+
+- `Projects`
+- `Areas`
+- `Resources`
+- `Archives`
+
+The app reads that directory directly. It does not import your work into a separate app-owned database.
+
+If you create a new workspace through the app, it creates plain folders and starter files you can inspect in Finder. If you stop using the app later, those files remain ordinary files on disk.
+
+## Documents
+
+The app works best with local files today.
+
+It can also work with:
+
+- local `.docx` drafts
+- Google Doc pointers
+- other tools that sync documents into a local folder
+
+This does not lock you into one provider. The app works over your local directory, and you can change document setup later without moving your workspace into a proprietary system.
+
+## Privacy And Storage
+
+Your workspace stays in the selected local folder. The app reads local files and only writes where a workflow says it will write.
+
+The app also keeps some lightweight local state on your Mac, such as:
+
+- workspace selection
+- cached catalog state
+- workflow run logs
+- write backups
+
+If you use Google Docs or another sync tool, that provider keeps its own network and storage behavior.
+
+## For A First Test
+
+The easiest way to try PressCockpit is:
+
+1. Open the app.
+2. Choose the demo workspace if you just want to explore safely.
+3. Choose an existing workspace if you want the app to read your real reporting folders.
+4. Create a new workspace only if you actually want a separate reporting root.
+
+The demo workspace is bundled with the app. It opens in standalone mode and hides local-only newsroom workflows by default.
+
+## Current Alpha State
+
+This is still an alpha tool.
+
+What already works well:
+
+- browsing a reporting workspace
+- seeing active projects
+- scaffolding a new project
+- creating a local draft from inside the app
+- running local workflows through the app shell
+
+What is still rough:
+
+- some advanced workflows still depend on local tooling
+- Google Docs support is useful but still partial
+- packaging and distribution are workable, not polished
+
+## Run The App
 
 From this folder:
 
@@ -18,31 +91,33 @@ From this folder:
 scripts/swiftpm-local.sh run JournalismWorkflowHub
 ```
 
-By default the app will try to discover the workspace root by walking up from the current directory until it finds a folder that looks like a journalism workspace.
+By default the app tries to discover the workspace root by walking up from the current directory until it finds a folder that looks like a journalism workspace.
 
-The repo currently lives under `My Drive`, so this wrapper keeps SwiftPM's SQLite build database out of the synced folder. Plain `swift run` and `swift test` can hit transient `.build/build.db` disk I/O errors there.
-
-You can override that explicitly:
+You can also point it at a workspace directly:
 
 ```bash
 scripts/swiftpm-local.sh run JournalismWorkflowHub --workspace-root "/path/to/coding_projects"
 ```
 
-You can also set an environment variable:
+Or use an environment variable:
 
 ```bash
 JWH_WORKSPACE_ROOT="/path/to/coding_projects" scripts/swiftpm-local.sh run JournalismWorkflowHub
 ```
 
-Run tests the same way:
+## Why The Wrapper Script Exists
+
+This repo currently lives under `My Drive`, so `scripts/swiftpm-local.sh` keeps SwiftPM's build database out of the synced folder. Plain `swift run` and `swift test` can hit transient `.build/build.db` disk I/O errors there.
+
+## Run Tests
 
 ```bash
 scripts/swiftpm-local.sh test --filter AppStoreNavigationTests
 ```
 
-## Package A Shareable Mac App
+## Build A Shareable Mac App
 
-Build a zipped macOS app bundle for alpha testers:
+To build a zipped macOS app bundle for alpha testers:
 
 ```bash
 scripts/build-macos-release.sh --version 0.1.1
@@ -61,6 +136,8 @@ You can also change the default launch profile:
 scripts/build-macos-release.sh --version 0.1.1 --profile standard
 ```
 
+## Release Tag
+
 Tagged pushes like `v0.1.1` trigger `.github/workflows/macos-release.yml`, which rebuilds the app on GitHub Actions and attaches the zip to the GitHub Release.
 
 Example:
@@ -70,7 +147,7 @@ git tag v0.1.1
 git push origin v0.1.1
 ```
 
-## Standalone audit mode
+## Standalone Mode
 
 Run the app in a local standalone profile without depending on your full newsroom workspace:
 
@@ -90,17 +167,23 @@ You can still point standalone mode at another workspace explicitly:
 scripts/swiftpm-local.sh run JournalismWorkflowHub --app-profile standalone --workspace-root "/path/to/other/workspace"
 ```
 
-## Custom presets
+## Custom Workflow Presets
 
-Add JSON presets to one of these locations:
+You can add JSON workflow presets to one of these locations:
 
 - `Resources/Overig/journalism_workflow_hub/workflows.json`
 - `~/Library/Application Support/JournalismWorkflowHub/workflows.json`
 
-Each preset can define a shell command template with workspace tokens like `{{workspace_root}}` and `{{selected_path}}`.
-Presets can also set `availability` to `portable`, `optional_local`, or `private_hidden`.
+Each preset can define a shell command template with workspace tokens such as `{{workspace_root}}` and `{{selected_path}}`.
+
+Presets can also set `availability` to:
+
+- `portable`
+- `optional_local`
+- `private_hidden`
 
 ## Planning
 
 The full product plan for this app lives in `Projects/2026/journalism_workflow_hub_plan/` in the private newsroom workspace.
+
 In standalone mode, the app does not require that planning project to exist.
