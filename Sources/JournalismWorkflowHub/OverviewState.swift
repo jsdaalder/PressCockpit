@@ -12,6 +12,7 @@ struct OverviewProjectSummary: Identifiable, Hashable {
     let item: WorkspaceItem
     let flags: [String]
     let displayFlags: [String]
+    let stateBadgeText: String
     let nextStep: String
     let primaryDocuments: [WorkspaceDocument]
     let primaryTarget: OverviewTarget
@@ -19,7 +20,7 @@ struct OverviewProjectSummary: Identifiable, Hashable {
 
     var id: String { item.id }
     var primaryFlag: String? { flags.first }
-    var displayPrimaryFlag: String? { displayFlags.first }
+    var displayPrimaryFlag: String? { stateBadgeText }
 }
 
 struct OverviewActionSummary: Identifiable, Hashable {
@@ -47,22 +48,22 @@ enum OverviewDeriver {
                 $0.section == .projects
                     && $0.isProjectRoot
                     && isReportingProjectType($0.projectType)
-                    && normalizedStatus(from: $0) == "active"
+                    && $0.activityState == .active
             }
     }
 
     static func projectSummaries(from snapshot: WorkspaceSnapshot, runs: [WorkflowRun]) -> [OverviewProjectSummary] {
         Array(activeReportingProjects(from: snapshot).sorted { compareProjects($0, $1, runs: runs) }.prefix(4)).map { item in
             let flags = projectFlags(for: item, runs: runs)
-            let failedRun = latestFailedRun(for: item, runs: runs)
             return OverviewProjectSummary(
                 item: item,
                 flags: flags,
                 displayFlags: displayFlags(from: flags),
+                stateBadgeText: item.projectStateBadgeLabel,
                 nextStep: nextStep(for: item, flags: flags),
                 primaryDocuments: item.primaryDocuments,
-                primaryTarget: failedRun.map { .run($0.id) } ?? .workspace(item.id),
-                primaryButtonTitle: failedRun == nil ? "Show in app" : "Inspect run"
+                primaryTarget: .workspace(item.id),
+                primaryButtonTitle: "Open in app"
             )
         }
     }
@@ -139,14 +140,6 @@ enum OverviewDeriver {
         type == .journalism || type == .dataJournalism
     }
 
-    private static func normalizedStatus(from item: WorkspaceItem) -> String {
-        item.frontmatter["status"]?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-            .replacingOccurrences(of: "-", with: "_")
-            .replacingOccurrences(of: " ", with: "_") ?? ""
-    }
-
     private static func compareProjects(_ lhs: WorkspaceItem, _ rhs: WorkspaceItem, runs: [WorkflowRun]) -> Bool {
         let lhsSeverity = severity(for: lhs, runs: runs)
         let rhsSeverity = severity(for: rhs, runs: runs)
@@ -190,7 +183,7 @@ enum OverviewDeriver {
 
     private static func nextStep(for item: WorkspaceItem, flags: [String]) -> String {
         if flags.contains("Workflow needs attention") {
-            return "Open the latest failed run and decide whether it should be re-run or inspected first."
+            return "Open the project and check the latest workflow issue before continuing the reporting."
         }
         if flags.contains("Project setup incomplete") {
             return "Tighten the summary, started date, or deliverable so the project is easier to trust and act on."

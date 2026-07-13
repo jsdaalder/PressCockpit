@@ -116,7 +116,7 @@ struct WorkflowRegistry {
                     .init(id: "project_root", label: "Project root", kind: .path, helpText: "Absolute path to the new project folder.", defaultValue: defaultProjectPath, required: true),
                     .init(id: "title", label: "Title", kind: .text, helpText: "Human-facing project title.", defaultValue: "New story", required: true),
                     .init(id: "owner", label: "Owner", kind: .text, helpText: "Project owner.", defaultValue: defaultOwner),
-                    .init(id: "status", label: "Status", kind: .choice, helpText: "Project state.", defaultValue: "active", choices: ["active", "scaffold_demo", "published", "paused"]),
+                    .init(id: "status", label: "Legacy status", kind: .choice, helpText: "Compatibility field used to derive the richer project state frontmatter.", defaultValue: "active", choices: ["active", "on_hold", "done", "archived"]),
                     .init(id: "project_type", label: "Project type", kind: .choice, helpText: "Project classification written into README frontmatter.", defaultValue: "journalism", choices: ["journalism", "data_journalism", "tooling", "general"]),
                     .init(id: "started", label: "Started", kind: .text, helpText: "Date in YYYY-MM-DD.", defaultValue: isoDate()),
                     .init(id: "deliverable", label: "Deliverable", kind: .text, helpText: "Story or product description.", defaultValue: ""),

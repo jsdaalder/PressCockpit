@@ -1,9 +1,18 @@
 import Foundation
 
+enum CaptureCatalogLoadResult {
+    case loaded(CaptureCatalog)
+    case missing
+    case unreadable
+    case workspaceMismatch(CaptureCatalog)
+}
+
 protocol CapturePersisting {
     var storageDirectory: URL { get }
+    func loadCatalog() -> CaptureCatalogLoadResult
     func load() -> CaptureCatalog?
     func loadRecords() -> [CaptureRecord]?
+    func recoverRecordsFromStorage(excluding existingRecordIDs: Set<String>) -> [CaptureRecord]
     func replace(with records: [CaptureRecord])
 }
 
@@ -32,17 +41,80 @@ struct CaptureStore {
         )
     }
 
-    func load() -> CaptureCatalog? {
-        guard let data = try? Data(contentsOf: storageURL),
-              let catalog = try? decoder.decode(CaptureCatalog.self, from: data),
-              catalog.workspaceRootPath == workspaceRoot.path else {
-            return nil
+    func loadCatalog() -> CaptureCatalogLoadResult {
+        guard let data = try? Data(contentsOf: storageURL) else {
+            return .missing
         }
+
+        guard let catalog = try? decoder.decode(CaptureCatalog.self, from: data) else {
+            return .unreadable
+        }
+
+        guard catalog.workspaceRootPath == workspaceRoot.path else {
+            return .workspaceMismatch(catalog)
+        }
+
+        return .loaded(catalog)
+    }
+
+    func load() -> CaptureCatalog? {
+        guard case .loaded(let catalog) = loadCatalog() else { return nil }
         return catalog
     }
 
     func loadRecords() -> [CaptureRecord]? {
         load()?.records
+    }
+
+    func recoverRecordsFromStorage(excluding existingRecordIDs: Set<String> = []) -> [CaptureRecord] {
+        let itemsDirectory = storageDirectory.appendingPathComponent("items", isDirectory: true)
+        let requestedKeys: Set<URLResourceKey> = [
+            .isDirectoryKey,
+            .creationDateKey,
+            .contentModificationDateKey
+        ]
+        let hintRecordsByID = recoveryHintRecordsByID()
+
+        guard let recordDirectories = try? fileManager.contentsOfDirectory(
+            at: itemsDirectory,
+            includingPropertiesForKeys: Array(requestedKeys),
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+
+        return recordDirectories.compactMap { recordDirectory in
+            let recordID = recordDirectory.lastPathComponent
+            guard !existingRecordIDs.contains(recordID) else { return nil }
+
+            let hintRecord = hintRecordsByID[recordID]
+            guard let importedURL = recoveredImportedURL(in: recordDirectory, hintRecord: hintRecord) else { return nil }
+            let resourceValues = try? importedURL.resourceValues(forKeys: requestedKeys)
+            let directoryValues = try? recordDirectory.resourceValues(forKeys: requestedKeys)
+            let isDirectory = resourceValues?.isDirectory == true
+            let capturedAt = hintRecord?.capturedAt
+                ?? resourceValues?.creationDate
+                ?? resourceValues?.contentModificationDate
+                ?? directoryValues?.creationDate
+                ?? directoryValues?.contentModificationDate
+                ?? .now
+
+            return CaptureRecord(
+                id: recordID,
+                displayName: hintRecord?.displayName ?? recoveredDisplayName(for: importedURL, isDirectory: isDirectory),
+                originalSourcePath: hintRecord?.originalSourcePath,
+                importedStoragePath: importedURL.path,
+                capturedAt: capturedAt,
+                captureType: hintRecord?.captureType ?? (isDirectory ? .folder : recoveredFileType(for: importedURL)),
+                state: .needsReview,
+                failureDescription: "Recovered from capture storage after stored metadata was unavailable.",
+                userNote: hintRecord?.userNote,
+                assignedTargetPath: nil,
+                assignedAt: nil,
+                assignedDestinationPath: nil
+            )
+        }
+        .sorted { $0.capturedAt > $1.capturedAt }
     }
 
     func replace(with records: [CaptureRecord]) {
@@ -77,6 +149,55 @@ struct CaptureStore {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder
+    }
+
+    private func recoveryHintRecordsByID() -> [String: CaptureRecord] {
+        switch loadCatalog() {
+        case .loaded(let catalog), .workspaceMismatch(let catalog):
+            return Dictionary(uniqueKeysWithValues: catalog.records.map { ($0.id, $0) })
+        case .missing, .unreadable:
+            return [:]
+        }
+    }
+
+    private func recoveredImportedURL(in recordDirectory: URL, hintRecord: CaptureRecord?) -> URL? {
+        guard let children = try? fileManager.contentsOfDirectory(
+            at: recordDirectory,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return nil
+        }
+
+        if let importedStoragePath = hintRecord?.importedStoragePath {
+            let expectedName = URL(fileURLWithPath: importedStoragePath).lastPathComponent
+            if let matchingChild = children.first(where: { $0.lastPathComponent == expectedName }) {
+                return matchingChild
+            }
+        }
+
+        if let firstDirectory = children.first(where: {
+            (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+        }) {
+            return firstDirectory
+        }
+
+        return children.sorted { $0.lastPathComponent < $1.lastPathComponent }.first
+    }
+
+    private func recoveredDisplayName(for importedURL: URL, isDirectory: Bool) -> String {
+        if isDirectory {
+            return importedURL.lastPathComponent
+        }
+
+        return importedURL.lastPathComponent
+    }
+
+    private func recoveredFileType(for importedURL: URL) -> CaptureRecordType {
+        if importedURL.pathExtension.lowercased() == "md" {
+            return .note
+        }
+        return .file
     }
 }
 

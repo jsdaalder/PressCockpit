@@ -617,6 +617,10 @@ struct WorkspaceScanner {
         frontmatter: [String: String],
         readmeBody: String
     ) -> String {
+        if let projectState = ProjectState.from(frontmatter: frontmatter, isArchivedStorage: section == .archives) {
+            return projectState.detailLabel
+        }
+
         if let status = frontmatter["status"], !status.isEmpty {
             return humanizeStatus(status)
         }

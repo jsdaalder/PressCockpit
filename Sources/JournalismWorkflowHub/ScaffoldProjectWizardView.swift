@@ -666,14 +666,16 @@ struct ScaffoldProjectWizardView: View {
                             HStack(spacing: 8) {
                                 readmePill("README.md")
                                 readmePill(draft.projectKindLabel)
-                                readmePill("status: active")
+                                readmePill("activity_state: active")
+                                readmePill("workflow_stage: lead")
                             }
 
                             VStack(alignment: .leading, spacing: 8) {
                                 readmePill("README.md")
                                 HStack(spacing: 8) {
                                     readmePill(draft.projectKindLabel)
-                                    readmePill("status: active")
+                                    readmePill("activity_state: active")
+                                    readmePill("workflow_stage: lead")
                                 }
                             }
                         }
@@ -684,7 +686,7 @@ struct ScaffoldProjectWizardView: View {
                                 .foregroundStyle(AppPalette.title)
                             Text(readmePreviewSummary)
                                 .font(.body)
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(AppPalette.title)
                         }
 
                         Divider()

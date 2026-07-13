@@ -29,8 +29,11 @@ final class WorkspaceScannerTests: XCTestCase {
         XCTAssertEqual(snapshot.items.count, 1)
         XCTAssertEqual(snapshot.items.first?.title, "Demo Story")
         XCTAssertEqual(snapshot.items.first?.frontmatter["status"], "active")
+        XCTAssertEqual(snapshot.items.first?.activityState, .active)
+        XCTAssertEqual(snapshot.items.first?.workflowStage, .activeInvestigation)
+        XCTAssertNil(snapshot.items.first?.inactiveReason)
         XCTAssertEqual(snapshot.items.first?.projectType, .journalism)
-        XCTAssertEqual(snapshot.items.first?.lifecycleStage, "Active")
+        XCTAssertEqual(snapshot.items.first?.lifecycleStage, "Active · Investigation")
         XCTAssertEqual(snapshot.items.first?.safetyPosture, .unknown)
     }
 
@@ -96,8 +99,40 @@ final class WorkspaceScannerTests: XCTestCase {
         let item = try XCTUnwrap(WorkspaceScanner(workspaceRoot: tmp).scan().items.first)
 
         XCTAssertEqual(item.projectType, .dataJournalism)
-        XCTAssertEqual(item.lifecycleStage, "On Hold")
+        XCTAssertEqual(item.activityState, .inactive)
+        XCTAssertEqual(item.workflowStage, .activeInvestigation)
+        XCTAssertEqual(item.inactiveReason, .waiting)
+        XCTAssertEqual(item.lifecycleStage, "Inactive · Investigation · Waiting")
         XCTAssertEqual(item.safetyPosture, .publishableReviewed)
+    }
+
+    func testExplicitProjectStateFrontmatterOverridesLegacyStatusFallback() throws {
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let project = tmp.appendingPathComponent("Projects/2026/foi_waiting")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true, attributes: nil)
+
+        try """
+        ---
+        type: project
+        project: FOI Waiting
+        activity_state: inactive
+        workflow_stage: feasibility_study
+        inactive_reason: waiting
+        status: on_hold
+        project_type: journalism
+        ---
+
+        # FOI Waiting
+
+        Waiting for public-records response before the next step.
+        """.write(to: project.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
+        let item = try XCTUnwrap(WorkspaceScanner(workspaceRoot: tmp).scan().items.first)
+
+        XCTAssertEqual(item.activityState, .inactive)
+        XCTAssertEqual(item.workflowStage, .feasibilityStudy)
+        XCTAssertEqual(item.inactiveReason, .waiting)
+        XCTAssertEqual(item.lifecycleStage, "Inactive · Feasibility study · Waiting")
     }
 
     func testHumanizesSlugLikeFrontmatterProjectTitle() throws {

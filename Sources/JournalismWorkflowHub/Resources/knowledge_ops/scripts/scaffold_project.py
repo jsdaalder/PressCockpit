@@ -15,6 +15,16 @@ PROJECT_TYPE_MAP = {
     "other": "general",
 }
 
+LEGACY_STATUS_MAP = {
+    "active": ("active", "lead", "", "active"),
+    "scaffold_demo": ("active", "lead", "", "active"),
+    "on_hold": ("inactive", "active_investigation", "waiting", "on_hold"),
+    "paused": ("inactive", "active_investigation", "waiting", "on_hold"),
+    "done": ("inactive", "published", "finished", "done"),
+    "published": ("inactive", "published", "finished", "done"),
+    "archived": ("inactive", "published", "finished", "archived"),
+}
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -45,6 +55,11 @@ def yaml_list(values: list[str]) -> str:
     return "[" + ", ".join(f'"{value}"' for value in cleaned) + "]"
 
 
+def derive_project_state(status: str) -> tuple[str, str, str, str]:
+    normalized = status.strip().lower().replace("-", "_").replace(" ", "_")
+    return LEGACY_STATUS_MAP.get(normalized, ("active", "lead", "", "active"))
+
+
 def write_new_file(path: Path, contents: str) -> None:
     if path.exists():
         raise FileExistsError(f"Refusing to overwrite existing file: {path}")
@@ -64,13 +79,17 @@ def build_readme(
 ) -> str:
     summary = deliverable.strip() or "Short project summary."
     sections = readme_sections(project_type, structured_answers)
+    activity_state, workflow_stage, inactive_reason, legacy_status = derive_project_state(status)
+    inactive_reason_line = f"inactive_reason: {inactive_reason}\n" if inactive_reason else ""
     return textwrap.dedent(
         f"""\
         ---
         type: project
         project: {title}
         owner: {owner}
-        status: {status}
+        activity_state: {activity_state}
+        workflow_stage: {workflow_stage}
+        {inactive_reason_line}status: {legacy_status}
         project_type: {project_type}
         started: {started}
         deliverable: {summary}

@@ -24,10 +24,14 @@ final class AppStore: ObservableObject {
     @Published var selectedRunOutput: String = ""
     @Published private(set) var documentMode: OnboardingDocumentMode
     @Published var hasCompletedOnboarding: Bool
+    @Published private(set) var onboardingLaunchMode: OnboardingLaunchMode?
     @Published private(set) var captureRecords: [CaptureRecord] = []
+    @Published private(set) var maintenanceItems: [MaintenanceItem] = []
     @Published var scaffoldProjectWizardDraft = ScaffoldProjectWizardDraft()
     @Published var scaffoldProjectWizardStep: ScaffoldProjectWizardStep = .workingTitle
     @Published var scaffoldPostCreateState: ScaffoldPostCreateState?
+    @Published var projectStatusChangeState: ProjectStatusChangeState?
+    @Published var projectStateEditState: ProjectStateEditState?
     @Published private(set) var isFinishingScaffoldPostCreate: Bool = false
     @Published private(set) var hiddenWorkflowCount: Int = 0
     @Published private(set) var workflowPreflightReports: [String: WorkflowPreflightReport] = [:]
@@ -37,6 +41,7 @@ final class AppStore: ObservableObject {
     private var scanner: WorkspaceScanner
     private var catalog: any WorkspaceCataloging
     private var captureStore: any CapturePersisting
+    private var maintenanceStore: any MaintenancePersisting
     private var workspaceQueries: WorkspaceQueryStore = .empty
     private var runner: CommandRunner
     private var backHistory: [SidebarSelection] = []
@@ -45,17 +50,25 @@ final class AppStore: ObservableObject {
     init(
         configuration: AppConfiguration = AppDefaults.configuration,
         catalog: (any WorkspaceCataloging)? = nil,
-        captureStore: (any CapturePersisting)? = nil
+        captureStore: (any CapturePersisting)? = nil,
+        maintenanceStore: (any MaintenancePersisting)? = nil
     ) {
+        let hasCompletedOnboarding = OnboardingPreferences.hasCompleted()
         self.appProfile = configuration.profile
         self.workspaceRoot = configuration.workspaceRoot
         self.demoWorkspaceRoot = configuration.demoWorkspaceRoot
         self.documentMode = OnboardingPreferences.documentMode()
-        self.hasCompletedOnboarding = OnboardingPreferences.hasCompleted()
+        self.hasCompletedOnboarding = hasCompletedOnboarding
+        self.onboardingLaunchMode = hasCompletedOnboarding ? nil : .firstRun
         self.scanner = WorkspaceScanner(workspaceRoot: configuration.workspaceRoot)
         self.catalog = catalog ?? WorkspaceCatalogStore(workspaceRoot: configuration.workspaceRoot)
         self.captureStore = captureStore ?? CaptureStore(workspaceRoot: configuration.workspaceRoot)
+        self.maintenanceStore = maintenanceStore ?? MaintenanceStore(workspaceRoot: configuration.workspaceRoot)
         self.runner = CommandRunner(workspaceRoot: configuration.workspaceRoot, appProfile: configuration.profile)
+        AppDebugLog.write(
+            "[jwh] launch profile=\(configuration.profile.rawValue) workspaceRoot=\(configuration.workspaceRoot.path)",
+            supportDirectory: journalismWorkflowHubSupportDirectory()
+        )
         if configuration.profile == .standard {
             WorkspaceRootResolver.persist(configuration.workspaceRoot)
         }
@@ -64,12 +77,13 @@ final class AppStore: ObservableObject {
     }
 
     var shouldShowOnboarding: Bool {
-        !hasCompletedOnboarding
+        onboardingLaunchMode != nil
     }
 
     func reloadAll() {
         reloadWorkspaceQueryState()
         reloadCaptureState()
+        reloadMaintenanceState()
         reloadPlanning()
         reloadWorkflows()
         reloadRuns()
@@ -77,6 +91,7 @@ final class AppStore: ObservableObject {
 
     func reloadWorkspace() {
         reloadWorkspaceQueryState()
+        reloadMaintenanceState()
     }
 
     func reloadPlanning() {
@@ -140,7 +155,11 @@ final class AppStore: ObservableObject {
     }
 
     var overviewOperations: [OverviewOperationSummary] {
-        OverviewDeriver.operationSummaries(from: workspaceQueries.snapshot, runs: runs)
+        var operations = OverviewDeriver.operationSummaries(from: workspaceQueries.snapshot, runs: runs)
+        if let maintenanceOperation = maintenanceOperationSummary {
+            operations.append(maintenanceOperation)
+        }
+        return operations
     }
 
     var firstWorkspaceItem: WorkspaceItem? {
@@ -155,6 +174,14 @@ final class AppStore: ObservableObject {
         captureRecords.filter { $0.state != .assigned }
     }
 
+    var captureTriageRecords: [CaptureRecord] {
+        captureQueueRecords.filter { $0.state == .needsReview }
+    }
+
+    var captureFailedRecords: [CaptureRecord] {
+        captureQueueRecords.filter { $0.state == .failed }
+    }
+
     var captureAssignedRecords: [CaptureRecord] {
         captureRecords
             .filter { $0.state == .assigned }
@@ -165,10 +192,17 @@ final class AppStore: ObservableObject {
             }
     }
 
-    var captureAssignableProjects: [WorkspaceItem] {
+    var captureAssignmentTargets: [WorkspaceItem] {
         workspaceQueries.items
-            .filter(\.isProjectRoot)
+            .filter(isCaptureAssignmentTarget)
             .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+    }
+
+    func maintenanceItems(for item: WorkspaceItem?) -> [MaintenanceItem] {
+        guard let item else { return [] }
+        return maintenanceItems
+            .filter { $0.projectPath == item.path }
+            .sorted { $0.createdAt > $1.createdAt }
     }
 
     func workspaceItem(for id: String) -> WorkspaceItem? {
@@ -242,6 +276,181 @@ final class AppStore: ObservableObject {
         refreshWorkflowPreflightReports()
     }
 
+    func beginProjectStatusChange(for item: WorkspaceItem, targetStatus: ProjectLifecycleStatus) {
+        guard item.isProjectRoot else { return }
+        guard let readmePath = item.readmePath else {
+            activeAlert = AppAlert(
+                title: "Missing README",
+                message: "This project does not have a root README.md to update."
+            )
+            return
+        }
+
+        let currentProjectState = item.projectState ?? ProjectState(
+            activityState: .active,
+            workflowStage: .activeInvestigation,
+            inactiveReason: nil
+        )
+        let currentStatus = currentProjectState.legacyLifecycleStatus(isArchivedStorage: item.section == .archives)
+        if targetStatus.requiresOffboarding {
+            projectStatusChangeState = ProjectStatusChangeState(
+                projectID: item.id,
+                projectPath: item.path,
+                readmePath: readmePath,
+                projectTitle: item.title,
+                currentStatus: currentStatus,
+                targetStatus: targetStatus,
+                currentProjectState: currentProjectState,
+                projectType: item.projectType,
+                dossierSlug: item.dossierSlug,
+                archiveYear: archiveYear(for: item)
+            )
+            return
+        }
+
+        let updatedState = quickProjectState(for: targetStatus, basedOn: currentProjectState)
+        updateProjectState(
+            updatedState,
+            for: item,
+            legacyStatusOverride: updatedState.legacyLifecycleStatus(isArchivedStorage: item.section == .archives)
+        )
+    }
+
+    func dismissProjectStatusChange() {
+        projectStatusChangeState = nil
+    }
+
+    func beginProjectStateEditing(for item: WorkspaceItem) {
+        guard item.isProjectRoot else { return }
+        guard let readmePath = item.readmePath else {
+            activeAlert = AppAlert(
+                title: "Missing README",
+                message: "This project does not have a root README.md to update."
+            )
+            return
+        }
+
+        let currentState = item.projectState ?? ProjectState(
+            activityState: .active,
+            workflowStage: .activeInvestigation,
+            inactiveReason: nil
+        )
+
+        projectStateEditState = ProjectStateEditState(
+            projectID: item.id,
+            projectPath: item.path,
+            readmePath: readmePath,
+            projectTitle: item.title,
+            currentState: currentState,
+            isArchivedStorage: item.section == .archives
+        )
+    }
+
+    func dismissProjectStateEdit() {
+        projectStateEditState = nil
+    }
+
+    func saveProjectStateEdit(
+        _ state: ProjectStateEditState,
+        activityState: ProjectActivityState,
+        workflowStage: ProjectWorkflowStage,
+        inactiveReason: ProjectInactiveReason?
+    ) {
+        guard let item = snapshot.items.first(where: { $0.id == state.projectID }) else {
+            activeAlert = AppAlert(
+                title: "Project not found",
+                message: "Reload the workspace and try editing the project state again."
+            )
+            return
+        }
+
+        if activityState == .inactive, inactiveReason == nil {
+            activeAlert = AppAlert(
+                title: "Inactive reason required",
+                message: "Choose why this project is inactive so waiting, finished, and discarded work stay distinct."
+            )
+            return
+        }
+
+        let normalizedState = ProjectState(
+            activityState: activityState,
+            workflowStage: workflowStage,
+            inactiveReason: activityState == .active ? nil : inactiveReason
+        )
+
+        updateProjectState(
+            normalizedState,
+            for: item,
+            legacyStatusOverride: normalizedState.legacyLifecycleStatus(isArchivedStorage: state.isArchivedStorage)
+        )
+        projectStateEditState = nil
+    }
+
+    func choosePublishedPDF() -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = false
+        panel.allowedContentTypes = [.pdf]
+        panel.prompt = "Choose PDF"
+        panel.message = "Choose the published PDF to copy into this project's docs folder."
+        panel.directoryURL = workspaceRoot
+
+        guard panel.runModal() == .OK else { return nil }
+        return panel.url?.standardizedFileURL
+    }
+
+    func completeProjectOffboarding(
+        _ state: ProjectStatusChangeState,
+        outcome: ProjectOffboardingOutcome,
+        publishedPDFURL: URL?,
+        routeToDossier: Bool,
+        producedSummary: String,
+        remainingOpenSummary: String,
+        impactSummary: String
+    ) async {
+        statusMessage = state.targetStatus == .archived
+            ? "Archiving \(state.projectTitle)…"
+            : "Finishing \(state.projectTitle)…"
+
+        do {
+            let closeout = try await applyProjectOffboarding(
+                state: state,
+                outcome: outcome,
+                publishedPDFURL: publishedPDFURL,
+                routeToDossier: routeToDossier,
+                producedSummary: producedSummary,
+                remainingOpenSummary: remainingOpenSummary,
+                impactSummary: impactSummary
+            )
+            reloadWorkspace()
+            reloadMaintenanceState()
+            projectStatusChangeState = nil
+
+            if let finalProjectPath = closeout?.finalProjectPath,
+               let itemID = workspaceItemID(forPath: finalProjectPath) {
+                select(.workspace(itemID))
+            } else if state.targetStatus == .archived {
+                select(.overview)
+            }
+
+            if let closeout, let importedPDFPath = closeout.importedPDFPath {
+                statusMessage = "\(state.targetStatus.label) — copied \(URL(fileURLWithPath: importedPDFPath).lastPathComponent)"
+            } else if let closeout, closeout.maintenanceItemCount > 0 {
+                statusMessage = "\(state.projectTitle) marked \(state.targetStatus.label.lowercased()) with \(closeout.maintenanceItemCount) follow-up \(closeout.maintenanceItemCount == 1 ? "item" : "items")"
+            } else {
+                statusMessage = "\(state.projectTitle) marked \(state.targetStatus.label.lowercased())"
+            }
+        } catch {
+            activeAlert = AppAlert(
+                title: "Could not change project status",
+                message: error.localizedDescription
+            )
+            statusMessage = error.localizedDescription
+        }
+    }
+
     func runSelectedWorkflow() {
         guard let workflow = selectedWorkflow else { return }
         let state = selectedInputs[workflow.id] ?? WorkflowParameterState()
@@ -262,6 +471,32 @@ final class AppStore: ObservableObject {
 
         selectedInputs[workflow.id] = state
         refreshWorkflowPreflightReports()
+
+        if workflow.isWriteAction {
+            do {
+                let registry = WorkflowRegistry(workspaceRoot: workspaceRoot, appProfile: appProfile)
+                let resolved = try registry.resolveCommand(
+                    workflow: workflow,
+                    state: state,
+                    selection: selectedWorkspaceItem
+                )
+                let backups = try createWorkflowWriteBackups(
+                    paths: resolved.estimatedOutputs,
+                    workspaceRoot: workspaceRoot,
+                    supportDirectory: supportDirectory()
+                )
+                if !backups.isEmpty {
+                    statusMessage = "Backed up \(backups.count) \(backups.count == 1 ? "file" : "files") before running \(workflow.label)…"
+                }
+            } catch {
+                statusMessage = error.localizedDescription
+                activeAlert = AppAlert(
+                    title: "Could not back up files before write action",
+                    message: error.localizedDescription
+                )
+                return
+            }
+        }
 
         isRunning = true
         statusMessage = "Running \(workflow.label)…"
@@ -305,6 +540,7 @@ final class AppStore: ObservableObject {
         OnboardingPreferences.persist(draft: draft)
         documentMode = draft.documentMode
         hasCompletedOnboarding = true
+        onboardingLaunchMode = nil
         statusMessage = "Workspace ready"
 
         switch draft.firstAction {
@@ -325,7 +561,18 @@ final class AppStore: ObservableObject {
         }
     }
 
+    func beginWorkspaceSwitch() {
+        onboardingLaunchMode = .switchWorkspace
+        statusMessage = "Choose a workspace root"
+    }
+
+    func cancelOnboardingLaunch() {
+        onboardingLaunchMode = hasCompletedOnboarding ? nil : .firstRun
+        statusMessage = "Ready"
+    }
+
     func reopenOnboarding() {
+        onboardingLaunchMode = .firstRun
         hasCompletedOnboarding = false
         OnboardingPreferences.reset()
     }
@@ -347,6 +594,10 @@ final class AppStore: ObservableObject {
 
     func openPath(_ path: String) {
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+
+    func openCaptureStorage() {
+        NSWorkspace.shared.activateFileViewerSelecting([captureStorageDirectory])
     }
 
     func openURL(_ url: URL) {
@@ -371,9 +622,35 @@ final class AppStore: ObservableObject {
         openDocument(draft)
     }
 
+    func linkedDossier(for item: WorkspaceItem?) -> WorkspaceItem? {
+        guard let slug = item?.dossierSlug else { return nil }
+        return workspaceQueries.items.first { candidate in
+            (candidate.section == .areas || candidate.section == .resources)
+                && URL(fileURLWithPath: candidate.path).lastPathComponent == slug
+        }
+    }
+
+    func openLinkedDossier(for item: WorkspaceItem?) {
+        guard let item, let slug = item.dossierSlug else { return }
+
+        if let dossier = linkedDossier(for: item) {
+            select(.workspace(dossier.id))
+            return
+        }
+
+        if let dossierDirectory = dossierURL(for: slug, workspaceRoot: workspaceRoot) {
+            NSWorkspace.shared.activateFileViewerSelecting([dossierDirectory])
+        }
+    }
+
     func openDocumentCache(_ document: WorkspaceDocument) {
         guard let cacheURL = document.cacheURL else { return }
         openURL(cacheURL)
+    }
+
+    func openDocsOverview(for item: WorkspaceItem?) {
+        guard let item else { return }
+        openURL(item.docsOverviewURL)
     }
 
     func openProjectRoot(_ path: String) {
@@ -481,9 +758,7 @@ final class AppStore: ObservableObject {
         }
 
         do {
-            let templateURL = try resolveDraftTemplateURL()
             let destinationURL = try createLocalDraft(
-                from: templateURL,
                 in: state.projectURL,
                 projectTitle: state.projectTitle
             )
@@ -585,6 +860,41 @@ final class AppStore: ObservableObject {
         }
     }
 
+    func addDocuments(to item: WorkspaceItem?) {
+        guard let item else { return }
+
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = true
+        panel.canCreateDirectories = false
+        panel.prompt = "Attach"
+        panel.message = "Choose files or folders to copy into this project's docs folder."
+        panel.directoryURL = item.url
+
+        guard panel.runModal() == .OK else { return }
+
+        do {
+            let importedPaths = try importDocumentsToProject(panel.urls, item: item)
+            guard !importedPaths.isEmpty else { return }
+            reloadWorkspace()
+
+            if let itemID = workspaceItemID(forPath: item.path) {
+                select(.workspace(itemID))
+            }
+
+            let count = importedPaths.count
+            statusMessage = "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title)"
+        } catch {
+            statusMessage = error.localizedDescription
+            activeAlert = AppAlert(title: "Could not attach documents", message: error.localizedDescription)
+        }
+    }
+
+    func importDocumentsToProject(_ urls: [URL], item: WorkspaceItem) throws -> [String] {
+        try importDocuments(from: urls, into: item.docsDirectoryURL)
+    }
+
     func addCaptureFiles() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = false
@@ -629,7 +939,7 @@ final class AppStore: ObservableObject {
                 state: .queued,
                 failureDescription: nil,
                 userNote: nil,
-                assignedProjectPath: nil,
+                assignedTargetPath: nil,
                 assignedAt: nil,
                 assignedDestinationPath: nil
             )
@@ -692,7 +1002,7 @@ final class AppStore: ObservableObject {
             state: .queued,
             failureDescription: nil,
             userNote: nil,
-            assignedProjectPath: nil,
+            assignedTargetPath: nil,
             assignedAt: nil,
             assignedDestinationPath: nil
         )
@@ -739,14 +1049,14 @@ final class AppStore: ObservableObject {
                 state: current.state,
                 failureDescription: current.failureDescription,
                 userNote: trimmed.isEmpty ? nil : trimmed,
-                assignedProjectPath: current.assignedProjectPath,
+                assignedTargetPath: current.assignedTargetPath,
                 assignedAt: current.assignedAt,
                 assignedDestinationPath: current.assignedDestinationPath
             )
         }
     }
 
-    func assignCaptureRecord(_ recordID: String, to project: WorkspaceItem, note: String) async {
+    func assignCaptureRecord(_ recordID: String, to target: WorkspaceItem, note: String) async {
         guard let current = captureRecords.first(where: { $0.id == recordID }) else { return }
         guard current.state != .assigned else { return }
         guard let importedStoragePath = current.importedStoragePath, !importedStoragePath.isEmpty else {
@@ -766,7 +1076,7 @@ final class AppStore: ObservableObject {
                 state: .processing,
                 failureDescription: nil,
                 userNote: normalizedNote.isEmpty ? nil : normalizedNote,
-                assignedProjectPath: existing.assignedProjectPath,
+                assignedTargetPath: existing.assignedTargetPath,
                 assignedAt: existing.assignedAt,
                 assignedDestinationPath: existing.assignedDestinationPath
             )
@@ -775,7 +1085,7 @@ final class AppStore: ObservableObject {
         do {
             let destinationURL = try await copyCaptureRecord(
                 from: URL(fileURLWithPath: importedStoragePath),
-                into: project.url.appendingPathComponent("docs", isDirectory: true)
+                into: target.url.appendingPathComponent("docs", isDirectory: true)
             )
 
             updateCaptureRecord(recordID) { existing in
@@ -789,14 +1099,14 @@ final class AppStore: ObservableObject {
                     state: .assigned,
                     failureDescription: nil,
                     userNote: normalizedNote.isEmpty ? nil : normalizedNote,
-                    assignedProjectPath: project.path,
+                    assignedTargetPath: target.path,
                     assignedAt: .now,
                     assignedDestinationPath: destinationURL.path
                 )
             }
 
             reloadWorkspace()
-            statusMessage = "Assigned \(current.displayTitle) to \(project.title)"
+            statusMessage = "Assigned \(current.displayTitle) to \(target.title)"
         } catch {
             updateCaptureRecord(recordID) { existing in
                 CaptureRecord(
@@ -809,12 +1119,97 @@ final class AppStore: ObservableObject {
                     state: .failed,
                     failureDescription: error.localizedDescription,
                     userNote: normalizedNote.isEmpty ? nil : normalizedNote,
-                    assignedProjectPath: existing.assignedProjectPath,
+                    assignedTargetPath: existing.assignedTargetPath,
                     assignedAt: existing.assignedAt,
                     assignedDestinationPath: existing.assignedDestinationPath
                 )
             }
             statusMessage = "Could not assign \(current.displayTitle)"
+        }
+    }
+
+    private func isCaptureAssignmentTarget(_ item: WorkspaceItem) -> Bool {
+        switch item.section {
+        case .projects:
+            return item.isProjectRoot
+        case .areas:
+            return isTopLevelArea(item)
+        case .resources, .archives:
+            return false
+        }
+    }
+
+    private func isTopLevelArea(_ item: WorkspaceItem) -> Bool {
+        let rootComponents = workspaceRoot.standardizedFileURL.pathComponents
+        let itemComponents = item.url.standardizedFileURL.pathComponents
+        guard itemComponents.starts(with: rootComponents) else { return false }
+        let relativeComponents = Array(itemComponents.dropFirst(rootComponents.count))
+        guard relativeComponents.first == "Areas" else { return false }
+        return relativeComponents.count == 2
+    }
+
+    func archiveCaptureRecord(_ recordID: String) async {
+        guard let current = captureRecords.first(where: { $0.id == recordID }) else { return }
+        guard let importedStoragePath = current.importedStoragePath, !importedStoragePath.isEmpty else {
+            statusMessage = "This capture item does not have a stored copy to archive."
+            return
+        }
+
+        updateCaptureRecord(
+            recordID,
+            state: .processing,
+            failureDescription: nil
+        )
+
+        let sourceURL = URL(fileURLWithPath: importedStoragePath)
+        let archiveRoot = workspaceRoot
+            .appendingPathComponent("Archives", isDirectory: true)
+            .appendingPathComponent("Capture archive", isDirectory: true)
+
+        do {
+            _ = try await moveCaptureRecord(from: sourceURL, into: archiveRoot)
+            cleanupCaptureContainer(afterRemoving: sourceURL)
+            removeCaptureRecord(recordID)
+            reloadWorkspace()
+            statusMessage = "Archived \(current.displayTitle) to Capture archive"
+        } catch {
+            updateCaptureRecord(
+                recordID,
+                state: .failed,
+                failureDescription: error.localizedDescription
+            )
+            statusMessage = "Could not archive \(current.displayTitle)"
+        }
+    }
+
+    func deleteCaptureRecord(_ recordID: String) async {
+        guard let current = captureRecords.first(where: { $0.id == recordID }) else { return }
+        guard let importedStoragePath = current.importedStoragePath, !importedStoragePath.isEmpty else {
+            removeCaptureRecord(recordID)
+            statusMessage = "Deleted \(current.displayTitle) from Capture"
+            return
+        }
+
+        updateCaptureRecord(
+            recordID,
+            state: .processing,
+            failureDescription: nil
+        )
+
+        let sourceURL = URL(fileURLWithPath: importedStoragePath)
+
+        do {
+            try await deleteCaptureRecordPayload(at: sourceURL)
+            cleanupCaptureContainer(afterRemoving: sourceURL)
+            removeCaptureRecord(recordID)
+            statusMessage = "Deleted \(current.displayTitle) from Capture"
+        } catch {
+            updateCaptureRecord(
+                recordID,
+                state: .failed,
+                failureDescription: error.localizedDescription
+            )
+            statusMessage = "Could not delete \(current.displayTitle)"
         }
     }
 
@@ -826,13 +1221,43 @@ final class AppStore: ObservableObject {
     }
 
     private func reloadCaptureState() {
-        if let storedRecords = captureStore.loadRecords() {
-            captureRecords = storedRecords.sorted { $0.capturedAt > $1.capturedAt }
-            return
+        switch captureStore.loadCatalog() {
+        case .loaded(let catalog):
+            let mergedRecords = mergedCaptureRecordsWithRecoveredItems(catalog.records)
+            captureRecords = mergedRecords
+            if mergedRecords != catalog.records {
+                captureStore.replace(with: mergedRecords)
+            }
+        case .missing:
+            let recoveredRecords = captureStore.recoverRecordsFromStorage(excluding: [])
+            captureRecords = recoveredRecords
+            if !recoveredRecords.isEmpty {
+                captureStore.replace(with: recoveredRecords)
+            }
+        case .unreadable, .workspaceMismatch:
+            let recoveredRecords = captureStore.recoverRecordsFromStorage(excluding: [])
+            captureRecords = recoveredRecords
         }
+    }
 
-        captureRecords = []
-        captureStore.replace(with: captureRecords)
+    private func reloadMaintenanceState() {
+        maintenanceItems = maintenanceStore.load()
+    }
+
+    private var maintenanceOperationSummary: OverviewOperationSummary? {
+        guard !maintenanceItems.isEmpty else { return nil }
+        let target = maintenanceItems.first.flatMap { item -> OverviewTarget? in
+            workspaceItemID(forPath: item.projectPath).map(OverviewTarget.workspace)
+        } ?? .overview
+
+        return OverviewOperationSummary(
+            id: "workspace-maintenance",
+            title: "Workspace maintenance queue",
+            detail: "\(maintenanceItems.count) closeout \(maintenanceItems.count == 1 ? "follow-up is" : "follow-ups are") waiting, such as missing publication PDFs, optional summaries, or dossier handoff.",
+            buttonTitle: "Open project",
+            count: maintenanceItems.count,
+            target: target
+        )
     }
 
     private func applySelection(
@@ -872,6 +1297,18 @@ final class AppStore: ObservableObject {
         switch selection {
         case .workspace(let id):
             selectedWorkspaceItemID = id
+            reloadWorkspace()
+            if let item = workspaceQueries.item(id: id) {
+                AppDebugLog.write(
+                    "[jwh] workspace-detail path=\(item.path) frontmatter=\(item.frontmatter.count) docs=\(item.documents.count) state=\(item.projectStateDetailLabel)",
+                    supportDirectory: supportDirectory()
+                )
+            } else {
+                AppDebugLog.write(
+                    "[jwh] workspace-detail missing id=\(id)",
+                    supportDirectory: supportDirectory()
+                )
+            }
             reloadWorkflows()
         default:
             refreshWorkflowPreflightReports()
@@ -1088,59 +1525,7 @@ final class AppStore: ObservableObject {
         })?.id
     }
 
-    private func resolveDraftTemplateURL() throws -> URL {
-        if let savedTemplateURL = DraftTemplatePreferences.savedURL() {
-            return savedTemplateURL
-        }
-
-        let suggestedTemplateURL = DraftSupport.suggestedTemplateURL()
-        let legacySavedTemplateURL = DraftTemplatePreferences.legacySavedURL()
-
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        panel.allowsMultipleSelection = false
-        panel.canCreateDirectories = false
-        if let docxType = UTType(filenameExtension: "docx") {
-            panel.allowedContentTypes = [docxType]
-        }
-        panel.prompt = "Use template"
-        panel.message = draftTemplateSelectionMessage(
-            suggestedTemplateURL: suggestedTemplateURL,
-            legacySavedTemplateURL: legacySavedTemplateURL
-        )
-        panel.directoryURL = legacySavedTemplateURL?.deletingLastPathComponent()
-            ?? suggestedTemplateURL?.deletingLastPathComponent()
-            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Downloads", isDirectory: true)
-
-        guard panel.runModal() == .OK, let templateURL = panel.url else {
-            throw NSError(
-                domain: "JournalismWorkflowHub.DraftTemplate",
-                code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Draft creation was cancelled because no `.docx` template was selected."]
-            )
-        }
-
-        DraftTemplatePreferences.persist(templateURL)
-        return templateURL
-    }
-
-    private func draftTemplateSelectionMessage(
-        suggestedTemplateURL: URL?,
-        legacySavedTemplateURL: URL?
-    ) -> String {
-        if let legacySavedTemplateURL {
-            return "Choose the `.docx` draft template the scaffold should copy into new projects. Re-select `\(legacySavedTemplateURL.lastPathComponent)` once so the app keeps permission to read it."
-        }
-
-        if let suggestedTemplateURL {
-            return "Choose the `.docx` draft template the scaffold should copy into new projects. Suggested: `\(suggestedTemplateURL.lastPathComponent)` in `\(suggestedTemplateURL.deletingLastPathComponent().path)`."
-        }
-
-        return "Choose the `.docx` draft template the scaffold should copy into new projects."
-    }
-
-    private func createLocalDraft(from templateURL: URL, in projectURL: URL, projectTitle: String) throws -> URL {
+    private func createLocalDraft(in projectURL: URL, projectTitle: String) throws -> URL {
         let fileManager = FileManager.default
         let destinationURL = projectURL.appendingPathComponent(DraftSupport.localDraftFilename(projectTitle: projectTitle))
 
@@ -1152,9 +1537,9 @@ final class AppStore: ObservableObject {
             )
         }
 
-        try SecurityScopedAccess.withAccess(to: [templateURL, projectURL]) {
-            try fileManager.copyItem(at: templateURL, to: destinationURL)
-        }
+        let draftData = try DraftSupport.scaffoldDraftData(projectTitle: projectTitle)
+        try fileManager.createDirectory(at: projectURL, withIntermediateDirectories: true, attributes: nil)
+        try draftData.write(to: destinationURL, options: .atomic)
         return destinationURL
     }
 
@@ -1202,6 +1587,21 @@ final class AppStore: ObservableObject {
         captureStore.replace(with: captureRecords)
     }
 
+    private func removeCaptureRecord(_ id: String) {
+        captureRecords.removeAll { $0.id == id }
+        captureStore.replace(with: captureRecords)
+    }
+
+    private func mergedCaptureRecordsWithRecoveredItems(_ records: [CaptureRecord]) -> [CaptureRecord] {
+        let existingRecordIDs = Set(records.map(\.id))
+        let recoveredRecords = captureStore.recoverRecordsFromStorage(excluding: existingRecordIDs)
+        guard !recoveredRecords.isEmpty else {
+            return records.sorted { $0.capturedAt > $1.capturedAt }
+        }
+
+        return (records + recoveredRecords).sorted { $0.capturedAt > $1.capturedAt }
+    }
+
     private func updateCaptureRecord(
         _ id: String,
         displayName: String? = nil,
@@ -1221,7 +1621,7 @@ final class AppStore: ObservableObject {
             state: state ?? current.state,
             failureDescription: failureDescription,
             userNote: current.userNote,
-            assignedProjectPath: current.assignedProjectPath,
+            assignedTargetPath: current.assignedTargetPath,
             assignedAt: current.assignedAt,
             assignedDestinationPath: current.assignedDestinationPath
         )
@@ -1357,6 +1757,48 @@ final class AppStore: ObservableObject {
         }.value
     }
 
+    private func moveCaptureRecord(from sourceURL: URL, into destinationRoot: URL) async throws -> URL {
+        let normalizedSource = sourceURL.standardizedFileURL
+        let normalizedDestinationRoot = destinationRoot.standardizedFileURL
+
+        return try await Task.detached(priority: .userInitiated) {
+            let fileManager = FileManager.default
+            try fileManager.createDirectory(at: normalizedDestinationRoot, withIntermediateDirectories: true, attributes: nil)
+            let destinationURL = uniqueImportDestinationForCapture(
+                sourceURL: normalizedSource,
+                in: normalizedDestinationRoot,
+                fileManager: fileManager
+            )
+            try fileManager.moveItem(at: normalizedSource, to: destinationURL)
+            return destinationURL
+        }.value
+    }
+
+    private func deleteCaptureRecordPayload(at sourceURL: URL) async throws {
+        let normalizedSource = sourceURL.standardizedFileURL
+
+        try await Task.detached(priority: .userInitiated) {
+            let fileManager = FileManager.default
+            if fileManager.fileExists(atPath: normalizedSource.path) {
+                try fileManager.removeItem(at: normalizedSource)
+            }
+        }.value
+    }
+
+    private func cleanupCaptureContainer(afterRemoving sourceURL: URL) {
+        let containerURL = sourceURL.standardizedFileURL.deletingLastPathComponent()
+        guard containerURL.lastPathComponent.count == 36 else { return }
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: containerURL,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else {
+            return
+        }
+        guard contents.isEmpty else { return }
+        try? FileManager.default.removeItem(at: containerURL)
+    }
+
     private func configuration(for draft: OnboardingDraft) throws -> AppConfiguration {
         switch draft.startMode {
         case .demo:
@@ -1396,6 +1838,7 @@ final class AppStore: ObservableObject {
         scanner = WorkspaceScanner(workspaceRoot: configuration.workspaceRoot)
         catalog = WorkspaceCatalogStore(workspaceRoot: configuration.workspaceRoot)
         captureStore = CaptureStore(workspaceRoot: configuration.workspaceRoot)
+        maintenanceStore = MaintenanceStore(workspaceRoot: configuration.workspaceRoot)
         workspaceQueries = .empty
         runner = CommandRunner(workspaceRoot: configuration.workspaceRoot, appProfile: configuration.profile)
         WorkspaceRootResolver.persistProfile(configuration.profile)
@@ -1406,6 +1849,221 @@ final class AppStore: ObservableObject {
         forwardHistory.removeAll()
         updateNavigationAvailability()
         reloadAll()
+    }
+
+    private func updateProjectState(
+        _ projectState: ProjectState,
+        for item: WorkspaceItem,
+        legacyStatusOverride: ProjectLifecycleStatus? = nil
+    ) {
+        guard let readmePath = item.readmePath else {
+            activeAlert = AppAlert(
+                title: "Missing README",
+                message: "This project does not have a root README.md to update."
+            )
+            return
+        }
+
+        do {
+            let readmeURL = URL(fileURLWithPath: readmePath)
+            let currentText = try String(contentsOf: readmeURL, encoding: .utf8)
+            let updatedText = updateFrontmatter(in: currentText) { frontmatter, orderedKeys in
+                let legacyStatus = legacyStatusOverride
+                    ?? projectState.legacyLifecycleStatus(isArchivedStorage: item.section == .archives)
+                applyProjectStateFrontmatter(
+                    projectState,
+                    legacyStatus: legacyStatus,
+                    to: &frontmatter,
+                    orderedKeys: &orderedKeys
+                )
+            }
+            try updatedText.write(to: readmeURL, atomically: true, encoding: .utf8)
+            reloadWorkspace()
+            statusMessage = "\(item.title) updated to \(projectState.detailLabel.lowercased())"
+        } catch {
+            activeAlert = AppAlert(
+                title: "Could not update project state",
+                message: error.localizedDescription
+            )
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    private func quickProjectState(
+        for targetStatus: ProjectLifecycleStatus,
+        basedOn currentState: ProjectState
+    ) -> ProjectState {
+        switch targetStatus {
+        case .active:
+            return ProjectState(
+                activityState: .active,
+                workflowStage: currentState.workflowStage,
+                inactiveReason: nil
+            )
+        case .onHold:
+            return ProjectState(
+                activityState: .inactive,
+                workflowStage: currentState.workflowStage,
+                inactiveReason: .waiting
+            )
+        case .done, .archived:
+            return ProjectState(
+                activityState: .inactive,
+                workflowStage: currentState.workflowStage,
+                inactiveReason: .finished
+            )
+        }
+    }
+
+    private func archiveYear(for item: WorkspaceItem) -> String {
+        let components = URL(fileURLWithPath: item.path).standardizedFileURL.pathComponents
+        if let projectsIndex = components.firstIndex(of: "Projects"), components.indices.contains(projectsIndex + 1) {
+            let candidate = components[projectsIndex + 1]
+            if candidate.count == 4, Int(candidate) != nil {
+                return candidate
+            }
+        }
+        if let started = item.frontmatter["started"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+           started.count >= 4 {
+            let candidate = String(started.prefix(4))
+            if Int(candidate) != nil {
+                return candidate
+            }
+        }
+        return String(Calendar(identifier: .gregorian).component(.year, from: .now))
+    }
+
+    private func applyProjectOffboarding(
+        state: ProjectStatusChangeState,
+        outcome: ProjectOffboardingOutcome,
+        publishedPDFURL: URL?,
+        routeToDossier: Bool,
+        producedSummary: String,
+        remainingOpenSummary: String,
+        impactSummary: String
+    ) async throws -> ProjectOffboardingResult? {
+        let projectURL = URL(fileURLWithPath: state.projectPath)
+        let readmeURL = URL(fileURLWithPath: state.readmePath)
+        let docsURL = projectURL.appendingPathComponent("docs", isDirectory: true)
+        let trimmedProducedSummary = producedSummary.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedRemainingOpenSummary = remainingOpenSummary.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedImpactSummary = impactSummary.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        var importedPDFPath: String?
+        if let publishedPDFURL {
+            let importedPaths = try copyDocuments([publishedPDFURL], into: docsURL)
+            importedPDFPath = importedPaths.first
+        }
+
+        let currentText = try String(contentsOf: readmeURL, encoding: .utf8)
+        var finalProjectState = ProjectState(
+            activityState: .inactive,
+            workflowStage: outcome == .published ? .published : state.currentProjectState.workflowStage,
+            inactiveReason: .finished
+        )
+        if outcome != .published, state.currentProjectState.workflowStage == .published {
+            finalProjectState = ProjectState(
+                activityState: .inactive,
+                workflowStage: .activeInvestigation,
+                inactiveReason: .finished
+            )
+        }
+        let managedSection = buildProjectCloseoutSection(
+            status: state.targetStatus,
+            projectState: finalProjectState,
+            outcome: outcome,
+            projectRoot: projectURL,
+            importedPDFPath: importedPDFPath,
+            producedSummary: trimmedProducedSummary,
+            remainingOpenSummary: trimmedRemainingOpenSummary,
+            impactSummary: trimmedImpactSummary
+        )
+
+        let updatedText = updateFrontmatter(in: currentText) { frontmatter, orderedKeys in
+            applyProjectStateFrontmatter(
+                finalProjectState,
+                legacyStatus: state.targetStatus,
+                to: &frontmatter,
+                orderedKeys: &orderedKeys
+            )
+        }
+        let finalText = upsertingManagedSection(
+            in: updatedText,
+            startMarker: projectCloseoutSectionStart,
+            endMarker: projectCloseoutSectionEnd,
+            sectionBody: managedSection
+        )
+
+        try finalText.write(to: readmeURL, atomically: true, encoding: .utf8)
+
+        var finalProjectURL = projectURL
+        if state.targetStatus == .archived {
+            let archiveDestination = archiveDestinationURL(
+                for: projectURL,
+                year: state.archiveYear,
+                projectType: state.projectType,
+                outcome: outcome,
+                workspaceRoot: workspaceRoot
+            )
+            try moveProjectDirectory(from: projectURL, to: archiveDestination)
+            finalProjectURL = archiveDestination
+            if let existingImportedPDFPath = importedPDFPath {
+                importedPDFPath = finalProjectURL
+                    .appendingPathComponent("docs", isDirectory: true)
+                    .appendingPathComponent(URL(fileURLWithPath: existingImportedPDFPath).lastPathComponent)
+                    .path
+            }
+        }
+
+        var updatedMaintenanceItems = maintenanceStore.load()
+        updatedMaintenanceItems.removeAll {
+            $0.source == "project_offboarding"
+                && ($0.projectPath == state.projectPath || $0.projectPath == finalProjectURL.path)
+        }
+
+        if routeToDossier, let dossierURL = dossierURL(for: state.dossierSlug, workspaceRoot: workspaceRoot) {
+            try writeDossierHandoffNote(
+                to: dossierURL,
+                projectTitle: state.projectTitle,
+                projectURL: finalProjectURL,
+                status: state.targetStatus,
+                projectState: finalProjectState,
+                outcome: outcome,
+                importedPDFPath: importedPDFPath,
+                producedSummary: trimmedProducedSummary,
+                remainingOpenSummary: trimmedRemainingOpenSummary,
+                impactSummary: trimmedImpactSummary
+            )
+        } else if routeToDossier, state.dossierSlug != nil {
+            updatedMaintenanceItems.append(
+                makeMaintenanceItem(
+                    kind: .missingDossierHandoff,
+                    projectTitle: state.projectTitle,
+                    projectPath: finalProjectURL.path,
+                    detail: "The project links to dossier `\(state.dossierSlug ?? "")`, but no dossier folder was found for a durable closeout handoff."
+                )
+            )
+        }
+
+        updatedMaintenanceItems.append(contentsOf: maintenanceItemsForOffboarding(
+            state: state,
+            outcome: outcome,
+            finalProjectPath: finalProjectURL.path,
+            publishedPDFImported: importedPDFPath != nil,
+            routeToDossier: routeToDossier,
+            producedSummary: trimmedProducedSummary,
+            remainingOpenSummary: trimmedRemainingOpenSummary,
+            impactSummary: trimmedImpactSummary
+        ))
+        maintenanceStore.replace(with: updatedMaintenanceItems)
+
+        return ProjectOffboardingResult(
+            importedPDFPath: importedPDFPath,
+            finalProjectPath: finalProjectURL.path,
+            maintenanceItemCount: updatedMaintenanceItems.filter {
+                $0.source == "project_offboarding" && $0.projectPath == finalProjectURL.path
+            }.count
+        )
     }
 }
 
@@ -1472,4 +2130,417 @@ struct AppAlert: Identifiable, Hashable {
     let id = UUID()
     let title: String
     let message: String
+}
+
+private struct ParsedReadmeDocument {
+    var frontmatter: [String: String]
+    var orderedKeys: [String]
+    var body: String
+}
+
+private struct ProjectOffboardingResult {
+    let importedPDFPath: String?
+    let finalProjectPath: String
+    let maintenanceItemCount: Int
+}
+
+private let projectCloseoutSectionStart = "<!-- project_closeout:start -->"
+private let projectCloseoutSectionEnd = "<!-- project_closeout:end -->"
+
+private func parseReadmeDocument(_ text: String) -> ParsedReadmeDocument {
+    guard text.hasPrefix("---\n") else {
+        return ParsedReadmeDocument(frontmatter: [:], orderedKeys: [], body: text)
+    }
+
+    let lines = text.components(separatedBy: .newlines)
+    var frontmatter: [String: String] = [:]
+    var orderedKeys: [String] = []
+    var endIndex: Int?
+
+    for index in 1..<lines.count {
+        if lines[index].trimmingCharacters(in: .whitespacesAndNewlines) == "---" {
+            endIndex = index
+            break
+        }
+
+        guard let colon = lines[index].firstIndex(of: ":") else { continue }
+        let key = String(lines[index][..<colon]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = String(lines[index][lines[index].index(after: colon)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        frontmatter[key] = value
+        if !orderedKeys.contains(key) {
+            orderedKeys.append(key)
+        }
+    }
+
+    guard let endIndex else {
+        return ParsedReadmeDocument(frontmatter: [:], orderedKeys: [], body: text)
+    }
+
+    let body = lines.dropFirst(endIndex + 1).joined(separator: "\n")
+    return ParsedReadmeDocument(frontmatter: frontmatter, orderedKeys: orderedKeys, body: body)
+}
+
+private func updateFrontmatter(
+    in text: String,
+    mutate: (inout [String: String], inout [String]) -> Void
+) -> String {
+    var document = parseReadmeDocument(text)
+    mutate(&document.frontmatter, &document.orderedKeys)
+
+    let orderedKeys = document.orderedKeys + document.frontmatter.keys.filter { !document.orderedKeys.contains($0) }.sorted()
+    var lines = ["---"]
+    for key in orderedKeys {
+        guard let value = document.frontmatter[key] else { continue }
+        lines.append("\(key): \(value)")
+    }
+    lines.append("---")
+
+    let frontmatterText = lines.joined(separator: "\n")
+    if document.body.isEmpty {
+        return frontmatterText + "\n"
+    }
+    return frontmatterText + "\n" + document.body
+}
+
+private func upsertingManagedSection(
+    in text: String,
+    startMarker: String,
+    endMarker: String,
+    sectionBody: String
+) -> String {
+    if let startRange = text.range(of: startMarker),
+       let endRange = text.range(of: endMarker, range: startRange.upperBound..<text.endIndex) {
+        let replacementRange = startRange.lowerBound..<endRange.upperBound
+        return text.replacingCharacters(in: replacementRange, with: sectionBody)
+    }
+
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.isEmpty {
+        return sectionBody + "\n"
+    }
+    return trimmed + "\n\n" + sectionBody + "\n"
+}
+
+private func buildProjectCloseoutSection(
+    status: ProjectLifecycleStatus,
+    projectState: ProjectState,
+    outcome: ProjectOffboardingOutcome,
+    projectRoot: URL,
+    importedPDFPath: String?,
+    producedSummary: String,
+    remainingOpenSummary: String,
+    impactSummary: String
+) -> String {
+    var lines = [projectCloseoutSectionStart, "## Project Closeout", ""]
+    lines.append("- Closed on: `\(currentISODateString())`")
+    lines.append("- Status set to: `\(status.rawValue)`")
+    lines.append("- Activity state: `\(projectState.activityState.rawValue)`")
+    lines.append("- Workflow stage: `\(projectState.workflowStage.rawValue)`")
+    if let inactiveReason = projectState.inactiveReason {
+        lines.append("- Inactive reason: `\(inactiveReason.rawValue)`")
+    }
+    lines.append("- Outcome: `\(outcome.rawValue)`")
+
+    if let importedPDFPath {
+        lines.append("- Published PDF: `\(relativePath(importedPDFPath, from: projectRoot.path))`")
+    }
+    if !producedSummary.isEmpty {
+        lines.append("- What it produced: \(producedSummary)")
+    }
+    if !remainingOpenSummary.isEmpty {
+        lines.append("- What remains open: \(remainingOpenSummary)")
+    }
+    if !impactSummary.isEmpty {
+        lines.append("- Impact / follow-up: \(impactSummary)")
+    }
+
+    lines.append("")
+    lines.append(projectCloseoutSectionEnd)
+    return lines.joined(separator: "\n")
+}
+
+private func applyProjectStateFrontmatter(
+    _ projectState: ProjectState,
+    legacyStatus: ProjectLifecycleStatus,
+    to frontmatter: inout [String: String],
+    orderedKeys: inout [String]
+) {
+    frontmatter["activity_state"] = projectState.activityState.rawValue
+    frontmatter["workflow_stage"] = projectState.workflowStage.rawValue
+    if let inactiveReason = projectState.inactiveReason, projectState.activityState == .inactive {
+        frontmatter["inactive_reason"] = inactiveReason.rawValue
+    } else {
+        frontmatter.removeValue(forKey: "inactive_reason")
+    }
+    frontmatter["status"] = legacyStatus.rawValue
+
+    for key in ["activity_state", "workflow_stage", "inactive_reason", "status"] where !orderedKeys.contains(key) {
+        orderedKeys.append(key)
+    }
+}
+
+private func currentISODateString() -> String {
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(secondsFromGMT: 0)
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter.string(from: Date())
+}
+
+private func relativePath(_ path: String, from rootPath: String) -> String {
+    let normalizedPath = URL(fileURLWithPath: path).standardizedFileURL.path
+    let normalizedRoot = URL(fileURLWithPath: rootPath).standardizedFileURL.path
+    guard normalizedPath.hasPrefix(normalizedRoot + "/") else {
+        return normalizedPath
+    }
+    return String(normalizedPath.dropFirst(normalizedRoot.count + 1))
+}
+
+private func copyDocuments(_ urls: [URL], into docsURL: URL) throws -> [String] {
+    try FileManager.default.createDirectory(at: docsURL, withIntermediateDirectories: true, attributes: nil)
+    var importedPaths: [String] = []
+
+    for url in urls {
+        let destination = uniqueImportDestinationForCapture(
+            sourceURL: url.standardizedFileURL,
+            in: docsURL.standardizedFileURL,
+            fileManager: FileManager.default
+        )
+        try SecurityScopedAccess.withAccess(to: [url, docsURL]) {
+            try FileManager.default.copyItem(at: url, to: destination)
+        }
+        importedPaths.append(destination.path)
+    }
+
+    return importedPaths
+}
+
+private func archiveDestinationURL(
+    for projectURL: URL,
+    year: String,
+    projectType: WorkspaceProjectType,
+    outcome: ProjectOffboardingOutcome,
+    workspaceRoot: URL
+) -> URL {
+    let archiveYearRoot = workspaceRoot
+        .appendingPathComponent("Archives", isDirectory: true)
+        .appendingPathComponent(year, isDirectory: true)
+
+    let parentURL: URL
+    if projectType == .tooling {
+        parentURL = archiveYearRoot.appendingPathComponent("personal", isDirectory: true)
+    } else if outcome == .unpublished || outcome == .superseded {
+        parentURL = archiveYearRoot.appendingPathComponent("unpublished", isDirectory: true)
+    } else {
+        parentURL = archiveYearRoot
+    }
+
+    return uniqueDirectoryDestination(
+        sourceURL: projectURL.standardizedFileURL,
+        in: parentURL.standardizedFileURL,
+        fileManager: .default
+    )
+}
+
+private func uniqueDirectoryDestination(sourceURL: URL, in parentURL: URL, fileManager: FileManager) -> URL {
+    let initialDestination = parentURL.appendingPathComponent(sourceURL.lastPathComponent, isDirectory: true)
+    guard fileManager.fileExists(atPath: initialDestination.path) else {
+        return initialDestination
+    }
+
+    var suffix = 2
+    while true {
+        let candidate = parentURL.appendingPathComponent("\(sourceURL.lastPathComponent)_\(suffix)", isDirectory: true)
+        if !fileManager.fileExists(atPath: candidate.path) {
+            return candidate
+        }
+        suffix += 1
+    }
+}
+
+private func moveProjectDirectory(from sourceURL: URL, to destinationURL: URL) throws {
+    try FileManager.default.createDirectory(
+        at: destinationURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true,
+        attributes: nil
+    )
+    try FileManager.default.moveItem(at: sourceURL, to: destinationURL)
+}
+
+private func dossierURL(for slug: String?, workspaceRoot: URL) -> URL? {
+    guard let slug, !slug.isEmpty else { return nil }
+    let candidates = [
+        workspaceRoot.appendingPathComponent("Areas", isDirectory: true).appendingPathComponent(slug, isDirectory: true),
+        workspaceRoot.appendingPathComponent("Resources", isDirectory: true).appendingPathComponent(slug, isDirectory: true)
+    ]
+
+    for candidate in candidates {
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDirectory), isDirectory.boolValue {
+            return candidate
+        }
+    }
+    return nil
+}
+
+private func writeDossierHandoffNote(
+    to dossierURL: URL,
+    projectTitle: String,
+    projectURL: URL,
+    status: ProjectLifecycleStatus,
+    projectState: ProjectState,
+    outcome: ProjectOffboardingOutcome,
+    importedPDFPath: String?,
+    producedSummary: String,
+    remainingOpenSummary: String,
+    impactSummary: String
+) throws {
+    let handoffDirectory = dossierURL
+        .appendingPathComponent("docs", isDirectory: true)
+        .appendingPathComponent("project_closeouts", isDirectory: true)
+    try FileManager.default.createDirectory(at: handoffDirectory, withIntermediateDirectories: true, attributes: nil)
+
+    let fileURL = handoffDirectory.appendingPathComponent("\(projectURL.lastPathComponent)_closeout.md")
+    let note = buildDossierHandoffNote(
+        dossierURL: dossierURL,
+        projectTitle: projectTitle,
+        projectURL: projectURL,
+        status: status,
+        projectState: projectState,
+        outcome: outcome,
+        importedPDFPath: importedPDFPath,
+        producedSummary: producedSummary,
+        remainingOpenSummary: remainingOpenSummary,
+        impactSummary: impactSummary
+    )
+    try note.write(to: fileURL, atomically: true, encoding: .utf8)
+}
+
+private func buildDossierHandoffNote(
+    dossierURL: URL,
+    projectTitle: String,
+    projectURL: URL,
+    status: ProjectLifecycleStatus,
+    projectState: ProjectState,
+    outcome: ProjectOffboardingOutcome,
+    importedPDFPath: String?,
+    producedSummary: String,
+    remainingOpenSummary: String,
+    impactSummary: String
+) -> String {
+    var lines = [
+        "# \(projectTitle) closeout handoff",
+        "",
+        "- Added on: `\(currentISODateString())`",
+        "- Project folder: `\(relativePath(projectURL.path, from: dossierURL.path))`",
+        "- Final status: `\(status.rawValue)`",
+        "- Activity state: `\(projectState.activityState.rawValue)`",
+        "- Workflow stage: `\(projectState.workflowStage.rawValue)`",
+        "- Outcome: `\(outcome.rawValue)`"
+    ]
+
+    if let inactiveReason = projectState.inactiveReason {
+        lines.append("- Inactive reason: `\(inactiveReason.rawValue)`")
+    }
+
+    if let importedPDFPath {
+        lines.append("- Published PDF: `\(relativePath(importedPDFPath, from: dossierURL.path))`")
+    }
+    if !producedSummary.isEmpty {
+        lines.append("- What it produced: \(producedSummary)")
+    }
+    if !remainingOpenSummary.isEmpty {
+        lines.append("- What remains open: \(remainingOpenSummary)")
+    }
+    if !impactSummary.isEmpty {
+        lines.append("- Impact / follow-up: \(impactSummary)")
+    }
+
+    lines.append("")
+    lines.append("Keep this note as the dossier-facing trace of what this project produced and what may still matter later.")
+    return lines.joined(separator: "\n")
+}
+
+private func maintenanceItemsForOffboarding(
+    state: ProjectStatusChangeState,
+    outcome: ProjectOffboardingOutcome,
+    finalProjectPath: String,
+    publishedPDFImported: Bool,
+    routeToDossier: Bool,
+    producedSummary: String,
+    remainingOpenSummary: String,
+    impactSummary: String
+) -> [MaintenanceItem] {
+    var items: [MaintenanceItem] = []
+
+    if outcome == .published && !publishedPDFImported {
+        items.append(
+            makeMaintenanceItem(
+                kind: .missingPublishedPDF,
+                projectTitle: state.projectTitle,
+                projectPath: finalProjectPath,
+                detail: "Add the canonical published PDF to this project's docs folder so publication handoff is complete."
+            )
+        )
+    }
+    if producedSummary.isEmpty {
+        items.append(
+            makeMaintenanceItem(
+                kind: .missingProducedSummary,
+                projectTitle: state.projectTitle,
+                projectPath: finalProjectPath,
+                detail: "Add a short note about what this project produced."
+            )
+        )
+    }
+    if remainingOpenSummary.isEmpty {
+        items.append(
+            makeMaintenanceItem(
+                kind: .missingRemainingOpen,
+                projectTitle: state.projectTitle,
+                projectPath: finalProjectPath,
+                detail: "Add the lingering questions or follow-up threads that remain open after closeout."
+            )
+        )
+    }
+    if impactSummary.isEmpty {
+        items.append(
+            makeMaintenanceItem(
+                kind: .missingImpactSummary,
+                projectTitle: state.projectTitle,
+                projectPath: finalProjectPath,
+                detail: "Add any impact or follow-up worth remembering, such as questions, reactions, or government response."
+            )
+        )
+    }
+    if state.dossierSlug != nil && !routeToDossier {
+        items.append(
+            makeMaintenanceItem(
+                kind: .missingDossierHandoff,
+                projectTitle: state.projectTitle,
+                projectPath: finalProjectPath,
+                detail: "This project links to dossier `\(state.dossierSlug ?? "")`, but closeout skipped the dossier handoff."
+            )
+        )
+    }
+
+    return items
+}
+
+private func makeMaintenanceItem(
+    kind: MaintenanceItemKind,
+    projectTitle: String,
+    projectPath: String,
+    detail: String
+) -> MaintenanceItem {
+    MaintenanceItem(
+        id: "project_offboarding::\(kind.rawValue)::\(projectPath)",
+        kind: kind,
+        projectTitle: projectTitle,
+        projectPath: projectPath,
+        detail: detail,
+        createdAt: .now,
+        source: "project_offboarding"
+    )
 }

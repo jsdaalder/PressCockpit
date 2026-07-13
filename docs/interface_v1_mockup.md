@@ -11,7 +11,7 @@ Create a fast first interface that is good enough to judge:
 - whether important features are missing before the UI hardens
 
 This is a product-direction mock-up, not a final visual design.
-It should stay aligned with `Projects/2026/journalism_workflow_hub_plan/docs/v1_product_definition.md` and `Projects/2026/journalism_workflow_hub_plan/docs/overview_screen_spec_v1.md`.
+It should stay aligned with `Projects/2026/journalism_workflow_hub_plan/docs/product/v1_product_definition.md` and `Projects/2026/journalism_workflow_hub_plan/docs/specs/overview_screen_spec_v1.md`.
 
 For the guided project creation flow, see:
 

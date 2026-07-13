@@ -2,6 +2,26 @@ import XCTest
 @testable import JournalismWorkflowHub
 
 final class OverviewDeriverTests: XCTestCase {
+    func testSummaryPreviewFormatterLimitsCollapsedPreviewToTenWords() {
+        let longSummary = """
+        De timinganalyse is bewust beperkt tot 2021-2025 omdat de gekoppelde KNMI tabel alleen voor deze jaren is opgebouwd.
+        """
+
+        XCTAssertEqual(
+            SummaryPreviewFormatter.wordLimitedPreview(longSummary, limit: 10),
+            "De timinganalyse is bewust beperkt tot 2021-2025 omdat de gekoppelde…"
+        )
+    }
+
+    func testSummaryPreviewFormatterKeepsShortSummaryUntouched() {
+        let shortSummary = "Kort, duidelijk en meteen bruikbaar."
+
+        XCTAssertEqual(
+            SummaryPreviewFormatter.wordLimitedPreview(shortSummary, limit: 10),
+            shortSummary
+        )
+    }
+
     func testActiveProjectsExcludeToolingAndInactiveStatusesAndCapAtFour() {
         let activeUnknown = makeProject(
             id: "active-unknown",
@@ -126,7 +146,13 @@ final class OverviewDeriverTests: XCTestCase {
             "Project setup incomplete",
             "Needs review before sharing"
         ])
-        XCTAssertEqual(summary.primaryTarget, .run("run-1"))
+        XCTAssertEqual(summary.displayPrimaryFlag, "Active · Investigation")
+        XCTAssertEqual(summary.primaryTarget, .workspace(project.id))
+        XCTAssertEqual(summary.primaryButtonTitle, "Open in app")
+        XCTAssertEqual(
+            summary.nextStep,
+            "Open the project and check the latest workflow issue before continuing the reporting."
+        )
     }
 
     func testSuggestedActionsAndOperationsDeduplicateLatestFailedRunScopes() {
@@ -431,6 +457,70 @@ final class OverviewDeriverTests: XCTestCase {
         )
 
         XCTAssertEqual(item.canonicalDraftDocument?.id, promotedGoogleDraft.id)
+    }
+
+    func testCanonicalDraftKeepsLocalAuthoredDraftUntilGoogleDraftWasExplicitlyPromoted() {
+        let project = makeProject(
+            id: "mixed-draft-ownership",
+            title: "Mixed Draft Ownership",
+            projectType: .journalism,
+            status: "active",
+            safety: .internalOnly,
+            deliverable: "Story",
+            hasAgents: true,
+            started: "2026-07-06"
+        )
+        let localDraft = WorkspaceDocument(
+            id: "/tmp/mixed-draft-ownership/Draft - Mixed Draft Ownership.docx",
+            path: "/tmp/mixed-draft-ownership/Draft - Mixed Draft Ownership.docx",
+            title: "Draft - Mixed Draft Ownership",
+            fileExtension: "docx",
+            provider: .localFile,
+            role: .draft,
+            cacheState: .localFile,
+            externalURL: nil,
+            docID: nil,
+            cachePath: nil,
+            cachedOn: nil
+        )
+        let linkedGoogleDoc = WorkspaceDocument(
+            id: "/tmp/mixed-draft-ownership/Artikel.gdoc",
+            path: "/tmp/mixed-draft-ownership/Artikel.gdoc",
+            title: "Artikel",
+            fileExtension: "gdoc",
+            provider: .googleDocPointer,
+            role: .draft,
+            cacheState: .cachedText,
+            externalURL: "https://docs.google.com/document/d/abc/edit",
+            docID: "abc",
+            cachePath: "/tmp/mixed-draft-ownership/docs/_derived/google_docs/artikel.md",
+            cachedOn: "2026-07-06"
+        )
+        let item = WorkspaceItem(
+            id: project.id,
+            section: project.section,
+            path: project.path,
+            readmePath: project.readmePath,
+            agentsPath: project.agentsPath,
+            title: project.title,
+            summary: project.summary,
+            agentsSummary: project.agentsSummary,
+            frontmatter: project.frontmatter,
+            googleDriveFolderURL: nil,
+            projectType: project.projectType,
+            lifecycleStage: project.lifecycleStage,
+            safetyPosture: project.safetyPosture,
+            directFileCount: project.directFileCount,
+            directFolderCount: project.directFolderCount,
+            markdownFiles: project.markdownFiles,
+            pdfFiles: project.pdfFiles,
+            gdocFiles: 1,
+            csvFiles: project.csvFiles,
+            xlsxFiles: project.xlsxFiles,
+            documents: [localDraft, linkedGoogleDoc]
+        )
+
+        XCTAssertEqual(item.canonicalDraftDocument?.id, localDraft.id)
     }
 
     func testCanonicalDraftPrefersLocalAuthoredDraftWhenNoGoogleDraftPointerExists() {

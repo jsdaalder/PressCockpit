@@ -14,6 +14,8 @@ final class ScaffoldProjectScriptTests: XCTestCase {
         XCTAssertTrue(contents.contains("--section-answer-1"))
         XCTAssertTrue(contents.contains("--section-answer-2"))
         XCTAssertTrue(contents.contains("--section-answer-3"))
+        XCTAssertTrue(contents.contains("activity_state: {activity_state}"))
+        XCTAssertTrue(contents.contains("workflow_stage: {workflow_stage}"))
         XCTAssertTrue(contents.contains("project_type: {project_type}"))
         XCTAssertTrue(contents.contains("Main reporting question:"))
         XCTAssertTrue(contents.contains("Expected pattern or claim:"))
@@ -114,5 +116,73 @@ final class ScaffoldProjectScriptTests: XCTestCase {
         XCTAssertTrue(overview.contains("Pitch: `Pitch.md`"))
         XCTAssertTrue(overview.contains("Working summary from research_notes.md"))
         XCTAssertFalse(overview.contains("_Old placeholder._"))
+    }
+
+    func testBuildProjectReadmePreservesTrustedFrontmatterFields() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let scriptURL = root
+            .appendingPathComponent("Sources/JournalismWorkflowHub/Resources/knowledge_ops/scripts/build_project_readme.py")
+
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let projectRoot = tmp.appendingPathComponent("Projects/2026/demo_story")
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true, attributes: nil)
+
+        try """
+        ---
+        type: project
+        project: Demo Story
+        activity_state: inactive
+        workflow_stage: feasibility_study
+        inactive_reason: waiting
+        status: on_hold
+        project_type: data_journalism
+        dossier: voedselcrisis_2027
+        safety: local_sensitive
+        google_drive_folder_url: https://drive.google.com/drive/folders/demo
+        owner: Jan
+        started: 2026-07-01
+        topics: ["food"]
+        entities: ["WFP"]
+        deliverable: A sharp story
+        ---
+
+        # Demo Story
+
+        Existing README body.
+        """.write(to: projectRoot.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = [
+            "python3",
+            scriptURL.path,
+            "--project-root", projectRoot.path,
+            "--write-readme",
+            "--overwrite",
+            "--skip-placeholder-cache"
+        ]
+
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        try process.run()
+        process.waitUntilExit()
+
+        let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        XCTAssertEqual(process.terminationStatus, 0, stderr)
+
+        let updatedReadme = try String(contentsOf: projectRoot.appendingPathComponent("README.md"), encoding: .utf8)
+        XCTAssertTrue(updatedReadme.contains("project_type: data_journalism"))
+        XCTAssertTrue(updatedReadme.contains("dossier: voedselcrisis_2027"))
+        XCTAssertTrue(updatedReadme.contains("safety: local_sensitive"))
+        XCTAssertTrue(updatedReadme.contains("google_drive_folder_url: https://drive.google.com/drive/folders/demo"))
+        XCTAssertTrue(updatedReadme.contains("activity_state: inactive"))
+        XCTAssertTrue(updatedReadme.contains("workflow_stage: feasibility_study"))
+        XCTAssertTrue(updatedReadme.contains("inactive_reason: waiting"))
     }
 }

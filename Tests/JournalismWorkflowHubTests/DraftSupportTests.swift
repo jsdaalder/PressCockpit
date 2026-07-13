@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import JournalismWorkflowHub
 
@@ -44,40 +45,30 @@ final class DraftSupportTests: XCTestCase {
         XCTAssertNil(DraftSupport.extractGoogleDocID(from: "not a google doc"))
     }
 
-    func testDraftTemplatePreferencesRoundTripSavedURL() throws {
-        let defaults = UserDefaults(suiteName: #function)!
-        defaults.removePersistentDomain(forName: #function)
-        defer { defaults.removePersistentDomain(forName: #function) }
+    func testScaffoldDraftDataContainsTemplateSections() throws {
+        let data = try DraftSupport.scaffoldDraftData(projectTitle: "Climate Story")
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".docx")
+        try data.write(to: tmp)
 
-        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true, attributes: nil)
-        let templateURL = tmp.appendingPathComponent("Template nieuw artikel.docx")
-        try Data("draft".utf8).write(to: templateURL)
-
-        DraftTemplatePreferences.persist(templateURL, defaults: defaults)
-
-        XCTAssertEqual(
-            DraftTemplatePreferences.savedURL(defaults: defaults)?.standardizedFileURL,
-            templateURL.standardizedFileURL
+        let document = try NSAttributedString(
+            url: tmp,
+            options: [:],
+            documentAttributes: nil
         )
-    }
+        let text = document.string
 
-    func testDraftTemplatePreferencesDoNotAutoReuseLegacyPathWithoutBookmark() throws {
-        let defaults = UserDefaults(suiteName: #function)!
-        defaults.removePersistentDomain(forName: #function)
-        defer { defaults.removePersistentDomain(forName: #function) }
-
-        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true, attributes: nil)
-        let templateURL = tmp.appendingPathComponent("Template nieuw artikel.docx")
-        try Data("draft".utf8).write(to: templateURL)
-
-        defaults.set(templateURL.path, forKey: DraftTemplatePreferences.scaffoldDraftTemplatePathKey)
-
-        XCTAssertNil(DraftTemplatePreferences.savedURL(defaults: defaults))
-        XCTAssertEqual(
-            DraftTemplatePreferences.legacySavedURL(defaults: defaults)?.standardizedFileURL,
-            templateURL.standardizedFileURL
-        )
+        XCTAssertTrue(text.contains("Climate Story"))
+        XCTAssertTrue(text.contains("[Nieuwsbrief]"))
+        XCTAssertTrue(text.contains("[Socials]"))
+        XCTAssertTrue(text.contains("[Kopsuggesties]"))
+        XCTAssertTrue(text.contains("[Lead]"))
+        XCTAssertTrue(text.contains("[Speedread]"))
+        XCTAssertTrue(text.contains("Wat is het nieuws?"))
+        XCTAssertTrue(text.contains("Waarom is dit belangrijk?"))
+        XCTAssertTrue(text.contains("Hoe hebben we dit onderzocht?"))
+        XCTAssertTrue(text.contains("[Auteurs]"))
+        XCTAssertTrue(text.contains("[Dossier]"))
+        XCTAssertTrue(text.contains("[Tags]"))
+        XCTAssertTrue(text.contains("[Gerelateerde artikelen]"))
     }
 }

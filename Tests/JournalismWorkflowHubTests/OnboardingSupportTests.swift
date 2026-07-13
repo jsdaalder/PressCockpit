@@ -2,6 +2,11 @@ import XCTest
 @testable import JournalismWorkflowHub
 
 final class OnboardingSupportTests: XCTestCase {
+    func testSwitchWorkspaceLaunchModeStartsAtWorkspaceSelectionStep() {
+        XCTAssertEqual(OnboardingLaunchMode.switchWorkspace.initialStep, .workspaceLocation)
+        XCTAssertEqual(OnboardingLaunchMode.switchWorkspace.steps, [.workspaceLocation, .workspaceSetup, .finish])
+    }
+
     func testCreateWorkspaceDraftRequiresExplicitConfirmationWhenAnotherValidWorkspaceExists() {
         var draft = OnboardingDraft.initial(defaultNewWorkspacePath: "/tmp/new-workspace")
         draft.startMode = .createWorkspace

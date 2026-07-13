@@ -26,6 +26,10 @@ struct JournalismWorkflowHubApp: App {
 
                 Divider()
 
+                Button("Switch workspace…") {
+                    store.beginWorkspaceSwitch()
+                }
+
                 Button("Reopen setup…") {
                     store.reopenOnboarding()
                 }
@@ -42,6 +46,7 @@ private enum AppPresentationPhase {
 
 struct AppRootView: View {
     @EnvironmentObject private var store: AppStore
+    @Environment(\.scenePhase) private var scenePhase
     @State private var phase: AppPresentationPhase = .splash
     @State private var didBootstrap = false
 
@@ -65,10 +70,14 @@ struct AppRootView: View {
         .onChange(of: phase, initial: false) { _, _ in
             activateApplicationWindow()
         }
-        .onChange(of: store.hasCompletedOnboarding, initial: false) { _, hasCompletedOnboarding in
-            if !hasCompletedOnboarding {
-                phase = .onboarding
-            }
+        .onChange(of: store.shouldShowOnboarding, initial: false) { _, shouldShowOnboarding in
+            phase = shouldShowOnboarding ? .onboarding : .app
+        }
+        .onChange(of: scenePhase, initial: false) { _, newPhase in
+            guard newPhase == .active, phase == .app else { return }
+            store.reloadWorkspace()
+            store.reloadWorkflows()
+            store.reloadRuns()
         }
         .task {
             guard !didBootstrap else { return }

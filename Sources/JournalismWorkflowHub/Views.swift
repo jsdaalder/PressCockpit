@@ -38,6 +38,10 @@ struct SidebarView: View {
                 .buttonStyle(.plain)
             }
 
+            Section("Current workspace") {
+                CurrentWorkspacePanel()
+            }
+
             Section("Workspace") {
                 ForEach(WorkspaceSection.allCases, id: \.self) { section in
                     let items = store.filteredWorkspaceItems.filter { $0.section == section }
@@ -57,33 +61,8 @@ struct SidebarView: View {
                 }
             }
 
-            Section("Workflows") {
-                ForEach(store.filteredWorkflows) { workflow in
-                    Button {
-                        store.select(.workflow(workflow.id))
-                    } label: {
-                        WorkflowRow(
-                            workflow: workflow,
-                            report: store.workflowPreflightReport(for: workflow)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .tag(SidebarSelection.workflow(workflow.id))
-                }
-            }
-
-            Section("Runs") {
-                ForEach(store.runs) { run in
-                    Button {
-                        store.select(.run(run.id))
-                    } label: {
-                        RunRow(run: run, isSelected: selectionMatchesRun(run.id))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
         }
-        .searchable(text: $store.searchText, prompt: "Search projects, workflows, runs")
+        .searchable(text: $store.searchText, prompt: "Search projects")
         .listStyle(.sidebar)
         .navigationTitle("Journalism Hub")
     }
@@ -99,11 +78,56 @@ struct SidebarView: View {
         )
     }
 
-    private func selectionMatchesRun(_ id: String) -> Bool {
-        if case .run(let selected) = store.selection {
-            return selected == id
+}
+
+private struct CurrentWorkspacePanel: View {
+    @EnvironmentObject private var store: AppStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center) {
+                Label(workspaceModeLabel, systemImage: workspaceModeIcon)
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .foregroundStyle(AppPalette.title)
+                Spacer()
+                Text(store.appProfile.label)
+                    .font(.system(.caption, design: .rounded).weight(.semibold))
+                    .foregroundStyle(AppPalette.subtle)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.55), in: Capsule())
+            }
+
+            Text(store.workspaceRoot.lastPathComponent)
+                .font(.system(.body, design: .rounded).weight(.semibold))
+                .foregroundStyle(AppPalette.title)
+
+            Text(store.workspaceRoot.path)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(AppPalette.subtle)
+                .textSelection(.enabled)
+
+            HStack(spacing: 12) {
+                Button("Open root") {
+                    store.openPath(store.workspaceRoot.path)
+                }
+
+                Button("Switch workspace…") {
+                    store.beginWorkspaceSwitch()
+                }
+            }
+            .buttonStyle(.link)
+            .font(.system(.caption, design: .rounded))
         }
-        return false
+        .padding(.vertical, 6)
+    }
+
+    private var workspaceModeLabel: String {
+        store.isUsingDemoWorkspace ? "Bundled demo workspace" : "Connected workspace"
+    }
+
+    private var workspaceModeIcon: String {
+        store.isUsingDemoWorkspace ? "sparkles.rectangle.stack" : "externaldrive"
     }
 }
 
@@ -120,6 +144,14 @@ struct DetailView: View {
         }
         .sheet(item: $store.scaffoldPostCreateState) { state in
             ScaffoldPostCreateSheet(state: state)
+                .environmentObject(store)
+        }
+        .sheet(item: $store.projectStatusChangeState) { state in
+            ProjectOffboardingSheet(state: state)
+                .environmentObject(store)
+        }
+        .sheet(item: $store.projectStateEditState) { state in
+            ProjectStateEditorSheet(state: state)
                 .environmentObject(store)
         }
         .alert(item: $store.activeAlert) { alert in
@@ -163,11 +195,7 @@ struct DetailView: View {
         case .publication:
             PublicationView()
         case .workspace(let id):
-            if let item = store.workspaceItem(for: id) {
-                WorkspaceDetailView(item: item)
-            } else {
-                EmptyStateView(title: "Missing folder", message: "The selected folder could not be found.")
-            }
+            WorkspaceDetailView(itemID: id)
         case .workflow(let id):
             if let workflow = store.workflows.first(where: { $0.id == id }) {
                 WorkflowDetailView(workflow: workflow)
@@ -209,7 +237,7 @@ struct DetailView: View {
                 ? "Standalone audit view over a demo or external workspace."
                 : "Current reporting work, next actions, and operational follow-up."
         case .capture:
-            return "A dedicated intake surface for unassigned reporting material. Add files, folders, or a quick note now; review and project assignment come next."
+            return "A dedicated intake surface for unassigned reporting material. Add files, folders, or a quick note now; items are stored locally in Capture first, then reviewed and filed into a project."
         case .planCenter:
             return "Roadmap, backlog, architecture notes, and automation ideas."
         case .publication:
@@ -281,37 +309,64 @@ struct CaptureView: View {
     @State private var selectedRecordID: String?
     @State private var reviewNoteText: String = ""
     @State private var selectedProjectPath: String = ""
+    @State private var triageRecordIDs: [String] = []
+    @State private var triageIndex: Int = 0
+    @State private var pendingDeleteRequest: CaptureDeleteRequest?
 
     var body: some View {
         HStack(alignment: .top, spacing: 18) {
             VStack(alignment: .leading, spacing: 18) {
                 captureIntakeSection
-                captureQueueSection
+                captureFilingSection
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 18) {
-                captureReviewSection
-                assignedHistorySection
                 quickNoteSection
-                captureStorageSection
+                assignedHistorySection
             }
             .frame(width: 300, alignment: .leading)
         }
         .frame(maxWidth: 1080, alignment: .leading)
         .onAppear(perform: syncSelectionWithQueue)
         .onChange(of: store.captureRecords) { _, _ in
+            syncTriageSession()
             syncSelectionWithQueue()
         }
         .onChange(of: selectedRecordID) { _, _ in
             syncReviewStateWithSelection()
+        }
+        .confirmationDialog(
+            "Delete from Capture?",
+            isPresented: Binding(
+                get: { pendingDeleteRequest != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingDeleteRequest = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let pendingDeleteRequest {
+                Button("Delete stored copy", role: .destructive) {
+                    confirmDeleteTriageRecord(request: pendingDeleteRequest)
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                pendingDeleteRequest = nil
+            }
+        } message: {
+            if let pendingDeleteRequest {
+                Text("This removes the copy stored in Capture for \(pendingDeleteRequest.title). The original source file stays where it came from.")
+            }
         }
     }
 
     private var captureIntakeSection: some View {
         SectionCard(title: "Add material") {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Drop files or one folder here, or use the picker buttons below. New material stays unassigned until you review it.")
+                Text("Drop files or one folder here, or use the picker buttons below. New material stays unassigned until you review it and file it into a project.")
                     .foregroundStyle(AppPalette.subtle)
 
                 VStack(alignment: .leading, spacing: 12) {
@@ -355,45 +410,95 @@ struct CaptureView: View {
                     }
                 }
 
-                Text("Queued items will appear below with their current state and source path.")
-                    .font(.caption)
-                    .foregroundStyle(AppPalette.subtle)
+                HStack(alignment: .center, spacing: 10) {
+                    Text("Items are stored locally in Capture first so you can review them before filing.")
+                        .font(.caption)
+                        .foregroundStyle(AppPalette.subtle)
+
+                    Button("Open capture storage") {
+                        store.openCaptureStorage()
+                    }
+                    .buttonStyle(.borderless)
+                }
             }
         }
     }
 
-    private var captureQueueSection: some View {
-        SectionCard(title: "Unassigned queue") {
-            if store.captureQueueRecords.isEmpty {
+    private var captureFilingSection: some View {
+        SectionCard(title: "Triage unassigned material") {
+            if !isTriageActive {
+                captureTriageStartState
+            } else {
+                captureTriageWizardState
+            }
+        }
+    }
+
+    private var captureTriageStartState: some View {
+        Group {
+            if store.captureTriageRecords.isEmpty && store.captureFailedRecords.isEmpty {
                 EmptyStateView(
                     title: "Nothing waiting yet",
-                    message: "Add a file, folder, or quick note. New items will stay here until they are reviewed and assigned."
+                    message: "Add a file, folder, or quick note. New items will stay here until you review them and file them."
                 )
-                .frame(minHeight: 160)
+                .frame(minHeight: 180)
             } else {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Newest items first. Failed imports stay visible here so you can see what happened.")
-                        .font(.caption)
-                        .foregroundStyle(AppPalette.subtle)
+                VStack(alignment: .leading, spacing: 14) {
+                    if !store.captureTriageRecords.isEmpty {
+                        Text("\(store.captureTriageRecords.count) \(store.captureTriageRecords.count == 1 ? "item is" : "items are") waiting to be filed. Start triage to walk through them one by one instead of managing an always-open queue.")
+                            .foregroundStyle(AppPalette.subtle)
 
-                    ForEach(store.captureQueueRecords) { record in
-                        Button {
-                            selectedRecordID = record.id
-                        } label: {
-                            CaptureRecordRow(
-                                record: record,
-                                isSelected: selectedCaptureRecord?.id == record.id
-                            )
+                        HStack(spacing: 12) {
+                            Label("\(store.captureTriageRecords.count) ready now", systemImage: "tray.full")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(AppPalette.title)
+
+                            if !store.captureFailedRecords.isEmpty {
+                                Label("\(store.captureFailedRecords.count) failed import\(store.captureFailedRecords.count == 1 ? "" : "s")", systemImage: "exclamationmark.triangle")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.orange)
+                            }
                         }
-                        .buttonStyle(.plain)
+
+                        Button("Start triage") {
+                            startTriage()
+                        }
+                        .buttonStyle(.borderedProminent)
+                    } else {
+                        Text("Nothing is ready to file right now, but failed imports are still visible so they do not disappear silently.")
+                            .foregroundStyle(AppPalette.subtle)
+                    }
+
+                    if !store.captureFailedRecords.isEmpty {
+                        failedImportSummarySection
                     }
                 }
             }
         }
     }
 
-    private var captureReviewSection: some View {
-        SectionCard(title: "Review and assign") {
+    private var captureTriageWizardState: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Triage session")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppPalette.title)
+
+                    Text(triageProgressLabel)
+                        .foregroundStyle(AppPalette.subtle)
+                }
+
+                Spacer()
+
+                Button("Stop triage") {
+                    stopTriage()
+                }
+            }
+
+            ProgressView(value: Double(triageIndex + 1), total: Double(max(triageRecordIDs.count, 1)))
+                .tint(AppPalette.title)
+
             if let selectedCaptureRecord {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(selectedCaptureRecord.displayTitle)
@@ -401,7 +506,7 @@ struct CaptureView: View {
                         .foregroundStyle(AppPalette.title)
                         .textSelection(.enabled)
 
-                    Text("Check the source, add a short note if useful, then file this item into one project.")
+                    Text("Check the source, add a short note if useful, then file this item into one active project or area. Notes are kept when you move between items.")
                         .foregroundStyle(AppPalette.subtle)
 
                     VStack(alignment: .leading, spacing: 6) {
@@ -414,13 +519,29 @@ struct CaptureView: View {
                         }
                     }
 
+                    HStack(spacing: 12) {
+                        if let importedStoragePath = selectedCaptureRecord.importedStoragePath, !importedStoragePath.isEmpty {
+                            Button("Open stored copy") {
+                                store.openPath(importedStoragePath)
+                            }
+                        }
+
+                        if let originalSourcePath = selectedCaptureRecord.originalSourcePath, !originalSourcePath.isEmpty {
+                            Button("Reveal source") {
+                                store.openPath(originalSourcePath)
+                            }
+                        }
+                    }
+                    .buttonStyle(.link)
+                    .font(.system(.caption, design: .rounded))
+
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Why this matters")
+                        Text("Description or why this matters (optional)")
                             .font(.subheadline.weight(.semibold))
 
                         TextEditor(text: $reviewNoteText)
                             .font(.body)
-                            .frame(minHeight: 84)
+                            .frame(minHeight: 96)
                             .scrollContentBackground(.hidden)
                             .padding(6)
                             .background(
@@ -431,38 +552,80 @@ struct CaptureView: View {
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                                     .stroke(AppPalette.border)
                             )
-
-                        Button("Save note") {
-                            store.setCaptureUserNote(reviewNoteText, for: selectedCaptureRecord.id)
-                        }
-                        .disabled(normalizedReviewNote == (selectedCaptureRecord.userNote ?? ""))
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Assign to project")
+                        Text("Assign to project or area")
                             .font(.subheadline.weight(.semibold))
 
                         Picker("Project", selection: $selectedProjectPath) {
-                            Text("Choose project").tag("")
-                            ForEach(store.captureAssignableProjects, id: \.path) { project in
+                            Text("Choose destination").tag("")
+                            ForEach(store.captureAssignmentTargets, id: \.path) { project in
                                 Text(project.title).tag(project.path)
                             }
                         }
                         .labelsHidden()
+                    }
 
-                        Button("Assign to project") {
-                            guard let project = store.captureAssignableProjects.first(where: { $0.path == selectedProjectPath }) else { return }
-                            Task { await store.assignCaptureRecord(selectedCaptureRecord.id, to: project, note: reviewNoteText) }
+                    HStack(spacing: 12) {
+                        Button("Back") {
+                            moveToPreviousTriageItem()
                         }
+                        .disabled(triageIndex == 0)
+
+                        Button(skipButtonTitle) {
+                            moveToNextTriageItem()
+                        }
+
+                        Spacer()
+
+                        Button("Archive") {
+                            archiveSelectedTriageRecord()
+                        }
+                        .disabled(!canResolveSelectedRecord)
+
+                        Button("Delete…", role: .destructive) {
+                            beginDeleteSelectedTriageRecord()
+                        }
+                        .disabled(!canResolveSelectedRecord)
+
+                        Button(assignButtonTitle) {
+                            assignSelectedTriageRecord()
+                        }
+                        .buttonStyle(.borderedProminent)
                         .disabled(!canAssignSelectedRecord)
                     }
                 }
             } else {
                 EmptyStateView(
-                    title: "Select something to review",
-                    message: "Pick an item from the queue to inspect its source, add context, and assign it into one project's docs folder."
+                    title: "Nothing left in this triage session",
+                    message: "You can stop here or start a new triage session if more material arrives."
                 )
                 .frame(minHeight: 180)
+            }
+        }
+    }
+
+    private var failedImportSummarySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Import issues")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppPalette.title)
+
+            Text("These items are not part of triage yet because the import failed.")
+                .font(.caption)
+                .foregroundStyle(AppPalette.subtle)
+
+            ForEach(store.captureFailedRecords.prefix(3)) { record in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(record.displayTitle)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppPalette.title)
+
+                    Text(record.failureDescription ?? "Import failed.")
+                        .font(.caption)
+                        .foregroundStyle(AppPalette.subtle)
+                }
             }
         }
     }
@@ -522,20 +685,6 @@ struct CaptureView: View {
         }
     }
 
-    private var captureStorageSection: some View {
-        SectionCard(title: "Capture storage") {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Imported items are copied into app support storage first so they remain separate from project docs until you file them.")
-                    .foregroundStyle(AppPalette.subtle)
-
-                Text(store.captureStorageDirectory.path)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(AppPalette.subtle)
-                    .textSelection(.enabled)
-            }
-        }
-    }
-
     private var selectedCaptureRecord: CaptureRecord? {
         let records = store.captureQueueRecords
         if let selectedRecordID, let record = records.first(where: { $0.id == selectedRecordID }) {
@@ -549,13 +698,24 @@ struct CaptureView: View {
     }
 
     private var canAssignSelectedRecord: Bool {
-        guard let selectedCaptureRecord else { return false }
-        guard selectedCaptureRecord.state == .needsReview else { return false }
-        guard selectedCaptureRecord.importedStoragePath != nil else { return false }
+        guard canResolveSelectedRecord else { return false }
         return !selectedProjectPath.isEmpty
     }
 
+    private var canResolveSelectedRecord: Bool {
+        guard let selectedCaptureRecord else { return false }
+        guard selectedCaptureRecord.state == .needsReview else { return false }
+        guard let importedStoragePath = selectedCaptureRecord.importedStoragePath else { return false }
+        return !importedStoragePath.isEmpty
+    }
+
     private func syncSelectionWithQueue() {
+        if isTriageActive, let currentTriageRecordID {
+            selectedRecordID = currentTriageRecordID
+            syncReviewStateWithSelection()
+            return
+        }
+
         let queue = store.captureQueueRecords
         if queue.isEmpty {
             selectedRecordID = nil
@@ -581,11 +741,159 @@ struct CaptureView: View {
         }
 
         reviewNoteText = selectedCaptureRecord.userNote ?? ""
-        if let assignedProjectPath = selectedCaptureRecord.assignedProjectPath,
-           store.captureAssignableProjects.contains(where: { $0.path == assignedProjectPath }) {
-            selectedProjectPath = assignedProjectPath
-        } else if selectedProjectPath.isEmpty || !store.captureAssignableProjects.contains(where: { $0.path == selectedProjectPath }) {
+        if let assignedTargetPath = selectedCaptureRecord.assignedTargetPath,
+           store.captureAssignmentTargets.contains(where: { $0.path == assignedTargetPath }) {
+            selectedProjectPath = assignedTargetPath
+        } else if selectedProjectPath.isEmpty || !store.captureAssignmentTargets.contains(where: { $0.path == selectedProjectPath }) {
             selectedProjectPath = ""
+        }
+    }
+
+    private var isTriageActive: Bool {
+        !triageRecordIDs.isEmpty && triageIndex < triageRecordIDs.count
+    }
+
+    private var currentTriageRecordID: String? {
+        guard isTriageActive else { return nil }
+        return triageRecordIDs[triageIndex]
+    }
+
+    private var triageProgressLabel: String {
+        let total = triageRecordIDs.count
+        guard total > 0 else { return "No items waiting." }
+        return "Item \(triageIndex + 1) of \(total). Work through the queue one item at a time and keep the rest out of sight."
+    }
+
+    private var skipButtonTitle: String {
+        triageIndex + 1 == triageRecordIDs.count ? "Finish later" : "Skip for now"
+    }
+
+    private var assignButtonTitle: String {
+        triageIndex + 1 == triageRecordIDs.count ? "Assign and finish" : "Assign and continue"
+    }
+
+    private func startTriage() {
+        triageRecordIDs = store.captureTriageRecords.map(\.id)
+        triageIndex = 0
+        selectedRecordID = triageRecordIDs.first
+        syncReviewStateWithSelection()
+    }
+
+    private func stopTriage() {
+        persistReviewNoteForSelection()
+        triageRecordIDs = []
+        triageIndex = 0
+        selectedRecordID = nil
+        syncSelectionWithQueue()
+    }
+
+    private func moveToPreviousTriageItem() {
+        guard triageIndex > 0 else { return }
+        persistReviewNoteForSelection()
+        triageIndex -= 1
+        selectedRecordID = triageRecordIDs[triageIndex]
+        syncReviewStateWithSelection()
+    }
+
+    private func moveToNextTriageItem() {
+        guard !triageRecordIDs.isEmpty else { return }
+        persistReviewNoteForSelection()
+
+        if triageIndex + 1 < triageRecordIDs.count {
+            triageIndex += 1
+            selectedRecordID = triageRecordIDs[triageIndex]
+            syncReviewStateWithSelection()
+        } else {
+            stopTriage()
+        }
+    }
+
+    private func assignSelectedTriageRecord() {
+        guard let selectedCaptureRecord else { return }
+        guard let project = store.captureAssignmentTargets.first(where: { $0.path == selectedProjectPath }) else { return }
+
+        persistReviewNoteForSelection()
+        let currentRecordID = selectedCaptureRecord.id
+        let note = reviewNoteText
+
+        Task {
+            await store.assignCaptureRecord(currentRecordID, to: project, note: note)
+            await MainActor.run {
+                advanceTriageSession(afterRemoving: currentRecordID)
+            }
+        }
+    }
+
+    private func archiveSelectedTriageRecord() {
+        guard let selectedCaptureRecord else { return }
+
+        persistReviewNoteForSelection()
+        let currentRecordID = selectedCaptureRecord.id
+
+        Task {
+            await store.archiveCaptureRecord(currentRecordID)
+            await MainActor.run {
+                advanceTriageSession(afterRemoving: currentRecordID)
+            }
+        }
+    }
+
+    private func beginDeleteSelectedTriageRecord() {
+        guard let selectedCaptureRecord else { return }
+        persistReviewNoteForSelection()
+        pendingDeleteRequest = CaptureDeleteRequest(
+            recordID: selectedCaptureRecord.id,
+            title: selectedCaptureRecord.displayTitle
+        )
+    }
+
+    private func confirmDeleteTriageRecord(request: CaptureDeleteRequest) {
+        pendingDeleteRequest = nil
+
+        Task {
+            await store.deleteCaptureRecord(request.recordID)
+            await MainActor.run {
+                advanceTriageSession(afterRemoving: request.recordID)
+            }
+        }
+    }
+
+    private func advanceTriageSession(afterRemoving recordID: String) {
+        if let index = triageRecordIDs.firstIndex(of: recordID) {
+            triageRecordIDs.remove(at: index)
+            if triageRecordIDs.isEmpty {
+                stopTriage()
+                return
+            }
+            triageIndex = min(index, triageRecordIDs.count - 1)
+            selectedRecordID = triageRecordIDs[triageIndex]
+            syncReviewStateWithSelection()
+        } else {
+            syncTriageSession()
+        }
+    }
+
+    private func syncTriageSession() {
+        guard !triageRecordIDs.isEmpty else { return }
+
+        let validIDs = Set(store.captureTriageRecords.map(\.id))
+        triageRecordIDs = triageRecordIDs.filter { validIDs.contains($0) }
+
+        if triageRecordIDs.isEmpty {
+            triageIndex = 0
+            selectedRecordID = nil
+            return
+        }
+
+        triageIndex = min(triageIndex, triageRecordIDs.count - 1)
+        selectedRecordID = triageRecordIDs[triageIndex]
+        syncReviewStateWithSelection()
+    }
+
+    private func persistReviewNoteForSelection() {
+        guard let selectedCaptureRecord else { return }
+        if normalizedReviewNote != (selectedCaptureRecord.userNote ?? "") {
+            store.setCaptureUserNote(reviewNoteText, for: selectedCaptureRecord.id)
         }
     }
 
@@ -601,6 +909,13 @@ struct CaptureView: View {
                 .textSelection(.enabled)
         }
     }
+}
+
+private struct CaptureDeleteRequest: Identifiable {
+    let recordID: String
+    let title: String
+
+    var id: String { recordID }
 }
 
 struct OverviewView: View {
@@ -823,220 +1138,312 @@ struct OverviewView: View {
 
 struct WorkspaceDetailView: View {
     @EnvironmentObject private var store: AppStore
-    let item: WorkspaceItem
+    let itemID: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            SectionCard(title: "Key links") {
-                VStack(alignment: .leading, spacing: 12) {
-                    if let draft = item.canonicalDraftDocument {
-                        Text(item.draftTargetExplanation(for: draft))
-                            .font(.subheadline)
-                            .foregroundStyle(AppPalette.subtle)
+        Group {
+            if let item {
+                VStack(alignment: .leading, spacing: 16) {
+                    SectionCard(title: "Project controls") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("This is the project-level control surface: check status, dossier linkage, the current draft target, and attach supporting material without leaving the app.")
+                                .font(.subheadline)
+                                .foregroundStyle(AppPalette.subtle)
 
-                        HStack {
-                            Button("Open draft") {
-                                store.openPreferredDraft(for: item)
-                            }
-                            Button("Open folder") {
-                                store.openFolder(for: item)
-                            }
-                        }
+                            MetadataGrid(rows: projectControlRows)
 
-                        auxiliaryProjectLinks(draft: draft)
-                    } else {
-                        Text("No canonical draft target is clear yet. The project folder is still available below.")
-                            .font(.subheadline)
-                            .foregroundStyle(AppPalette.subtle)
-
-                        HStack {
-                            Button("Open folder") {
-                                store.openFolder(for: item)
-                            }
-                            if let googleDriveURL = item.googleDriveURL {
-                                Button("Open Drive folder") {
-                                    store.openURL(googleDriveURL)
+                            HStack(spacing: 12) {
+                                if item.canonicalDraftDocument != nil {
+                                    Button("Open draft") {
+                                        store.openPreferredDraft(for: item)
+                                    }
+                                }
+                                Button("Attach docs…") {
+                                    store.addDocuments(to: item)
+                                }
+                                Button("Open docs folder") {
+                                    store.openPath(item.docsDirectoryURL.path)
+                                }
+                                Button("Open folder") {
+                                    store.openFolder(for: item)
                                 }
                             }
-                            if store.shouldOfferGoogleDraftPromotion(for: item) {
-                                Button("Promote Google draft…") {
-                                    store.promoteGoogleDraft(for: item)
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .tint(AppPalette.title)
+
+                            HStack(spacing: 12) {
+                                projectStatusMenu
+                                Button("Edit project state…") {
+                                    store.beginProjectStateEditing(for: item)
+                                }
+                                if item.dossierSlug != nil {
+                                    Button("Open dossier") {
+                                        store.openLinkedDossier(for: item)
+                                    }
+                                }
+                                if item.hasDocsOverview {
+                                    Button("Open docs overview") {
+                                        store.openDocsOverview(for: item)
+                                    }
+                                }
+                                if let googleDriveURL = item.googleDriveURL {
+                                    Button("Open Drive folder") {
+                                        store.openURL(googleDriveURL)
+                                    }
+                                }
+                                if store.shouldOfferGoogleDraftPromotion(for: item) {
+                                    Button("Promote Google draft…") {
+                                        store.promoteGoogleDraft(for: item)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .tint(AppPalette.title)
+                        }
+                    }
+
+                    SectionCard(title: "Project at a glance") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Use this section to understand what kind of project this is, how it should be handled, and how much working material sits at the root.")
+                                .font(.subheadline)
+                                .foregroundStyle(AppPalette.subtle)
+
+                            MetadataGrid(rows: [
+                                ("Section", item.section.label),
+                                ("Project kind", item.projectType.label),
+                                ("Project state", item.projectStateDetailLabel),
+                                ("Activity state", item.activityState?.label ?? "Not set"),
+                                ("Workflow stage", item.workflowStage?.label ?? "Not set"),
+                                ("Inactive reason", item.activityState == .inactive ? (item.inactiveReason?.label ?? "Not set") : "Not applicable"),
+                                ("Handling", item.safetyPosture.label),
+                                ("Workspace path", item.path),
+                                ("Root documents", "\(item.documents.count)"),
+                                ("Direct files", "\(item.directFileCount)"),
+                                ("Direct folders", "\(item.directFolderCount)"),
+                                ("Markdown", "\(item.markdownFiles)"),
+                                ("PDFs", "\(item.pdfFiles)"),
+                                ("Google Doc pointers", "\(item.gdocFiles)")
+                            ])
+                        }
+                    }
+
+                    SectionCard(title: "How to work with this project") {
+                        VStack(alignment: .leading, spacing: 14) {
+                            if !item.subtitle.isEmpty {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Current summary")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(AppPalette.title)
+                                    Text(item.subtitle)
+                                        .font(.body)
+                                        .foregroundStyle(AppPalette.title)
+                                        .textSelection(.enabled)
+                                }
+                            } else {
+                                Text("This project still needs a clearer working summary in its README.")
+                                    .font(.body)
+                                    .foregroundStyle(AppPalette.subtle)
+                            }
+
+                            if !item.agentsSummary.isEmpty {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Local rules")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(AppPalette.title)
+                                    Text(item.agentsSummary)
+                                        .font(.body)
+                                        .foregroundStyle(AppPalette.title)
+                                        .textSelection(.enabled)
+                                }
+                            } else {
+                                Text("No local rules are captured in `AGENTS.md` yet.")
+                                    .font(.caption)
+                                    .foregroundStyle(AppPalette.subtle)
+                            }
+
+                            HStack {
+                                Button("Open README") { store.openReadme(for: item) }
+                                if let agentsURL = item.agentsURL {
+                                    Button("Open local rules") {
+                                        store.openURL(agentsURL)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .tint(AppPalette.title)
+                        }
+                    }
+
+                    SectionCard(title: "Structured metadata") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Trusted fields from the root README that drive classification and workflow behavior.")
+                                .font(.subheadline)
+                                .foregroundStyle(AppPalette.subtle)
+                            if item.frontmatter.isEmpty {
+                                Text("No trusted README frontmatter was detected.")
+                                    .font(.body)
+                                    .foregroundStyle(AppPalette.subtle)
+                            } else {
+                                ForEach(item.frontmatter.keys.sorted(), id: \.self) { key in
+                                    KeyValueRow(key: key, value: item.frontmatter[key] ?? "")
+                                }
+                            }
+                        }
+                    }
+
+                    if !item.documents.isEmpty {
+                        SectionCard(title: "Project documents") {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("These are the root-level drafts, notes, pointers, and local copies the scanner found. Snapshot copies stay visible here, but they do not automatically become the main draft link.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(AppPalette.subtle)
+
+                                ForEach(item.documents) { document in
+                                    WorkspaceDocumentRow(
+                                        document: document,
+                                        isPreferredDraft: item.canonicalDraftDocument == document,
+                                        isLikelySnapshot: item.isLikelyDerivedSnapshot(document),
+                                        openDocument: { store.openDocument(document) },
+                                        openCache: { store.openDocumentCache(document) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    SectionCard(title: "Project maintenance") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("These actions update derived project state or prepare local Google Doc cache placeholders. Write actions now route through workflow detail first so you can review them before execution.")
+                                .font(.subheadline)
+                                .foregroundStyle(AppPalette.subtle)
+
+                            HStack {
+                                Button("Open folder") { store.openFolder(for: item) }
+                                if item.hasGoogleDocPointers {
+                                    Button("Open Google Doc prep workflow") {
+                                        store.select(.workspace(item.id))
+                                        store.select(.workflow("refresh-project-google-doc-prep"))
+                                    }
+                                }
+                                if item.isProjectRoot {
+                                    Button("Open README rebuild workflow") {
+                                        store.select(.workspace(item.id))
+                                        store.select(.workflow("build-project-readme"))
+                                    }
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .tint(AppPalette.title)
+                        }
+                    }
+
+                    if !projectMaintenanceItems.isEmpty {
+                        SectionCard(title: "Closeout follow-up") {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Optional offboarding details that were skipped stay visible here until you decide to fill them in.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(AppPalette.subtle)
+
+                                ForEach(projectMaintenanceItems) { item in
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(item.kind.label)
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(AppPalette.title)
+                                        Text(item.detail)
+                                            .font(.body)
+                                            .foregroundStyle(AppPalette.title)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, 2)
+                                }
+                            }
+                        }
+                    }
+
+                    if let matches = publicationMatches {
+                        SectionCard(title: "Publication links") {
+                            VStack(alignment: .leading, spacing: 10) {
+                                ForEach(matches, id: \.id) { story in
+                                    PublicationStoryRow(story: story)
                                 }
                             }
                         }
                     }
                 }
-            }
-
-            SectionCard(title: "Project at a glance") {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Use this section to understand what kind of project this is, how it should be handled, and how much working material sits at the root.")
-                        .font(.subheadline)
-                        .foregroundStyle(AppPalette.subtle)
-
-                    MetadataGrid(rows: [
-                        ("Section", item.section.label),
-                        ("Project kind", item.projectType.label),
-                        ("Current stage", item.lifecycleStage),
-                        ("Handling", item.safetyPosture.label),
-                        ("Workspace path", item.path),
-                        ("Root documents", "\(item.documents.count)"),
-                        ("Direct files", "\(item.directFileCount)"),
-                        ("Direct folders", "\(item.directFolderCount)"),
-                        ("Markdown", "\(item.markdownFiles)"),
-                        ("PDFs", "\(item.pdfFiles)"),
-                        ("Google Doc pointers", "\(item.gdocFiles)")
-                    ])
-                }
-            }
-
-            SectionCard(title: "How to work with this project") {
-                VStack(alignment: .leading, spacing: 14) {
-                    if !item.subtitle.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Current summary")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(AppPalette.title)
-                            Text(item.subtitle)
-                                .font(.body)
-                                .foregroundStyle(.primary)
-                                .textSelection(.enabled)
-                        }
-                    } else {
-                        Text("This project still needs a clearer working summary in its README.")
-                            .font(.body)
-                            .foregroundStyle(AppPalette.subtle)
-                    }
-
-                    if !item.agentsSummary.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Local rules")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(AppPalette.title)
-                            Text(item.agentsSummary)
-                                .font(.body)
-                                .foregroundStyle(.primary)
-                                .textSelection(.enabled)
-                        }
-                    } else {
-                        Text("No local rules are captured in `AGENTS.md` yet.")
-                            .font(.caption)
-                            .foregroundStyle(AppPalette.subtle)
-                    }
-
-                    HStack {
-                        Button("Open README") { store.openReadme(for: item) }
-                        if let agentsURL = item.agentsURL {
-                            Button("Open local rules") {
-                                store.openURL(agentsURL)
-                            }
-                        }
-                    }
-                }
-            }
-
-            if !item.frontmatter.isEmpty {
-                SectionCard(title: "Structured metadata") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Trusted fields from the root README that drive classification and workflow behavior.")
-                            .font(.subheadline)
-                            .foregroundStyle(AppPalette.subtle)
-                        ForEach(item.frontmatter.keys.sorted(), id: \.self) { key in
-                            KeyValueRow(key: key, value: item.frontmatter[key] ?? "")
-                        }
-                    }
-                }
-            }
-
-            if !item.documents.isEmpty {
-                SectionCard(title: "Detected documents") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("These are the root-level drafts, notes, pointers, and local copies the scanner found. Snapshot copies stay visible here, but they do not automatically become the main draft link.")
-                            .font(.subheadline)
-                            .foregroundStyle(AppPalette.subtle)
-
-                        ForEach(item.documents) { document in
-                            WorkspaceDocumentRow(
-                                document: document,
-                                isPreferredDraft: item.canonicalDraftDocument == document,
-                                isLikelySnapshot: item.isLikelyDerivedSnapshot(document),
-                                openDocument: { store.openDocument(document) },
-                                openCache: { store.openDocumentCache(document) }
-                            )
-                        }
-                    }
-                }
-            }
-
-            SectionCard(title: "Project maintenance") {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("These actions update derived project state or prepare local Google Doc cache placeholders. They do not change which draft link the app treats as canonical.")
-                        .font(.subheadline)
-                        .foregroundStyle(AppPalette.subtle)
-
-                    HStack {
-                        Button("Open folder") { store.openFolder(for: item) }
-                        if item.hasGoogleDocPointers {
-                            Button("Prepare Google Doc cache") {
-                                store.select(.workspace(item.id))
-                                store.select(.workflow("refresh-project-google-doc-prep"))
-                                store.runSelectedWorkflow()
-                            }
-                        }
-                        if item.isProjectRoot {
-                            Button("Refresh README") {
-                                store.select(.workspace(item.id))
-                                store.select(.workflow("build-project-readme"))
-                                store.runSelectedWorkflow()
-                            }
-                        }
-                    }
-                }
-            }
-
-            if let matches = publicationMatches {
-                SectionCard(title: "Publication links") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(matches, id: \.id) { story in
-                            PublicationStoryRow(story: story)
-                        }
-                    }
-                }
+            } else {
+                EmptyStateView(title: "Missing folder", message: "The selected folder could not be found.")
             }
         }
-        .task {
+        .task(id: itemID) {
+            store.reloadWorkspace()
             store.reloadWorkflows()
         }
     }
 
+    private var item: WorkspaceItem? {
+        store.workspaceItem(for: itemID)
+    }
+
     private var publicationMatches: [PublicationStory]? {
+        guard let item else { return nil }
         let allMatches = store.snapshot.publication.storiesByYear.values.flatMap { $0 }
         let selected = allMatches.filter { $0.projectPath == item.path }
         return selected.isEmpty ? nil : selected.sorted { $0.pdfTitle < $1.pdfTitle }
     }
 
-    @ViewBuilder
-    private func auxiliaryProjectLinks(draft: WorkspaceDocument) -> some View {
-        if draft.cachePath != nil || item.googleDriveURL != nil || store.shouldOfferGoogleDraftPromotion(for: item) {
-            HStack {
-                if draft.cachePath != nil {
-                    Button("Open cached copy") {
-                        store.openDocumentCache(draft)
-                    }
+    private var projectControlRows: [(String, String)] {
+        guard let item else { return [] }
+        var rows: [(String, String)] = [
+            ("Project state", item.projectStateDetailLabel),
+            ("Dossier", item.dossierSlug ?? "None linked yet")
+        ]
+
+        if let draft = item.canonicalDraftDocument {
+            rows.append(("Canonical draft", draft.title))
+            rows.append(("Draft target", item.draftOwnershipSummary(for: draft)))
+        } else {
+            rows.append(("Canonical draft", "Not decided yet"))
+        }
+
+        if item.hasDocsOverview {
+            rows.append(("Docs overview", "Present in docs/docs_overview.md"))
+        }
+
+        if !projectMaintenanceItems.isEmpty {
+            rows.append(("Closeout follow-up", "\(projectMaintenanceItems.count) queued"))
+        }
+
+        return rows
+    }
+
+    private var projectMaintenanceItems: [MaintenanceItem] {
+        store.maintenanceItems(for: item)
+    }
+
+    private var projectStatusMenu: some View {
+        Menu {
+            if let item {
+                Button("Mark active") {
+                    store.beginProjectStatusChange(for: item, targetStatus: .active)
                 }
-                if let googleDriveURL = item.googleDriveURL {
-                    Button("Open Drive folder") {
-                        store.openURL(googleDriveURL)
-                    }
+                Button("Put on hold") {
+                    store.beginProjectStatusChange(for: item, targetStatus: .onHold)
                 }
-                if store.shouldOfferGoogleDraftPromotion(for: item) {
-                    Button("Promote Google draft…") {
-                        store.promoteGoogleDraft(for: item)
-                    }
+                Button("Mark finished…") {
+                    store.beginProjectStatusChange(for: item, targetStatus: .done)
+                }
+                Button("Archive…") {
+                    store.beginProjectStatusChange(for: item, targetStatus: .archived)
                 }
             }
-            .buttonStyle(.borderless)
+        } label: {
+            Label("Quick state change", systemImage: "arrow.triangle.2.circlepath")
         }
+        .controlSize(.small)
     }
 }
 
@@ -1136,7 +1543,7 @@ struct WorkflowDetailView: View {
                 }
                 if workflow.selectionRequirement != .none && store.selectedWorkspaceItem == nil {
                     Text("Select a workspace item in the sidebar first.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppPalette.subtle)
                 }
             }
 
@@ -1584,7 +1991,7 @@ struct WorkspaceRow: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .top, spacing: 8) {
                 Text(item.title)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(AppPalette.title)
                 Spacer(minLength: 8)
                 WorkspaceBadge(text: item.projectType.label)
             }
@@ -1729,17 +2136,9 @@ struct MetadataGrid: View {
     let rows: [(String, String)]
 
     var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                GridRow {
-                    Text(row.0)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppPalette.subtle)
-                    Text(row.1)
-                        .font(.body)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                KeyValueRow(key: row.0, value: row.1)
             }
         }
     }
@@ -1755,11 +2154,22 @@ struct KeyValueRow: View {
                 .frame(width: 160, alignment: .leading)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(AppPalette.subtle)
-            Text(value)
+            Text(displayValue)
                 .font(.body)
+                .foregroundStyle(isPlaceholder ? AppPalette.subtle : AppPalette.title)
                 .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
             Spacer()
         }
+    }
+
+    private var displayValue: String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Not set" : value
+    }
+
+    private var isPlaceholder: Bool {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 
@@ -1856,42 +2266,47 @@ struct OverviewProjectRow: View {
     let isExpanded: Bool
     let toggleExpanded: () -> Void
     let primaryAction: () -> Void
+    @State private var isHoveringProjectTitle = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(summary.item.title)
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(AppPalette.title)
-                            .lineLimit(2)
-                            .textSelection(.enabled)
+                        Button(action: primaryAction) {
+                            Text(summary.item.title)
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(isHoveringProjectTitle ? Color.accentColor : AppPalette.title)
+                                .underline(true, color: isHoveringProjectTitle ? Color.accentColor.opacity(0.6) : AppPalette.border)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Open this project in the app")
+                        .onHover { hovering in
+                            isHoveringProjectTitle = hovering
+                        }
                         if let primaryFlag = summary.displayPrimaryFlag {
                             WorkspaceBadge(text: primaryFlag)
                         }
                     }
 
-                    Text(projectSummaryText)
-                        .font(.subheadline)
-                        .foregroundStyle(AppPalette.subtle)
-                        .textSelection(.enabled)
-                        .lineLimit(isExpanded ? 3 : 2)
+                    if let projectSummaryText {
+                        Text(projectSummaryText)
+                            .font(.subheadline)
+                            .foregroundStyle(AppPalette.subtle)
+                            .textSelection(.enabled)
+                            .lineLimit(isExpanded ? 3 : 2)
+                    }
                 }
                 Spacer()
 
-                HStack(spacing: 10) {
-                    if !isExpanded {
-                        Button(summary.primaryButtonTitle, action: primaryAction)
-                            .controlSize(.small)
-                    }
-                    Button(action: toggleExpanded) {
-                        Label(isExpanded ? "Less" : "More", systemImage: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(AppPalette.subtle)
-                    }
-                    .buttonStyle(.borderless)
+                Button(action: toggleExpanded) {
+                    Label(isExpanded ? "Less" : "More", systemImage: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppPalette.subtle)
                 }
+                .buttonStyle(.borderless)
             }
 
             if !collapsedShortcuts.isEmpty {
@@ -1920,34 +2335,68 @@ struct OverviewProjectRow: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(summary.nextStep)
                         .font(.subheadline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(AppPalette.title)
                         .textSelection(.enabled)
 
                     HStack(spacing: 12) {
-                        Button(summary.primaryButtonTitle, action: primaryAction)
-                            .controlSize(.small)
-                        Button("Open folder") {
+                        Button(action: primaryAction) {
+                            OverviewProjectActionLabel(
+                                title: "Open project in app",
+                                systemImage: "square.grid.2x2"
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .help("Open this project inside Journalism Workflow Hub")
+
+                        Button {
                             store.openFolder(for: summary.item)
+                        } label: {
+                            OverviewProjectActionLabel(
+                                title: "Open project in Finder",
+                                systemImage: "folder",
+                                trailingSystemImage: "arrow.up.right"
+                            )
                         }
-                        .controlSize(.small)
-                        Button("Open README") {
+                        .buttonStyle(.plain)
+
+                        Button {
                             store.openReadme(for: summary.item)
+                        } label: {
+                            OverviewProjectActionLabel(
+                                title: "Open README",
+                                systemImage: "book.closed",
+                                trailingSystemImage: "arrow.up.right"
+                            )
                         }
-                        .controlSize(.small)
+                        .buttonStyle(.plain)
+
+                        changeStatusMenu
                     }
 
                     HStack(spacing: 12) {
                         if let draft = summary.item.canonicalDraftDocument, draft.cachePath != nil {
-                            Button("Open local cache") {
+                            Button {
                                 store.openDocumentCache(draft)
+                            } label: {
+                                OverviewProjectActionLabel(
+                                    title: "Open local cache",
+                                    systemImage: "externaldrive",
+                                    trailingSystemImage: "arrow.up.right"
+                                )
                             }
-                            .buttonStyle(.borderless)
+                            .buttonStyle(.plain)
                         }
                         if let googleDriveURL = summary.item.googleDriveURL {
-                            Button("Open Drive folder") {
+                            Button {
                                 store.openURL(googleDriveURL)
+                            } label: {
+                                OverviewProjectActionLabel(
+                                    title: "Open Drive folder",
+                                    systemImage: "link",
+                                    trailingSystemImage: "arrow.up.right"
+                                )
                             }
-                            .buttonStyle(.borderless)
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -1958,9 +2407,39 @@ struct OverviewProjectRow: View {
         .padding(.vertical, 12)
     }
 
-    private var projectSummaryText: String {
+    private var changeStatusMenu: some View {
+        Menu {
+            Button("Mark finished…") {
+                store.beginProjectStatusChange(for: summary.item, targetStatus: .done)
+            }
+
+            Button("Archive…") {
+                store.beginProjectStatusChange(for: summary.item, targetStatus: .archived)
+            }
+
+            Divider()
+
+            Button("Put on hold") {
+                store.beginProjectStatusChange(for: summary.item, targetStatus: .onHold)
+            }
+        } label: {
+            OverviewProjectActionLabel(
+                title: "Change status",
+                systemImage: "arrow.triangle.2.circlepath",
+                trailingSystemImage: "chevron.down"
+            )
+        }
+    }
+
+    private var projectSummaryText: String? {
         if !summary.item.summary.isEmpty {
-            return summary.item.summary
+            if isExpanded {
+                return summary.item.summary
+            }
+            return SummaryPreviewFormatter.wordLimitedPreview(summary.item.summary, limit: 10)
+        }
+        guard isExpanded else {
+            return nil
         }
         if !summary.item.subtitle.isEmpty {
             return summary.item.subtitle
@@ -1983,16 +2462,6 @@ struct OverviewProjectRow: View {
             )
         }
 
-        shortcuts.append(
-            OverviewProjectShortcut(
-                id: "\(summary.id)-folder",
-                label: "Folder",
-                iconName: "folder",
-                helpText: "Open local project folder",
-                action: { store.openFolder(for: summary.item) }
-            )
-        )
-
         return shortcuts
     }
 }
@@ -2003,6 +2472,305 @@ struct OverviewProjectShortcut: Identifiable {
     let iconName: String
     let helpText: String
     let action: () -> Void
+}
+
+private struct OverviewProjectActionLabel: View {
+    let title: String
+    let systemImage: String
+    var trailingSystemImage: String? = nil
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Label(title, systemImage: systemImage)
+                .lineLimit(1)
+
+            if let trailingSystemImage {
+                Image(systemName: trailingSystemImage)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(AppPalette.subtle)
+            }
+        }
+        .font(.caption.weight(.medium))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(AppPalette.card.opacity(0.98), in: Capsule())
+        .overlay(Capsule().stroke(AppPalette.border))
+        .foregroundStyle(AppPalette.title)
+    }
+}
+
+struct ProjectStateEditorSheet: View {
+    @EnvironmentObject private var store: AppStore
+    let state: ProjectStateEditState
+
+    @State private var activityState: ProjectActivityState
+    @State private var workflowStage: ProjectWorkflowStage
+    @State private var inactiveReason: ProjectInactiveReason?
+
+    init(state: ProjectStateEditState) {
+        self.state = state
+        _activityState = State(initialValue: state.currentState.activityState)
+        _workflowStage = State(initialValue: state.currentState.workflowStage)
+        _inactiveReason = State(initialValue: state.currentState.inactiveReason)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Edit Project State")
+                    .font(.system(.title2, design: .serif).weight(.semibold))
+                    .foregroundStyle(AppPalette.title)
+
+                Text("Use activity, workflow stage, and inactive reason to describe the project accurately. Safety stays separate.")
+                    .font(.subheadline)
+                    .foregroundStyle(AppPalette.subtle)
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                statusRow("Project", value: state.projectTitle)
+                statusRow("Current", value: state.currentState.detailLabel)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Activity state")
+                        .font(.subheadline.weight(.semibold))
+                    Picker("Activity state", selection: $activityState) {
+                        ForEach(ProjectActivityState.allCases, id: \.self) { option in
+                            Text(option.label).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Workflow stage")
+                        .font(.subheadline.weight(.semibold))
+                    Picker("Workflow stage", selection: $workflowStage) {
+                        ForEach(ProjectWorkflowStage.allCases, id: \.self) { option in
+                            Text(option.label).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+
+                if activityState == .inactive {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Inactive reason")
+                            .font(.subheadline.weight(.semibold))
+                        Picker("Inactive reason", selection: inactiveReasonBinding) {
+                            Text("Choose reason").tag(Optional<ProjectInactiveReason>.none)
+                            ForEach(ProjectInactiveReason.allCases, id: \.self) { option in
+                                Text(option.label).tag(Optional(option))
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                }
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    store.dismissProjectStateEdit()
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button("Save state") {
+                    store.saveProjectStateEdit(
+                        state,
+                        activityState: activityState,
+                        workflowStage: workflowStage,
+                        inactiveReason: inactiveReason
+                    )
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(24)
+        .frame(width: 520)
+        .onChange(of: activityState) { _, newValue in
+            if newValue == .active {
+                inactiveReason = nil
+            } else if inactiveReason == nil {
+                inactiveReason = .waiting
+            }
+        }
+    }
+
+    private var inactiveReasonBinding: Binding<ProjectInactiveReason?> {
+        Binding(
+            get: { inactiveReason },
+            set: { inactiveReason = $0 }
+        )
+    }
+
+    private func statusRow(_ title: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            Text(value)
+                .foregroundStyle(AppPalette.subtle)
+                .textSelection(.enabled)
+        }
+    }
+}
+
+struct ProjectOffboardingSheet: View {
+    @EnvironmentObject private var store: AppStore
+    let state: ProjectStatusChangeState
+
+    @State private var outcome: ProjectOffboardingOutcome = .unknown
+    @State private var publishedPDFURL: URL?
+    @State private var routeToDossier = true
+    @State private var producedSummary: String = ""
+    @State private var remainingOpenSummary: String = ""
+    @State private var impactSummary: String = ""
+    @State private var isSaving = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(sheetTitle)
+                    .font(.system(.title2, design: .serif).weight(.semibold))
+                    .foregroundStyle(AppPalette.title)
+
+                Text("Close out \(state.projectTitle) before it leaves the active desk. Required decisions stay small; the reporting notes stay optional.")
+                    .font(.subheadline)
+                    .foregroundStyle(AppPalette.subtle)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                statusRow("Current status", value: state.currentStatus.label)
+                statusRow("New status", value: state.targetStatus.label)
+                statusRow("Current project state", value: state.currentProjectState.detailLabel)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Outcome")
+                        .font(.subheadline.weight(.semibold))
+                    Picker("Outcome", selection: $outcome) {
+                        ForEach(ProjectOffboardingOutcome.allCases, id: \.self) { choice in
+                            Text(choice.label).tag(choice)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .center) {
+                    Text("Published PDF")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Button(publishedPDFURL == nil ? "Choose PDF" : "Choose different PDF") {
+                        publishedPDFURL = store.choosePublishedPDF()
+                    }
+                    .controlSize(.small)
+                }
+
+                if let publishedPDFURL {
+                    Text(publishedPDFURL.path)
+                        .font(.caption)
+                        .foregroundStyle(AppPalette.subtle)
+                        .textSelection(.enabled)
+                } else {
+                    Text("Add the finished publication PDF here when it exists. You can skip it for now.")
+                        .font(.caption)
+                        .foregroundStyle(AppPalette.subtle)
+                }
+            }
+
+            if let dossierSlug = state.dossierSlug {
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle("Add a closeout handoff to dossier `\(dossierSlug)`", isOn: $routeToDossier)
+                    Text("This writes a durable dossier-facing closeout note without trying to reorganize the whole project automatically.")
+                        .font(.caption)
+                        .foregroundStyle(AppPalette.subtle)
+                }
+            }
+
+            offboardingTextEditor(
+                title: "What it produced (optional)",
+                text: $producedSummary
+            )
+
+            offboardingTextEditor(
+                title: "What remains open (optional)",
+                text: $remainingOpenSummary
+            )
+
+            offboardingTextEditor(
+                title: "Impact / follow-up (optional)",
+                text: $impactSummary
+            )
+
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    store.dismissProjectStatusChange()
+                }
+                .keyboardShortcut(.cancelAction)
+                .disabled(isSaving)
+
+                Button(confirmButtonTitle) {
+                    isSaving = true
+                    Task {
+                        await store.completeProjectOffboarding(
+                            state,
+                            outcome: outcome,
+                            publishedPDFURL: publishedPDFURL,
+                            routeToDossier: routeToDossier,
+                            producedSummary: producedSummary,
+                            remainingOpenSummary: remainingOpenSummary,
+                            impactSummary: impactSummary
+                        )
+                        isSaving = false
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(isSaving)
+            }
+        }
+        .padding(24)
+        .frame(width: 640)
+    }
+
+    private var sheetTitle: String {
+        state.targetStatus == .archived ? "Archive Project" : "Finish Project"
+    }
+
+    private var confirmButtonTitle: String {
+        state.targetStatus == .archived ? "Archive project" : "Mark finished"
+    }
+
+    private func statusRow(_ title: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            Text(value)
+                .foregroundStyle(AppPalette.subtle)
+                .textSelection(.enabled)
+        }
+    }
+
+    private func offboardingTextEditor(title: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+
+            TextEditor(text: text)
+                .font(.body)
+                .frame(minHeight: 80)
+                .scrollContentBackground(.hidden)
+                .padding(6)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(AppPalette.card.opacity(0.9))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(AppPalette.border)
+                )
+        }
+    }
 }
 
 struct OverviewOperationRow: View {
@@ -2107,8 +2875,8 @@ struct CaptureAssignedRecordRow: View {
                 .foregroundStyle(AppPalette.title)
                 .textSelection(.enabled)
 
-            if let assignedProjectPath = record.assignedProjectPath {
-                Text(assignedProjectTitle(from: assignedProjectPath))
+            if let assignedTargetPath = record.assignedTargetPath {
+                Text(assignedTargetTitle(from: assignedTargetPath))
                     .font(.caption)
                     .foregroundStyle(AppPalette.subtle)
                     .textSelection(.enabled)
@@ -2130,7 +2898,7 @@ struct CaptureAssignedRecordRow: View {
         .padding(.vertical, 2)
     }
 
-    private func assignedProjectTitle(from path: String) -> String {
+    private func assignedTargetTitle(from path: String) -> String {
         URL(fileURLWithPath: path).lastPathComponent
     }
 }

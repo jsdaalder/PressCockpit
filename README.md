@@ -15,21 +15,29 @@ Native SwiftUI launcher for a local journalism workspace.
 From this folder:
 
 ```bash
-swift run JournalismWorkflowHub
+scripts/swiftpm-local.sh run JournalismWorkflowHub
 ```
 
 By default the app will try to discover the workspace root by walking up from the current directory until it finds a folder that looks like a journalism workspace.
 
+The repo currently lives under `My Drive`, so this wrapper keeps SwiftPM's SQLite build database out of the synced folder. Plain `swift run` and `swift test` can hit transient `.build/build.db` disk I/O errors there.
+
 You can override that explicitly:
 
 ```bash
-swift run JournalismWorkflowHub --workspace-root "/path/to/coding_projects"
+scripts/swiftpm-local.sh run JournalismWorkflowHub --workspace-root "/path/to/coding_projects"
 ```
 
 You can also set an environment variable:
 
 ```bash
-JWH_WORKSPACE_ROOT="/path/to/coding_projects" swift run JournalismWorkflowHub
+JWH_WORKSPACE_ROOT="/path/to/coding_projects" scripts/swiftpm-local.sh run JournalismWorkflowHub
+```
+
+Run tests the same way:
+
+```bash
+scripts/swiftpm-local.sh test --filter AppStoreNavigationTests
 ```
 
 ## Package A Shareable Mac App
@@ -37,29 +45,29 @@ JWH_WORKSPACE_ROOT="/path/to/coding_projects" swift run JournalismWorkflowHub
 Build a zipped macOS app bundle for alpha testers:
 
 ```bash
-scripts/build-macos-release.sh --version 0.1.0
+scripts/build-macos-release.sh --version 0.1.1
 ```
 
 This creates:
 
-- `dist/PressCockpit-macOS-0.1.0.zip`
-- `dist/PressCockpit-macOS-0.1.0.zip.sha256`
+- `dist/PressCockpit-macOS-0.1.1.zip`
+- `dist/PressCockpit-macOS-0.1.1.zip.sha256`
 
 The packaged app defaults to standalone mode so testers can open the bundled demo workspace without your private newsroom setup.
 
 You can also change the default launch profile:
 
 ```bash
-scripts/build-macos-release.sh --version 0.1.0 --profile standard
+scripts/build-macos-release.sh --version 0.1.1 --profile standard
 ```
 
-Tagged pushes like `v0.1.0` trigger `.github/workflows/macos-release.yml`, which rebuilds the app on GitHub Actions and attaches the zip to the GitHub Release.
+Tagged pushes like `v0.1.1` trigger `.github/workflows/macos-release.yml`, which rebuilds the app on GitHub Actions and attaches the zip to the GitHub Release.
 
 Example:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
 ## Standalone audit mode
@@ -67,7 +75,7 @@ git push origin v0.1.0
 Run the app in a local standalone profile without depending on your full newsroom workspace:
 
 ```bash
-swift run JournalismWorkflowHub --app-profile standalone
+scripts/swiftpm-local.sh run JournalismWorkflowHub --app-profile standalone
 ```
 
 This profile:
@@ -79,7 +87,7 @@ This profile:
 You can still point standalone mode at another workspace explicitly:
 
 ```bash
-swift run JournalismWorkflowHub --app-profile standalone --workspace-root "/path/to/other/workspace"
+scripts/swiftpm-local.sh run JournalismWorkflowHub --app-profile standalone --workspace-root "/path/to/other/workspace"
 ```
 
 ## Custom presets

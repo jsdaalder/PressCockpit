@@ -1,8 +1,8 @@
+import AppKit
 import Foundation
 
 enum DraftSupport {
     static let defaultGoogleDraftPointerFilename = "Draft.gdoc"
-    private static let suggestedTemplateRelativePath = "Downloads/Template nieuw artikel.docx"
     private static let maxDraftTitleLength = 72
 
     static func localDraftFilename(projectTitle: String) -> String {
@@ -44,13 +44,79 @@ enum DraftSupport {
         """
     }
 
-    static func suggestedTemplateURL(fileManager: FileManager = .default) -> URL? {
-        let candidate = URL(fileURLWithPath: NSHomeDirectory())
-            .appendingPathComponent(suggestedTemplateRelativePath)
-        guard fileManager.fileExists(atPath: candidate.path) else {
-            return nil
+    static func scaffoldDraftData(projectTitle: String) throws -> Data {
+        let document = NSMutableAttributedString()
+
+        if !projectTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            appendParagraph(
+                projectTitle,
+                to: document,
+                font: NSFont.systemFont(ofSize: 18, weight: .semibold),
+                spacingBefore: 0,
+                spacingAfter: 18
+            )
         }
-        return candidate
+
+        appendSection(
+            "[Nieuwsbrief]",
+            body: ["Schrijf hier een korte nieuwsbriefsamenvatting."],
+            to: document
+        )
+        appendSection(
+            "[Socials]",
+            body: ["Schrijf hier korte social copy."],
+            to: document
+        )
+        appendSection(
+            "[Kopsuggesties]",
+            bullets: ["Kopsuggestie 1"],
+            to: document
+        )
+        appendSection(
+            "[Lead]",
+            body: ["Schrijf hier de lead."],
+            to: document
+        )
+        appendSection(
+            "[Speedread]",
+            body: [
+                "Wat is het nieuws?",
+                "Waarom is dit belangrijk?",
+                "Hoe hebben we dit onderzocht?"
+            ],
+            bulletGroups: [
+                ["Kernpunt"],
+                ["Belang"],
+                ["Onderzoeksmethode"]
+            ],
+            to: document
+        )
+        appendSection(
+            "[Auteurs]",
+            body: [NSFullUserName().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Auteur" : NSFullUserName()],
+            to: document
+        )
+        appendSection(
+            "[Dossier]",
+            body: ["Vul hier het dossier in."],
+            to: document
+        )
+        appendSection(
+            "[Tags]",
+            body: ["Vul hier tags in."],
+            to: document
+        )
+        appendSection(
+            "[Gerelateerde artikelen]",
+            bullets: ["Artikel 1", "Artikel 2", "Artikel 3"],
+            to: document,
+            addDivider: true
+        )
+
+        return try document.data(
+            from: NSRange(location: 0, length: document.length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.officeOpenXML]
+        )
     }
 
     private static func cleanedProjectTitle(_ projectTitle: String) -> String {
@@ -83,58 +149,114 @@ enum DraftSupport {
         let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? String(title.prefix(maxDraftTitleLength)) : "\(trimmed)..."
     }
-}
 
-struct DraftTemplatePreferences {
-    static let scaffoldDraftTemplatePathKey = "scaffoldDraftTemplatePath"
-    static let scaffoldDraftTemplateBookmarkKey = "scaffoldDraftTemplateBookmark"
+    private static func appendSection(
+        _ heading: String,
+        body: [String] = [],
+        bullets: [String] = [],
+        bulletGroups: [[String]] = [],
+        to document: NSMutableAttributedString,
+        addDivider: Bool = false
+    ) {
+        appendParagraph(
+            heading,
+            to: document,
+            font: NSFont.systemFont(ofSize: 14, weight: .bold),
+            spacingBefore: document.length == 0 ? 0 : 14,
+            spacingAfter: 8
+        )
 
-    static func savedURL(defaults: UserDefaults = .standard, fileManager: FileManager = .default) -> URL? {
-        if let bookmarkData = defaults.data(forKey: scaffoldDraftTemplateBookmarkKey) {
-            var isStale = false
-            if let resolvedURL = try? URL(
-                resolvingBookmarkData: bookmarkData,
-                options: [.withSecurityScope],
-                relativeTo: nil,
-                bookmarkDataIsStale: &isStale
-            ) {
-                if isStale {
-                    persist(resolvedURL, defaults: defaults)
+        for (index, paragraph) in body.enumerated() {
+            appendParagraph(
+                paragraph,
+                to: document,
+                font: NSFont.systemFont(ofSize: 11),
+                spacingBefore: 0,
+                spacingAfter: (index == body.count - 1 && bullets.isEmpty && bulletGroups.isEmpty) ? 12 : 6
+            )
+
+            if index < bulletGroups.count {
+                for bullet in bulletGroups[index] {
+                    appendBullet(bullet, to: document)
                 }
-                let standardizedURL = resolvedURL.standardizedFileURL
-                if fileManager.fileExists(atPath: standardizedURL.path) {
-                    return standardizedURL
-                }
+                appendSpacer(to: document, spacingAfter: 8)
             }
-
-            defaults.removeObject(forKey: scaffoldDraftTemplateBookmarkKey)
         }
 
-        return nil
+        if body.count < bulletGroups.count {
+            for group in bulletGroups.dropFirst(body.count) {
+                for bullet in group {
+                    appendBullet(bullet, to: document)
+                }
+                appendSpacer(to: document, spacingAfter: 8)
+            }
+        }
+
+        for bullet in bullets {
+            appendBullet(bullet, to: document)
+        }
+
+        if !bullets.isEmpty {
+            appendSpacer(to: document, spacingAfter: 12)
+        } else if body.isEmpty && bulletGroups.isEmpty {
+            appendSpacer(to: document, spacingAfter: 12)
+        }
+
+        if addDivider {
+            appendDivider(to: document)
+        }
     }
 
-    static func legacySavedURL(defaults: UserDefaults = .standard, fileManager: FileManager = .default) -> URL? {
-        guard let savedPath = defaults.string(forKey: scaffoldDraftTemplatePathKey),
-              !savedPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return nil
-        }
+    private static func appendParagraph(
+        _ text: String,
+        to document: NSMutableAttributedString,
+        font: NSFont,
+        spacingBefore: CGFloat,
+        spacingAfter: CGFloat
+    ) {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.paragraphSpacingBefore = spacingBefore
+        paragraphStyle.paragraphSpacing = spacingAfter
+        paragraphStyle.lineSpacing = 2
 
-        let standardizedURL = URL(fileURLWithPath: savedPath).standardizedFileURL
-        return fileManager.fileExists(atPath: standardizedURL.path) ? standardizedURL : nil
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .paragraphStyle: paragraphStyle
+        ]
+        document.append(NSAttributedString(string: text + "\n", attributes: attributes))
     }
 
-    static func persist(_ url: URL, defaults: UserDefaults = .standard) {
-        let standardizedURL = url.standardizedFileURL
-        defaults.set(standardizedURL.path, forKey: scaffoldDraftTemplatePathKey)
+    private static func appendBullet(_ text: String, to document: NSMutableAttributedString) {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.headIndent = 18
+        paragraphStyle.firstLineHeadIndent = 0
+        paragraphStyle.paragraphSpacing = 6
+        paragraphStyle.lineSpacing = 2
 
-        if let bookmarkData = try? standardizedURL.bookmarkData(
-            options: [.withSecurityScope],
-            includingResourceValuesForKeys: nil,
-            relativeTo: nil
-        ) {
-            defaults.set(bookmarkData, forKey: scaffoldDraftTemplateBookmarkKey)
-        } else {
-            defaults.removeObject(forKey: scaffoldDraftTemplateBookmarkKey)
-        }
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 11),
+            .paragraphStyle: paragraphStyle
+        ]
+        document.append(NSAttributedString(string: "•\t\(text)\n", attributes: attributes))
+    }
+
+    private static func appendSpacer(to document: NSMutableAttributedString, spacingAfter: CGFloat) {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.paragraphSpacing = spacingAfter
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 11),
+            .paragraphStyle: paragraphStyle
+        ]
+        document.append(NSAttributedString(string: "\n", attributes: attributes))
+    }
+
+    private static func appendDivider(to document: NSMutableAttributedString) {
+        appendParagraph(
+            String(repeating: "_", count: 48),
+            to: document,
+            font: NSFont.systemFont(ofSize: 11),
+            spacingBefore: 0,
+            spacingAfter: 12
+        )
     }
 }

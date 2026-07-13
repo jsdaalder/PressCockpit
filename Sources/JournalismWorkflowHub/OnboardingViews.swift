@@ -1,32 +1,6 @@
 import SwiftUI
 import AppKit
 
-private enum OnboardingStep: Int, CaseIterable {
-    case welcome
-    case startMode
-    case documentMode
-    case workspaceLocation
-    case workspaceSetup
-    case finish
-
-    var title: String {
-        switch self {
-        case .welcome:
-            return "Welcome"
-        case .startMode:
-            return "How do you want to start?"
-        case .documentMode:
-            return "How do you handle documents?"
-        case .workspaceLocation:
-            return "Where should the workspace live?"
-        case .workspaceSetup:
-            return "Workspace setup"
-        case .finish:
-            return "Ready to start"
-        }
-    }
-}
-
 struct OnboardingFlowView: View {
     @EnvironmentObject private var store: AppStore
     let onFinished: () -> Void
@@ -61,7 +35,8 @@ struct OnboardingFlowView: View {
         .onAppear {
             guard !didLoadDefaults else { return }
             didLoadDefaults = true
-            draft = store.defaultOnboardingDraft
+            step = initialStep
+            draft = seededDraft
         }
         .alert("Setup issue", isPresented: Binding(
             get: { errorMessage != nil },
@@ -75,7 +50,7 @@ struct OnboardingFlowView: View {
 
     private var onboardingHeader: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("First-run setup")
+            Text(headerEyebrow)
                 .font(.system(size: 16, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color(red: 0.20, green: 0.28, blue: 0.28))
                 .textCase(.uppercase)
@@ -85,12 +60,12 @@ struct OnboardingFlowView: View {
                     .font(.system(size: 36, weight: .semibold, design: .serif))
                     .foregroundStyle(Color(red: 0.12, green: 0.18, blue: 0.18))
                 Spacer()
-                Text("\(step.rawValue + 1) / \(OnboardingStep.allCases.count)")
+                Text("\(currentStepIndex + 1) / \(availableSteps.count)")
                     .font(.system(.body, design: .rounded))
                     .foregroundStyle(Color(red: 0.27, green: 0.34, blue: 0.34))
             }
 
-            ProgressView(value: Double(step.rawValue + 1), total: Double(OnboardingStep.allCases.count))
+            ProgressView(value: Double(currentStepIndex + 1), total: Double(availableSteps.count))
                 .tint(Color(red: 0.16, green: 0.27, blue: 0.27))
         }
         .frame(maxWidth: 780, alignment: .leading)
@@ -123,14 +98,21 @@ struct OnboardingFlowView: View {
                 .overlay(Color.white.opacity(0.45))
 
             HStack {
+                if launchMode == .switchWorkspace {
+                    Button("Cancel") {
+                        store.cancelOnboardingLaunch()
+                        onFinished()
+                    }
+                }
+
                 Button("Back") {
                     moveBackward()
                 }
-                .disabled(step == .welcome)
+                .disabled(currentStepIndex == 0)
 
                 Spacer()
 
-                Button(step == .finish ? "Finish setup" : "Continue") {
+                Button(primaryButtonTitle) {
                     continueFromCurrentStep()
                 }
                 .buttonStyle(.borderedProminent)
@@ -149,15 +131,15 @@ struct OnboardingFlowView: View {
 
     private var welcomeStep: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Journalism Workflow Hub is a local-first newsroom control surface. It reads your reporting workspace, shows what matters now, and runs trusted local workflows without turning your files into a hidden cloud system.")
+            Text("Journalism Workflow Hub is a trustworthy view over your real reporting workspace.\n\nIt helps you see what is active, open the right project fast, and run local workflows with clear write boundaries. It is not a parallel CMS or a hidden cloud system.")
                 .font(.system(.body, design: .rounded))
                 .foregroundStyle(Color(red: 0.18, green: 0.25, blue: 0.25))
 
             VStack(alignment: .leading, spacing: 10) {
-                onboardingBullet("The app reads local folders such as `Projects`, `Areas`, `Resources`, and `Archives`.")
-                onboardingBullet("It can work with plain local files immediately.")
-                onboardingBullet("Google Doc pointers are partially supported; other sync providers can still work if they sync to a local folder.")
-                onboardingBullet("Some advanced workflows still depend on local tooling and may stay unavailable until configured.")
+                onboardingBullet("Reads ordinary workspace folders such as `Projects`, `Areas`, `Resources`, and `Archives`.")
+                onboardingBullet("Works best with plain local files today.")
+                onboardingBullet("Can also work with Google Doc pointers or other tools that sync to a local folder.")
+                onboardingBullet("Some advanced workflows still depend on local tooling and may not be available on this machine yet.")
             }
         }
     }
@@ -195,7 +177,7 @@ struct OnboardingFlowView: View {
 
     private var documentModeStep: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("This sets expectations for the first run. It does not lock the app into one provider forever.")
+            Text("Choose the document setup that matches this workspace today.\n\nThis does not lock you into one provider. The app works over your local directory, and you can change document setup later without moving your workspace into a proprietary system.")
                 .foregroundStyle(Color(red: 0.18, green: 0.25, blue: 0.25))
 
             ForEach(OnboardingDocumentMode.allCases, id: \.self) { mode in
@@ -221,14 +203,14 @@ struct OnboardingFlowView: View {
                     pathPreview(demoRoot.path)
                 }
             case .existingWorkspace:
-                Text("Point the app at the root folder of an existing workspace.")
+                Text("Point the app at the real root of your workspace. The app reads that directory directly; it does not import your reporting work into a separate app-owned structure.")
                     .foregroundStyle(Color(red: 0.18, green: 0.25, blue: 0.25))
                 workspacePathEditor(
                     label: "Existing workspace root",
                     browseLabel: "Choose workspace…"
                 )
             case .createWorkspace:
-                Text("Choose where the new workspace should be created. The default keeps the first setup obvious and easy to inspect.")
+                Text("If you create a new workspace here, the app will make plain folders and starter files you can inspect in Finder. If you stop using the app later, those folders remain ordinary files on disk.")
                     .foregroundStyle(Color(red: 0.18, green: 0.25, blue: 0.25))
                 workspacePathEditor(
                     label: "New workspace root",
@@ -246,7 +228,7 @@ struct OnboardingFlowView: View {
                     .foregroundStyle(Color(red: 0.18, green: 0.25, blue: 0.25))
                 capabilityIssueList(issues: demoSetupMessages)
             case .existingWorkspace:
-                Text("The app checks for the folders it needs at the root of the selected workspace.")
+                Text("The app expects a PARA-like root structure at the workspace root. Required today: `Projects` and `Resources`. `Areas` and `Archives` are optional but recommended.")
                     .foregroundStyle(Color(red: 0.18, green: 0.25, blue: 0.25))
                 capabilityIssueList(issues: validationReport.issues)
             case .createWorkspace:
@@ -313,6 +295,11 @@ struct OnboardingFlowView: View {
                 capabilityIssueList(issues: finishMessages)
             }
 
+            onboardingInfoCard(
+                title: "Privacy and security",
+                body: "Your workspace stays in the selected local folder. The app reads local files and only writes where a workflow says it will write. It does not require moving your reporting workspace into a Journalism Workflow Hub cloud backend.\n\nThe app also keeps some lightweight local app state on this Mac, such as workspace selection, cached catalog state, workflow run logs, and write backups.\n\nIf you use Google Docs or another sync tool, that provider keeps its own network and storage behavior."
+            )
+
             VStack(alignment: .leading, spacing: 10) {
                 Text("What should happen first?")
                     .font(.headline)
@@ -358,6 +345,45 @@ struct OnboardingFlowView: View {
         case .finish:
             return true
         }
+    }
+
+    private var launchMode: OnboardingLaunchMode {
+        store.onboardingLaunchMode ?? .firstRun
+    }
+
+    private var availableSteps: [OnboardingStep] {
+        launchMode.steps
+    }
+
+    private var currentStepIndex: Int {
+        availableSteps.firstIndex(of: step) ?? 0
+    }
+
+    private var headerEyebrow: String {
+        launchMode.title
+    }
+
+    private var initialStep: OnboardingStep {
+        launchMode.initialStep
+    }
+
+    private var seededDraft: OnboardingDraft {
+        var draft = store.defaultOnboardingDraft
+        if launchMode == .switchWorkspace {
+            draft.firstAction = .openOverview
+            if store.isUsingDemoWorkspace {
+                draft.startMode = .existingWorkspace
+                draft.workspacePath = ""
+            }
+        }
+        return draft
+    }
+
+    private var primaryButtonTitle: String {
+        if step == .finish, launchMode == .switchWorkspace {
+            return "Switch workspace"
+        }
+        return step == .finish ? "Finish setup" : "Continue"
     }
 
     private var validationReport: WorkspaceValidationReport {
@@ -535,6 +561,21 @@ struct OnboardingFlowView: View {
         .background(Color.white.opacity(0.55), in: Capsule())
     }
 
+    private func onboardingInfoCard(title: String, body: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(Color(red: 0.13, green: 0.18, blue: 0.18))
+
+            Text(body)
+                .font(.system(.body, design: .rounded))
+                .foregroundStyle(Color(red: 0.18, green: 0.25, blue: 0.25))
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.45), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
     private func onboardingBullet(_ text: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Circle()
@@ -558,12 +599,12 @@ struct OnboardingFlowView: View {
     }
 
     private func moveBackward() {
-        guard let previous = OnboardingStep(rawValue: step.rawValue - 1) else { return }
-        step = previous
+        guard currentStepIndex > 0 else { return }
+        step = availableSteps[currentStepIndex - 1]
     }
 
     private func continueFromCurrentStep() {
-        if step == .finish {
+        if step == availableSteps.last {
             do {
                 try store.completeOnboarding(using: draft)
                 onFinished()
@@ -573,9 +614,8 @@ struct OnboardingFlowView: View {
             return
         }
 
-        if let next = OnboardingStep(rawValue: step.rawValue + 1) {
-            step = next
-        }
+        guard currentStepIndex + 1 < availableSteps.count else { return }
+        step = availableSteps[currentStepIndex + 1]
     }
 
     private func chooseDirectory() {

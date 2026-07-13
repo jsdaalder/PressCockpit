@@ -1,5 +1,18 @@
 import Foundation
 
+enum SummaryPreviewFormatter {
+    static func wordLimitedPreview(_ text: String, limit: Int) -> String {
+        guard limit > 0 else { return "" }
+
+        let words = text.split(whereSeparator: \.isWhitespace)
+        guard words.count > limit else {
+            return text
+        }
+
+        return words.prefix(limit).joined(separator: " ") + "…"
+    }
+}
+
 enum AppProfile: String, Codable, Hashable, CaseIterable {
     case standard
     case standalone
@@ -294,6 +307,317 @@ enum SidebarSelection: Hashable {
     case run(String)
 }
 
+enum ProjectActivityState: String, Codable, Hashable, CaseIterable {
+    case active
+    case inactive
+
+    var label: String {
+        switch self {
+        case .active:
+            return "Active"
+        case .inactive:
+            return "Inactive"
+        }
+    }
+
+    static func from(frontmatterValue: String?) -> ProjectActivityState? {
+        guard let normalized = normalizedProjectStateToken(frontmatterValue) else { return nil }
+        return ProjectActivityState(rawValue: normalized)
+    }
+}
+
+enum ProjectWorkflowStage: String, Codable, Hashable, CaseIterable {
+    case lead
+    case feasibilityStudy = "feasibility_study"
+    case activeInvestigation = "active_investigation"
+    case draftingFactChecking = "drafting_fact_checking"
+    case deskHeadReview = "desk_head_review"
+    case eindredactie
+    case published
+
+    var label: String {
+        switch self {
+        case .lead:
+            return "Lead"
+        case .feasibilityStudy:
+            return "Feasibility study"
+        case .activeInvestigation:
+            return "Investigation"
+        case .draftingFactChecking:
+            return "Drafting & fact-checking"
+        case .deskHeadReview:
+            return "Desk head review"
+        case .eindredactie:
+            return "Eindredactie"
+        case .published:
+            return "Published"
+        }
+    }
+
+    static func from(frontmatterValue: String?) -> ProjectWorkflowStage? {
+        guard let normalized = normalizedProjectStateToken(frontmatterValue) else { return nil }
+        return ProjectWorkflowStage(rawValue: normalized)
+    }
+}
+
+enum ProjectInactiveReason: String, Codable, Hashable, CaseIterable {
+    case waiting
+    case finished
+    case discarded
+    case parked
+
+    var label: String {
+        switch self {
+        case .waiting:
+            return "Waiting"
+        case .finished:
+            return "Finished"
+        case .discarded:
+            return "Discarded"
+        case .parked:
+            return "Parked"
+        }
+    }
+
+    static func from(frontmatterValue: String?) -> ProjectInactiveReason? {
+        guard let normalized = normalizedProjectStateToken(frontmatterValue) else { return nil }
+        return ProjectInactiveReason(rawValue: normalized)
+    }
+}
+
+struct ProjectState: Hashable {
+    let activityState: ProjectActivityState
+    let workflowStage: ProjectWorkflowStage
+    let inactiveReason: ProjectInactiveReason?
+
+    var badgeLabel: String {
+        "\(activityState.label) · \(workflowStage.label)"
+    }
+
+    var detailLabel: String {
+        if activityState == .inactive, let inactiveReason {
+            return "\(activityState.label) · \(workflowStage.label) · \(inactiveReason.label)"
+        }
+        return badgeLabel
+    }
+
+    func legacyLifecycleStatus(isArchivedStorage: Bool) -> ProjectLifecycleStatus {
+        if isArchivedStorage {
+            return .archived
+        }
+        if activityState == .active {
+            return .active
+        }
+        if inactiveReason == .finished {
+            return .done
+        }
+        return .onHold
+    }
+
+    static func from(frontmatter: [String: String], isArchivedStorage: Bool) -> ProjectState? {
+        let legacyStatus = ProjectLifecycleStatus.from(frontmatterStatus: frontmatter["status"])
+        let explicitActivity = ProjectActivityState.from(frontmatterValue: frontmatter["activity_state"])
+        let explicitWorkflowStage = ProjectWorkflowStage.from(frontmatterValue: frontmatter["workflow_stage"])
+        let explicitInactiveReason = ProjectInactiveReason.from(frontmatterValue: frontmatter["inactive_reason"])
+
+        guard explicitActivity != nil || explicitWorkflowStage != nil || explicitInactiveReason != nil || legacyStatus != nil || isArchivedStorage else {
+            return nil
+        }
+
+        let workflowStage = explicitWorkflowStage ?? defaultWorkflowStage(
+            legacyStatus: legacyStatus,
+            explicitInactiveReason: explicitInactiveReason,
+            isArchivedStorage: isArchivedStorage
+        )
+
+        let activityState = explicitActivity
+            ?? (explicitInactiveReason != nil ? .inactive : defaultActivityState(legacyStatus: legacyStatus, isArchivedStorage: isArchivedStorage))
+
+        let inactiveReason: ProjectInactiveReason?
+        if activityState == .active {
+            inactiveReason = nil
+        } else {
+            inactiveReason = explicitInactiveReason ?? defaultInactiveReason(legacyStatus: legacyStatus, isArchivedStorage: isArchivedStorage)
+        }
+
+        return ProjectState(
+            activityState: activityState,
+            workflowStage: workflowStage,
+            inactiveReason: inactiveReason
+        )
+    }
+
+    private static func defaultActivityState(
+        legacyStatus: ProjectLifecycleStatus?,
+        isArchivedStorage: Bool
+    ) -> ProjectActivityState {
+        if isArchivedStorage {
+            return .inactive
+        }
+
+        switch legacyStatus {
+        case .active:
+            return .active
+        case .onHold, .done, .archived:
+            return .inactive
+        case nil:
+            return .active
+        }
+    }
+
+    private static func defaultWorkflowStage(
+        legacyStatus: ProjectLifecycleStatus?,
+        explicitInactiveReason: ProjectInactiveReason?,
+        isArchivedStorage: Bool
+    ) -> ProjectWorkflowStage {
+        if isArchivedStorage || legacyStatus == .done || legacyStatus == .archived || explicitInactiveReason == .finished {
+            return .published
+        }
+        return .activeInvestigation
+    }
+
+    private static func defaultInactiveReason(
+        legacyStatus: ProjectLifecycleStatus?,
+        isArchivedStorage: Bool
+    ) -> ProjectInactiveReason {
+        if isArchivedStorage {
+            return .finished
+        }
+
+        switch legacyStatus {
+        case .done, .archived:
+            return .finished
+        case .onHold:
+            return .waiting
+        case .active, nil:
+            return .waiting
+        }
+    }
+}
+
+private func normalizedProjectStateToken(_ value: String?) -> String? {
+    guard let value else { return nil }
+    let normalized = value
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased()
+        .replacingOccurrences(of: "-", with: "_")
+        .replacingOccurrences(of: " ", with: "_")
+
+    guard !normalized.isEmpty else { return nil }
+    return normalized
+}
+
+enum ProjectLifecycleStatus: String, Codable, Hashable, CaseIterable {
+    case active
+    case onHold = "on_hold"
+    case done
+    case archived
+
+    var label: String {
+        switch self {
+        case .active:
+            return "Active"
+        case .onHold:
+            return "On hold"
+        case .done:
+            return "Finished"
+        case .archived:
+            return "Archived"
+        }
+    }
+
+    var requiresOffboarding: Bool {
+        self == .done || self == .archived
+    }
+
+    static func from(frontmatterStatus: String?) -> ProjectLifecycleStatus? {
+        guard let frontmatterStatus else { return nil }
+        let normalized = frontmatterStatus
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "-", with: "_")
+            .replacingOccurrences(of: " ", with: "_")
+        return ProjectLifecycleStatus(rawValue: normalized)
+    }
+}
+
+enum ProjectOffboardingOutcome: String, Codable, Hashable, CaseIterable {
+    case unknown
+    case published
+    case unpublished
+    case superseded
+
+    var label: String {
+        switch self {
+        case .unknown:
+            return "Not decided yet"
+        case .published:
+            return "Published"
+        case .unpublished:
+            return "Useful but unpublished"
+        case .superseded:
+            return "Superseded"
+        }
+    }
+}
+
+struct ProjectStatusChangeState: Identifiable, Hashable {
+    let id = UUID()
+    let projectID: String
+    let projectPath: String
+    let readmePath: String
+    let projectTitle: String
+    let currentStatus: ProjectLifecycleStatus
+    let targetStatus: ProjectLifecycleStatus
+    let currentProjectState: ProjectState
+    let projectType: WorkspaceProjectType
+    let dossierSlug: String?
+    let archiveYear: String
+}
+
+struct ProjectStateEditState: Identifiable, Hashable {
+    let id = UUID()
+    let projectID: String
+    let projectPath: String
+    let readmePath: String
+    let projectTitle: String
+    let currentState: ProjectState
+    let isArchivedStorage: Bool
+}
+
+enum MaintenanceItemKind: String, Codable, Hashable, CaseIterable {
+    case missingPublishedPDF = "missing_published_pdf"
+    case missingProducedSummary = "missing_produced_summary"
+    case missingRemainingOpen = "missing_remaining_open"
+    case missingImpactSummary = "missing_impact_summary"
+    case missingDossierHandoff = "missing_dossier_handoff"
+
+    var label: String {
+        switch self {
+        case .missingPublishedPDF:
+            return "Published PDF missing"
+        case .missingProducedSummary:
+            return "Produced summary missing"
+        case .missingRemainingOpen:
+            return "Open questions missing"
+        case .missingImpactSummary:
+            return "Impact note missing"
+        case .missingDossierHandoff:
+            return "Dossier handoff missing"
+        }
+    }
+}
+
+struct MaintenanceItem: Identifiable, Codable, Hashable {
+    let id: String
+    let kind: MaintenanceItemKind
+    let projectTitle: String
+    let projectPath: String
+    let detail: String
+    let createdAt: Date
+    let source: String
+}
+
 enum CaptureRecordState: String, Codable, Hashable, CaseIterable {
     case queued
     case processing
@@ -347,9 +671,86 @@ struct CaptureRecord: Identifiable, Codable, Hashable {
     let state: CaptureRecordState
     let failureDescription: String?
     let userNote: String?
-    let assignedProjectPath: String?
+    let assignedTargetPath: String?
     let assignedAt: Date?
     let assignedDestinationPath: String?
+
+    init(
+        id: String,
+        displayName: String?,
+        originalSourcePath: String?,
+        importedStoragePath: String?,
+        capturedAt: Date,
+        captureType: CaptureRecordType,
+        state: CaptureRecordState,
+        failureDescription: String?,
+        userNote: String?,
+        assignedTargetPath: String?,
+        assignedAt: Date?,
+        assignedDestinationPath: String?
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.originalSourcePath = originalSourcePath
+        self.importedStoragePath = importedStoragePath
+        self.capturedAt = capturedAt
+        self.captureType = captureType
+        self.state = state
+        self.failureDescription = failureDescription
+        self.userNote = userNote
+        self.assignedTargetPath = assignedTargetPath
+        self.assignedAt = assignedAt
+        self.assignedDestinationPath = assignedDestinationPath
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case displayName
+        case originalSourcePath
+        case importedStoragePath
+        case capturedAt
+        case captureType
+        case state
+        case failureDescription
+        case userNote
+        case assignedTargetPath
+        case assignedProjectPath
+        case assignedAt
+        case assignedDestinationPath
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+        originalSourcePath = try container.decodeIfPresent(String.self, forKey: .originalSourcePath)
+        importedStoragePath = try container.decodeIfPresent(String.self, forKey: .importedStoragePath)
+        capturedAt = try container.decode(Date.self, forKey: .capturedAt)
+        captureType = try container.decode(CaptureRecordType.self, forKey: .captureType)
+        state = try container.decode(CaptureRecordState.self, forKey: .state)
+        failureDescription = try container.decodeIfPresent(String.self, forKey: .failureDescription)
+        userNote = try container.decodeIfPresent(String.self, forKey: .userNote)
+        assignedTargetPath = try container.decodeIfPresent(String.self, forKey: .assignedTargetPath)
+            ?? container.decodeIfPresent(String.self, forKey: .assignedProjectPath)
+        assignedAt = try container.decodeIfPresent(Date.self, forKey: .assignedAt)
+        assignedDestinationPath = try container.decodeIfPresent(String.self, forKey: .assignedDestinationPath)
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encodeIfPresent(displayName, forKey: .displayName)
+        try container.encodeIfPresent(originalSourcePath, forKey: .originalSourcePath)
+        try container.encodeIfPresent(importedStoragePath, forKey: .importedStoragePath)
+        try container.encode(capturedAt, forKey: .capturedAt)
+        try container.encode(captureType, forKey: .captureType)
+        try container.encode(state, forKey: .state)
+        try container.encodeIfPresent(failureDescription, forKey: .failureDescription)
+        try container.encodeIfPresent(userNote, forKey: .userNote)
+        try container.encodeIfPresent(assignedTargetPath, forKey: .assignedTargetPath)
+        try container.encodeIfPresent(assignedAt, forKey: .assignedAt)
+        try container.encodeIfPresent(assignedDestinationPath, forKey: .assignedDestinationPath)
+    }
 
     var displayTitle: String {
         if let displayName, !displayName.isEmpty {
@@ -465,7 +866,7 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
     var workspaceSummary: String {
         let bits = [
             projectType.label,
-            lifecycleStage.isEmpty ? nil : lifecycleStage,
+            projectState?.detailLabel ?? (lifecycleStage.isEmpty ? nil : lifecycleStage),
             agentsSummary.isEmpty ? nil : agentsSummary
         ].compactMap { $0 }
         return bits.joined(separator: " • ")
@@ -479,6 +880,15 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
         if let status = frontmatter["status"], !status.isEmpty {
             values.append(status)
         }
+        if let activityState {
+            values.append(activityState.rawValue)
+        }
+        if let workflowStage {
+            values.append(workflowStage.rawValue)
+        }
+        if let inactiveReason {
+            values.append(inactiveReason.rawValue)
+        }
         if let started = frontmatter["started"], !started.isEmpty {
             values.append(started)
         }
@@ -489,6 +899,53 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
 
     var isProjectRoot: Bool {
         frontmatter["type"] == "project"
+    }
+
+    var activityState: ProjectActivityState? {
+        projectState?.activityState
+    }
+
+    var workflowStage: ProjectWorkflowStage? {
+        projectState?.workflowStage
+    }
+
+    var inactiveReason: ProjectInactiveReason? {
+        projectState?.inactiveReason
+    }
+
+    var projectState: ProjectState? {
+        guard isProjectRoot else { return nil }
+        return ProjectState.from(frontmatter: frontmatter, isArchivedStorage: section == .archives)
+    }
+
+    var projectStateBadgeLabel: String {
+        projectState?.badgeLabel ?? lifecycleStage
+    }
+
+    var projectStateDetailLabel: String {
+        projectState?.detailLabel ?? lifecycleStage
+    }
+
+    var lifecycleStatus: ProjectLifecycleStatus? {
+        projectState?.legacyLifecycleStatus(isArchivedStorage: section == .archives)
+            ?? ProjectLifecycleStatus.from(frontmatterStatus: frontmatter["status"])
+    }
+
+    var dossierSlug: String? {
+        let value = frontmatter["dossier"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return value.isEmpty ? nil : value
+    }
+
+    var docsDirectoryURL: URL {
+        url.appendingPathComponent("docs", isDirectory: true)
+    }
+
+    var docsOverviewURL: URL {
+        docsDirectoryURL.appendingPathComponent("docs_overview.md")
+    }
+
+    var hasDocsOverview: Bool {
+        FileManager.default.fileExists(atPath: docsOverviewURL.path)
     }
 
     var hasGoogleDocPointers: Bool {
@@ -570,16 +1027,25 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
         return "Open draft will open the main Google Doc in the browser. Local snapshot copies stay secondary and do not replace the main draft target."
     }
 
+    func draftOwnershipSummary(for document: WorkspaceDocument) -> String {
+        let provider = document.provider == .googleDocPointer ? "Google Doc" : "Local file"
+        let role = document.role.label
+        if isLikelyDerivedSnapshot(document) {
+            return "\(provider) • \(role) • treated as a secondary snapshot"
+        }
+        return "\(provider) • \(role) • current canonical draft target"
+    }
+
     private func preferredCanonicalDocument(for role: WorkspaceDocumentRole) -> WorkspaceDocument? {
         let roleDocuments = documents.filter { $0.role == role }
         guard !roleDocuments.isEmpty else { return nil }
 
         if role == .draft {
-            if let googleDraft = roleDocuments
-                .filter({ $0.provider == .googleDocPointer })
+            if let promotedGoogleDraft = roleDocuments
+                .filter(isExplicitPromotedGoogleDraft)
                 .sorted(by: Self.compareOverviewDocuments)
                 .first {
-                return googleDraft
+                return promotedGoogleDraft
             }
 
             if let localDraft = roleDocuments
@@ -588,9 +1054,26 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
                 .first {
                 return localDraft
             }
+
+            if let googleDraft = roleDocuments
+                .filter({ $0.provider == .googleDocPointer })
+                .sorted(by: Self.compareOverviewDocuments)
+                .first {
+                return googleDraft
+            }
         }
 
         return roleDocuments.sorted(by: Self.compareOverviewDocuments).first
+    }
+
+    private func isExplicitPromotedGoogleDraft(_ document: WorkspaceDocument) -> Bool {
+        guard document.provider == .googleDocPointer, document.role == .draft else {
+            return false
+        }
+
+        return URL(fileURLWithPath: document.path).lastPathComponent.localizedCaseInsensitiveCompare(
+            DraftSupport.defaultGoogleDraftPointerFilename
+        ) == .orderedSame
     }
 
     private static let overviewDocumentRoles: [WorkspaceDocumentRole] = [

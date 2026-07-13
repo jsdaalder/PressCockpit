@@ -13,7 +13,23 @@ from urllib.parse import urlparse
 
 SYSTEM_FILES = {".DS_Store"}
 DERIVED_PARTS = {"_derived", "google_docs"}
-README_FRONTMATTER_KEYS = ("type", "project", "status", "owner", "started", "topics", "entities", "deliverable")
+README_FRONTMATTER_KEYS = (
+    "type",
+    "project",
+    "activity_state",
+    "workflow_stage",
+    "inactive_reason",
+    "status",
+    "project_type",
+    "dossier",
+    "safety",
+    "google_drive_folder_url",
+    "owner",
+    "started",
+    "topics",
+    "entities",
+    "deliverable",
+)
 SECTION_LABEL_RE = re.compile(r"^\[(.+?)\]\s*$")
 LIST_ITEM_RE = re.compile(r"^\d+\.\s+")
 SPECIAL_LABELS = {
@@ -21,6 +37,13 @@ SPECIAL_LABELS = {
     "co2": "CO2",
 }
 LOW_SIGNAL_MARKERS = ("lorem ipsum", "asdf")
+
+LEGACY_STATUS_MAP = {
+    "active": ("active", "active_investigation", ""),
+    "on_hold": ("inactive", "active_investigation", "waiting"),
+    "done": ("inactive", "published", "finished"),
+    "archived": ("inactive", "published", "finished"),
+}
 
 
 @dataclass(frozen=True)
@@ -111,6 +134,24 @@ def normalize_topic_label(value: str) -> str:
     if not cleaned:
         return ""
     return humanize_label(cleaned)
+
+
+def derive_project_state(existing_metadata: dict[str, str]) -> tuple[str, str, str]:
+    activity_state = existing_metadata.get("activity_state", "").strip()
+    workflow_stage = existing_metadata.get("workflow_stage", "").strip()
+    inactive_reason = existing_metadata.get("inactive_reason", "").strip()
+
+    if activity_state and workflow_stage:
+        if activity_state == "active":
+            return activity_state, workflow_stage, ""
+        return activity_state, workflow_stage, inactive_reason
+
+    normalized_status = existing_metadata.get("status", "active").strip().lower().replace("-", "_").replace(" ", "_")
+    activity_state, workflow_stage, inactive_reason = LEGACY_STATUS_MAP.get(
+        normalized_status,
+        ("active", "active_investigation", "")
+    )
+    return activity_state, workflow_stage, inactive_reason
 
 
 def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
@@ -469,18 +510,29 @@ def choose_project_summary(inventory: ProjectInventory) -> str:
 def build_frontmatter(inventory: ProjectInventory, existing_metadata: dict[str, str]) -> str:
     project_slug = inventory.project_root.name
     started_default = existing_metadata.get("started") or f"{inventory.project_root.parent.name}-01-01"
+    activity_state, workflow_stage, inactive_reason = derive_project_state(existing_metadata)
     lines = [
         "---",
         f"type: {existing_metadata.get('type', 'project')}",
         f"project: {existing_metadata.get('project', project_slug)}",
+        f"activity_state: {activity_state}",
+        f"workflow_stage: {workflow_stage}",
+    ]
+    if inactive_reason and activity_state == "inactive":
+        lines.append(f"inactive_reason: {inactive_reason}")
+    lines.extend([
         f"status: {existing_metadata.get('status', 'active')}",
+        f"project_type: {existing_metadata.get('project_type', 'journalism')}",
+        f"dossier: {existing_metadata.get('dossier', '')}",
+        f"safety: {existing_metadata.get('safety', 'unknown')}",
+        f"google_drive_folder_url: {existing_metadata.get('google_drive_folder_url', '')}",
         f"owner: {existing_metadata.get('owner', '')}",
         f"started: {started_default}",
         f"topics: {existing_metadata.get('topics', '[]')}",
         f"entities: {existing_metadata.get('entities', '[]')}",
         f"deliverable: {existing_metadata.get('deliverable', '')}",
         "---",
-    ]
+    ])
     return "\n".join(lines)
 
 

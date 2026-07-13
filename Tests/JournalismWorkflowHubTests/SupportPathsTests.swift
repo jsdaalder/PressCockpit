@@ -2,26 +2,52 @@ import XCTest
 @testable import JournalismWorkflowHub
 
 final class SupportPathsTests: XCTestCase {
-    func testBundledDemoWorkspaceExists() {
-        let root = bundledDemoWorkspaceRoot()
+    func testSupportDirectoryUsesTemporaryRootDuringTests() {
+        let supportDirectory = journalismWorkflowHubSupportDirectory()
 
-        XCTAssertNotNil(root)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: root?.appendingPathComponent("Projects/2026/demo_story/README.md").path ?? ""))
+        XCTAssertTrue(supportDirectory.path.hasPrefix(FileManager.default.temporaryDirectory.path))
+        XCTAssertTrue(supportDirectory.path.contains("JournalismWorkflowHubTests"))
     }
 
-    func testCaptureDirectoryHelperCreatesSubdirectory() {
+    func testLogsDirectoryLivesUnderSupportRoot() {
+        let supportDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let logsDirectory = journalismWorkflowHubLogsDirectory(supportDirectory: supportDirectory)
+
+        XCTAssertEqual(logsDirectory.path, supportDirectory.appendingPathComponent("logs").path)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: logsDirectory.path))
+    }
+
+    func testCreateWorkflowWriteBackupsCopiesExistingWorkspaceFiles() throws {
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let captureDirectory = journalismWorkflowHubCaptureDirectory(supportDirectory: tmp)
+        let workspaceRoot = tmp.appendingPathComponent("workspace")
+        let supportRoot = tmp.appendingPathComponent("support")
+        let readmeURL = workspaceRoot.appendingPathComponent("Projects/2026/demo/README.md")
 
-        XCTAssertEqual(captureDirectory.lastPathComponent, "capture")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: captureDirectory.path))
-    }
+        try FileManager.default.createDirectory(
+            at: readmeURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+        try """
+        ---
+        type: project
+        ---
+        """.write(to: readmeURL, atomically: true, encoding: .utf8)
 
-    func testBundledKnowledgeOpsScriptsExist() {
-        let root = bundledKnowledgeOpsScriptsRoot()
+        let backups = try createWorkflowWriteBackups(
+            paths: [readmeURL.path, "", readmeURL.path],
+            workspaceRoot: workspaceRoot,
+            supportDirectory: supportRoot,
+            now: Date(timeIntervalSince1970: 0)
+        )
 
-        XCTAssertNotNil(root)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: root?.appendingPathComponent("scaffold_project.py").path ?? ""))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: root?.appendingPathComponent("refresh_knowledge_ops.py").path ?? ""))
+        XCTAssertEqual(backups.count, 1)
+        let backupPath = try XCTUnwrap(backups.first)
+        let backupURL = URL(fileURLWithPath: backupPath)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: backupURL.path))
+        XCTAssertTrue(backupURL.path.contains("workflow_backups/19700101_000000/Projects/2026/demo/README.md"))
+
+        let backupContents = try String(contentsOf: backupURL, encoding: .utf8)
+        XCTAssertTrue(backupContents.contains("type: project"))
     }
 }

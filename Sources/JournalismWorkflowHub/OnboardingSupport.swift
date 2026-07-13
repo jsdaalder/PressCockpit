@@ -1,5 +1,58 @@
 import Foundation
 
+enum OnboardingStep: Int, CaseIterable, Hashable {
+    case welcome
+    case startMode
+    case documentMode
+    case workspaceLocation
+    case workspaceSetup
+    case finish
+
+    var title: String {
+        switch self {
+        case .welcome:
+            return "Welcome"
+        case .startMode:
+            return "How do you want to start?"
+        case .documentMode:
+            return "How do you handle documents?"
+        case .workspaceLocation:
+            return "Where should the workspace live?"
+        case .workspaceSetup:
+            return "Workspace setup"
+        case .finish:
+            return "Ready to start"
+        }
+    }
+}
+
+enum OnboardingLaunchMode: Hashable {
+    case firstRun
+    case switchWorkspace
+
+    var title: String {
+        switch self {
+        case .firstRun:
+            return "First-run setup"
+        case .switchWorkspace:
+            return "Switch workspace"
+        }
+    }
+
+    var steps: [OnboardingStep] {
+        switch self {
+        case .firstRun:
+            return OnboardingStep.allCases
+        case .switchWorkspace:
+            return [.workspaceLocation, .workspaceSetup, .finish]
+        }
+    }
+
+    var initialStep: OnboardingStep {
+        steps.first ?? .welcome
+    }
+}
+
 enum OnboardingStartMode: String, CaseIterable, Hashable {
     case demo
     case existingWorkspace = "existing_workspace"
