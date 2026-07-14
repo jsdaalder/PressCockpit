@@ -122,7 +122,7 @@ final class WorkflowPreflightEvaluatorTests: XCTestCase {
 
         XCTAssertEqual(report.status, .invalidConfiguration)
         XCTAssertEqual(report.summary, "The bundled scaffold script is outdated.")
-        XCTAssertEqual(report.missingItems, ["--section-answer-1", "--section-answer-2", "--section-answer-3"])
+        XCTAssertEqual(report.missingItems, ["--activity-state", "--workflow-stage", "--inactive-reason", "--section-answer-1", "--section-answer-2", "--section-answer-3"])
         XCTAssertFalse(report.isRunnable)
     }
 

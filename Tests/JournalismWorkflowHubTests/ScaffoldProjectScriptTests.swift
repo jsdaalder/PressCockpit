@@ -11,6 +11,9 @@ final class ScaffoldProjectScriptTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: scriptURL.path), scriptURL.path)
         let contents = try String(contentsOf: scriptURL, encoding: .utf8)
         XCTAssertTrue(contents.contains("--project-type"))
+        XCTAssertTrue(contents.contains("--activity-state"))
+        XCTAssertTrue(contents.contains("--workflow-stage"))
+        XCTAssertTrue(contents.contains("--inactive-reason"))
         XCTAssertTrue(contents.contains("--section-answer-1"))
         XCTAssertTrue(contents.contains("--section-answer-2"))
         XCTAssertTrue(contents.contains("--section-answer-3"))
@@ -21,6 +24,51 @@ final class ScaffoldProjectScriptTests: XCTestCase {
         XCTAssertTrue(contents.contains("Expected pattern or claim:"))
         XCTAssertTrue(contents.contains("What this tool should unblock:"))
         XCTAssertTrue(contents.contains("scaffold-doc-summaries:start"))
+    }
+
+    func testScaffoldScriptAcceptsExplicitCanonicalProjectState() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let scriptURL = root
+            .appendingPathComponent("Sources/JournalismWorkflowHub/Resources/knowledge_ops/scripts/scaffold_project.py")
+
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let projectRoot = tmp.appendingPathComponent("Projects/2026/foi_waiting")
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = [
+            "python3",
+            scriptURL.path,
+            "--project-root", projectRoot.path,
+            "--title", "FOI Waiting",
+            "--owner", "Jan",
+            "--activity-state", "inactive",
+            "--workflow-stage", "feasibility_study",
+            "--inactive-reason", "waiting",
+            "--project-type", "journalism",
+            "--started", "2026-07-14",
+            "--deliverable", "Waiting for records."
+        ]
+
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        try process.run()
+        process.waitUntilExit()
+
+        let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        XCTAssertEqual(process.terminationStatus, 0, stderr)
+
+        let readme = try String(contentsOf: projectRoot.appendingPathComponent("README.md"), encoding: .utf8)
+        XCTAssertTrue(readme.contains("activity_state: inactive"))
+        XCTAssertTrue(readme.contains("workflow_stage: feasibility_study"))
+        XCTAssertTrue(readme.contains("inactive_reason: waiting"))
+        XCTAssertTrue(readme.contains("status: on_hold"))
     }
 
     func testBundledKnowledgeOpsScriptsDoNotHardcodeJanWorkspacePath() throws {

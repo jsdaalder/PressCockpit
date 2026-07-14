@@ -1139,18 +1139,19 @@ struct OverviewView: View {
 struct WorkspaceDetailView: View {
     @EnvironmentObject private var store: AppStore
     let itemID: String
+    @State private var showsAdvancedMetadata = false
 
     var body: some View {
         Group {
             if let item {
                 VStack(alignment: .leading, spacing: 16) {
-                    SectionCard(title: "Project controls") {
+                    SectionCard(title: "Project trust") {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("This is the project-level control surface: check status, dossier linkage, the current draft target, and attach supporting material without leaving the app.")
+                            Text("This is the main place to check the project's current state, dossier link, and main draft target before you do anything else.")
                                 .font(.subheadline)
                                 .foregroundStyle(AppPalette.subtle)
 
-                            MetadataGrid(rows: projectControlRows)
+                            MetadataGrid(rows: item.projectTrustRows)
 
                             HStack(spacing: 12) {
                                 if item.canonicalDraftDocument != nil {
@@ -1158,22 +1159,6 @@ struct WorkspaceDetailView: View {
                                         store.openPreferredDraft(for: item)
                                     }
                                 }
-                                Button("Attach docs…") {
-                                    store.addDocuments(to: item)
-                                }
-                                Button("Open docs folder") {
-                                    store.openPath(item.docsDirectoryURL.path)
-                                }
-                                Button("Open folder") {
-                                    store.openFolder(for: item)
-                                }
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .tint(AppPalette.title)
-
-                            HStack(spacing: 12) {
-                                projectStatusMenu
                                 Button("Edit project state…") {
                                     store.beginProjectStateEditing(for: item)
                                 }
@@ -1187,45 +1172,16 @@ struct WorkspaceDetailView: View {
                                         store.openDocsOverview(for: item)
                                     }
                                 }
-                                if let googleDriveURL = item.googleDriveURL {
-                                    Button("Open Drive folder") {
-                                        store.openURL(googleDriveURL)
-                                    }
-                                }
                                 if store.shouldOfferGoogleDraftPromotion(for: item) {
                                     Button("Promote Google draft…") {
                                         store.promoteGoogleDraft(for: item)
                                     }
                                 }
+                                projectStatusMenu
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                             .tint(AppPalette.title)
-                        }
-                    }
-
-                    SectionCard(title: "Project at a glance") {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Use this section to understand what kind of project this is, how it should be handled, and how much working material sits at the root.")
-                                .font(.subheadline)
-                                .foregroundStyle(AppPalette.subtle)
-
-                            MetadataGrid(rows: [
-                                ("Section", item.section.label),
-                                ("Project kind", item.projectType.label),
-                                ("Project state", item.projectStateDetailLabel),
-                                ("Activity state", item.activityState?.label ?? "Not set"),
-                                ("Workflow stage", item.workflowStage?.label ?? "Not set"),
-                                ("Inactive reason", item.activityState == .inactive ? (item.inactiveReason?.label ?? "Not set") : "Not applicable"),
-                                ("Handling", item.safetyPosture.label),
-                                ("Workspace path", item.path),
-                                ("Root documents", "\(item.documents.count)"),
-                                ("Direct files", "\(item.directFileCount)"),
-                                ("Direct folders", "\(item.directFolderCount)"),
-                                ("Markdown", "\(item.markdownFiles)"),
-                                ("PDFs", "\(item.pdfFiles)"),
-                                ("Google Doc pointers", "\(item.gdocFiles)")
-                            ])
                         }
                     }
 
@@ -1277,30 +1233,34 @@ struct WorkspaceDetailView: View {
                         }
                     }
 
-                    SectionCard(title: "Structured metadata") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Trusted fields from the root README that drive classification and workflow behavior.")
+                    SectionCard(title: "Supporting documents") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("These are the root-level drafts, notes, pointers, and local copies the scanner found. The main draft target is decided above; this section is the supporting file list.")
                                 .font(.subheadline)
                                 .foregroundStyle(AppPalette.subtle)
-                            if item.frontmatter.isEmpty {
-                                Text("No trusted README frontmatter was detected.")
+
+                            HStack(spacing: 12) {
+                                Button("Attach docs…") {
+                                    store.addDocuments(to: item)
+                                }
+                                Button("Open docs folder") {
+                                    store.openPath(item.docsDirectoryURL.path)
+                                }
+                                if let googleDriveURL = item.googleDriveURL {
+                                    Button("Open Drive folder") {
+                                        store.openURL(googleDriveURL)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .tint(AppPalette.title)
+
+                            if item.documents.isEmpty {
+                                Text("No root-level project documents were found yet.")
                                     .font(.body)
                                     .foregroundStyle(AppPalette.subtle)
                             } else {
-                                ForEach(item.frontmatter.keys.sorted(), id: \.self) { key in
-                                    KeyValueRow(key: key, value: item.frontmatter[key] ?? "")
-                                }
-                            }
-                        }
-                    }
-
-                    if !item.documents.isEmpty {
-                        SectionCard(title: "Project documents") {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("These are the root-level drafts, notes, pointers, and local copies the scanner found. Snapshot copies stay visible here, but they do not automatically become the main draft link.")
-                                    .font(.subheadline)
-                                    .foregroundStyle(AppPalette.subtle)
-
                                 ForEach(item.documents) { document in
                                     WorkspaceDocumentRow(
                                         document: document,
@@ -1373,6 +1333,33 @@ struct WorkspaceDetailView: View {
                             }
                         }
                     }
+
+                    SectionCard(title: "Advanced metadata") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Raw trusted README frontmatter for troubleshooting or audit checks. The project trust section above is the main user-facing summary.")
+                                .font(.subheadline)
+                                .foregroundStyle(AppPalette.subtle)
+
+                            DisclosureGroup(
+                                showsAdvancedMetadata ? "Hide raw README metadata" : "Show raw README metadata",
+                                isExpanded: $showsAdvancedMetadata
+                            ) {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    if item.frontmatter.isEmpty {
+                                        Text("No trusted README frontmatter was detected.")
+                                            .font(.body)
+                                            .foregroundStyle(AppPalette.subtle)
+                                    } else {
+                                        ForEach(item.frontmatter.keys.sorted(), id: \.self) { key in
+                                            KeyValueRow(key: key, value: item.frontmatter[key] ?? "")
+                                        }
+                                    }
+                                }
+                                .padding(.top, 8)
+                            }
+                            .tint(AppPalette.title)
+                        }
+                    }
                 }
             } else {
                 EmptyStateView(title: "Missing folder", message: "The selected folder could not be found.")
@@ -1393,31 +1380,6 @@ struct WorkspaceDetailView: View {
         let allMatches = store.snapshot.publication.storiesByYear.values.flatMap { $0 }
         let selected = allMatches.filter { $0.projectPath == item.path }
         return selected.isEmpty ? nil : selected.sorted { $0.pdfTitle < $1.pdfTitle }
-    }
-
-    private var projectControlRows: [(String, String)] {
-        guard let item else { return [] }
-        var rows: [(String, String)] = [
-            ("Project state", item.projectStateDetailLabel),
-            ("Dossier", item.dossierSlug ?? "None linked yet")
-        ]
-
-        if let draft = item.canonicalDraftDocument {
-            rows.append(("Canonical draft", draft.title))
-            rows.append(("Draft target", item.draftOwnershipSummary(for: draft)))
-        } else {
-            rows.append(("Canonical draft", "Not decided yet"))
-        }
-
-        if item.hasDocsOverview {
-            rows.append(("Docs overview", "Present in docs/docs_overview.md"))
-        }
-
-        if !projectMaintenanceItems.isEmpty {
-            rows.append(("Closeout follow-up", "\(projectMaintenanceItems.count) queued"))
-        }
-
-        return rows
     }
 
     private var projectMaintenanceItems: [MaintenanceItem] {

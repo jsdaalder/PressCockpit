@@ -184,6 +184,9 @@ enum WorkflowPreflightEvaluator {
         }
 
         let requiredFlags = [
+            "--activity-state",
+            "--workflow-stage",
+            "--inactive-reason",
             "--section-answer-1",
             "--section-answer-2",
             "--section-answer-3"

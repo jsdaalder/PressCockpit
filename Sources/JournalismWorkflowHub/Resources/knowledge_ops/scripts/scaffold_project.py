@@ -33,7 +33,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--project-root", required=True)
     parser.add_argument("--title", required=True)
     parser.add_argument("--owner", required=True)
-    parser.add_argument("--status", required=True)
+    parser.add_argument("--activity-state", default="")
+    parser.add_argument("--workflow-stage", default="")
+    parser.add_argument("--inactive-reason", default="")
+    parser.add_argument("--status", default="active")
     parser.add_argument("--project-type", default="journalism")
     parser.add_argument("--started", required=True)
     parser.add_argument("--deliverable", default="")
@@ -55,9 +58,57 @@ def yaml_list(values: list[str]) -> str:
     return "[" + ", ".join(f'"{value}"' for value in cleaned) + "]"
 
 
+def normalize_state_token(value: str) -> str:
+    return value.strip().lower().replace("-", "_").replace(" ", "_")
+
+
 def derive_project_state(status: str) -> tuple[str, str, str, str]:
-    normalized = status.strip().lower().replace("-", "_").replace(" ", "_")
+    normalized = normalize_state_token(status)
     return LEGACY_STATUS_MAP.get(normalized, ("active", "lead", "", "active"))
+
+
+def derive_legacy_status(
+    activity_state: str,
+    workflow_stage: str,
+    inactive_reason: str,
+) -> str:
+    if activity_state == "active":
+        return "active"
+    if inactive_reason == "finished" or workflow_stage == "published":
+        return "done"
+    return "on_hold"
+
+
+def resolve_project_state(
+    activity_state: str,
+    workflow_stage: str,
+    inactive_reason: str,
+    status: str,
+) -> tuple[str, str, str, str]:
+    normalized_activity = normalize_state_token(activity_state)
+    normalized_stage = normalize_state_token(workflow_stage)
+    normalized_reason = normalize_state_token(inactive_reason)
+
+    if not normalized_activity and not normalized_stage and not normalized_reason:
+        return derive_project_state(status)
+
+    if not normalized_activity or not normalized_stage:
+        raise ValueError("Explicit project state requires both --activity-state and --workflow-stage.")
+
+    if normalized_activity not in {"active", "inactive"}:
+        raise ValueError(f"Unsupported activity_state: {activity_state}")
+
+    if normalized_activity == "active":
+        normalized_reason = ""
+    elif not normalized_reason:
+        raise ValueError("inactive_reason is required when activity_state is inactive.")
+
+    legacy_status = derive_legacy_status(
+        normalized_activity,
+        normalized_stage,
+        normalized_reason,
+    )
+    return normalized_activity, normalized_stage, normalized_reason, legacy_status
 
 
 def write_new_file(path: Path, contents: str) -> None:
@@ -69,6 +120,9 @@ def write_new_file(path: Path, contents: str) -> None:
 def build_readme(
     title: str,
     owner: str,
+    activity_state: str,
+    workflow_stage: str,
+    inactive_reason: str,
     status: str,
     project_type: str,
     started: str,
@@ -79,7 +133,12 @@ def build_readme(
 ) -> str:
     summary = deliverable.strip() or "Short project summary."
     sections = readme_sections(project_type, structured_answers)
-    activity_state, workflow_stage, inactive_reason, legacy_status = derive_project_state(status)
+    activity_state, workflow_stage, inactive_reason, legacy_status = resolve_project_state(
+        activity_state,
+        workflow_stage,
+        inactive_reason,
+        status,
+    )
     inactive_reason_line = f"inactive_reason: {inactive_reason}\n" if inactive_reason else ""
     return textwrap.dedent(
         f"""\
@@ -380,6 +439,9 @@ def main() -> int:
             build_readme(
                 title=args.title.strip(),
                 owner=args.owner.strip(),
+                activity_state=args.activity_state,
+                workflow_stage=args.workflow_stage,
+                inactive_reason=args.inactive_reason,
                 status=args.status.strip(),
                 project_type=project_type,
                 started=args.started.strip(),
@@ -395,7 +457,7 @@ def main() -> int:
         )
         write_new_file(project_root / "AGENTS.md", build_agents())
         write_new_file(docs_root / "docs_overview.md", build_docs_overview(args.title.strip(), project_type))
-    except FileExistsError as error:
+    except (FileExistsError, ValueError) as error:
         print(str(error), file=sys.stderr)
         return 1
 

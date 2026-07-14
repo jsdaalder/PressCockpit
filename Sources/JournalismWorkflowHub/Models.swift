@@ -936,6 +936,29 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
         return value.isEmpty ? nil : value
     }
 
+    var projectTrustRows: [(String, String)] {
+        var rows: [(String, String)] = [
+            ("Activity state", activityState?.label ?? "Not set"),
+            ("Workflow stage", workflowStage?.label ?? "Not set")
+        ]
+
+        if activityState == .inactive {
+            rows.append(("Inactive reason", inactiveReason?.label ?? "Not set"))
+        }
+
+        rows.append(("Dossier", dossierSlug ?? "None linked yet"))
+
+        if let draft = canonicalDraftDocument {
+            rows.append(("Canonical draft", draft.title))
+            rows.append(("Draft target", draftOwnershipSummary(for: draft)))
+        } else {
+            rows.append(("Canonical draft", "Not decided yet"))
+        }
+
+        rows.append(("Handling", safetyPosture.label))
+        return rows
+    }
+
     var docsDirectoryURL: URL {
         url.appendingPathComponent("docs", isDirectory: true)
     }
