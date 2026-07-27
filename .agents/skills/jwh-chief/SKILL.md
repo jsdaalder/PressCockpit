@@ -56,6 +56,8 @@ When this skill routes through `chief_of_staff`, require the chief to:
 - decide whether delegation is needed
 - spawn the minimum useful set of specialists
 - avoid broad fan-out
+- make the git-delivery state explicit for non-trivial feature work:
+  current branch, whether a separate branch is required, what is already committed, and whether push or merge-to-`main` remain outstanding
 - reconcile conflicting specialist outputs
 - apply the planning lifecycle guardrail for non-trivial work
 - return one merged recommendation, plan, implementation path, or review
@@ -71,6 +73,7 @@ For non-trivial work, require the chief to check the planning lifecycle:
 3. Before implementation, check whether it touches data models, persistence, workflow execution, preflight behavior, permissions, privacy posture, document export safety, filesystem assumptions, sync/cloud/collaboration, or cross-cutting app boundaries. If yes, update or request an update to `Projects/2026/journalism_workflow_hub_plan/docs/architecture.md` before coding.
 4. After implementation or review, verify appropriately with tests, focused review, or a clear statement of what could not be run.
 5. Before closing, ensure planning docs still match reality or explicitly say no planning update was needed.
+6. Before calling feature work finished, ensure git closeout is explicit: committed state, push status, and whether merge to `main` is done now or intentionally deferred.
 
 Skip this guardrail for trivial wording changes, obvious one-file fixes, and low-risk mechanical edits.
 
@@ -86,3 +89,4 @@ Keep abstract UX decisions separate from UI construction:
 - Keep changes minimal and auditable.
 - Preserve the existing product direction unless a redesign is explicitly requested.
 - Avoid automations and hooks for this workflow in v1.
+- For non-trivial implementation work, decide branch strategy before coding and do not leave feature closeout ambiguous about commit, push, or merge-to-`main` state.
