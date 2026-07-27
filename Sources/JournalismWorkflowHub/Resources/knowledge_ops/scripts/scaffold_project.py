@@ -139,31 +139,33 @@ def build_readme(
         inactive_reason,
         status,
     )
-    inactive_reason_line = f"inactive_reason: {inactive_reason}\n" if inactive_reason else ""
-    return textwrap.dedent(
-        f"""\
-        ---
-        type: project
-        project: {title}
-        owner: {owner}
-        activity_state: {activity_state}
-        workflow_stage: {workflow_stage}
-        {inactive_reason_line}status: {legacy_status}
-        project_type: {project_type}
-        started: {started}
-        deliverable: {summary}
-        topics: {yaml_list(topics)}
-        entities: {yaml_list(entities)}
-        safety: internal
-        ---
-
-        # {title}
-
-        {summary}
-
-        {sections}
-        """
-    )
+    lines = [
+        "---",
+        "type: project",
+        f"project: {title}",
+        f"owner: {owner}",
+        f"activity_state: {activity_state}",
+        f"workflow_stage: {workflow_stage}",
+    ]
+    if inactive_reason:
+        lines.append(f"inactive_reason: {inactive_reason}")
+    lines.extend([
+        f"status: {legacy_status}",
+        f"project_type: {project_type}",
+        f"started: {started}",
+        f"deliverable: {summary}",
+        f"topics: {yaml_list(topics)}",
+        f"entities: {yaml_list(entities)}",
+        "safety: internal",
+        "---",
+        "",
+        f"# {title}",
+        "",
+        summary,
+        "",
+        sections,
+    ])
+    return "\n".join(lines) + "\n"
 
 
 def build_agents() -> str:
@@ -190,31 +192,30 @@ def build_agents() -> str:
 def build_docs_overview(title: str, project_type: str) -> str:
     expected_contents = docs_overview_expected_contents(project_type)
     next_steps = docs_overview_next_steps(project_type)
-    return textwrap.dedent(
-        f"""\
-        # Docs Overview
-
-        Date created: {current_date()}
-
-        ## Project
-
-        - Title: {title}
-
-        ## Expected contents
-
-        {expected_contents}
-
-        ## Imported document synthesis
-
-        <!-- scaffold-doc-summaries:start -->
-        _No imported source summaries yet. The local summary step can fold working notes here after scaffold uploads._
-        <!-- scaffold-doc-summaries:end -->
-
-        ## Next steps
-
-        {next_steps}
-        """
-    )
+    lines = [
+        "# Docs Overview",
+        "",
+        f"Date created: {current_date()}",
+        "",
+        "## Project",
+        "",
+        f"- Title: {title}",
+        "",
+        "## Expected contents",
+        "",
+        expected_contents,
+        "",
+        "## Imported document synthesis",
+        "",
+        "<!-- scaffold-doc-summaries:start -->",
+        "_No imported source summaries yet. The local summary step can fold working notes here after scaffold uploads._",
+        "<!-- scaffold-doc-summaries:end -->",
+        "",
+        "## Next steps",
+        "",
+        next_steps,
+    ]
+    return "\n".join(lines) + "\n"
 
 
 def current_date() -> str:

@@ -37,6 +37,33 @@ final class WorkspaceScannerTests: XCTestCase {
         XCTAssertEqual(snapshot.items.first?.safetyPosture, .unknown)
     }
 
+    func testParsesIndentedFrontmatterFromExistingScaffoldedReadme() throws {
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let project = tmp.appendingPathComponent("Projects/2026/indented_demo")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true, attributes: nil)
+
+        try """
+                ---
+                type: project
+                project: Indented Demo Story
+                status: active
+                project_type: journalism
+                started: 2026-07-14
+                ---
+
+                # Indented Demo Story
+
+                Summary paragraph for an older scaffolded README.
+                """.write(to: project.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
+        let item = try XCTUnwrap(WorkspaceScanner(workspaceRoot: tmp).scan().items.first)
+
+        XCTAssertEqual(item.title, "Indented Demo Story")
+        XCTAssertEqual(item.frontmatter["project"], "Indented Demo Story")
+        XCTAssertEqual(item.projectType, .journalism)
+        XCTAssertEqual(item.summary, "Summary paragraph for an older scaffolded README.")
+    }
+
     func testReadsAgentsAndClassifiesToolingProjects() throws {
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let project = tmp.appendingPathComponent("Projects/2026/workflow_hub")

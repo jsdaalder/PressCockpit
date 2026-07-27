@@ -42,6 +42,7 @@ final class WorkflowRegistryTests: XCTestCase {
         XCTAssertEqual(workflow.parameters.first(where: { $0.id == "activity_state" })?.defaultValue, "active")
         XCTAssertEqual(workflow.parameters.first(where: { $0.id == "workflow_stage" })?.defaultValue, "lead")
         XCTAssertEqual(projectTypeDefault, "journalism")
+        XCTAssertFalse(workflow.parameters.contains(where: { $0.id == "status" }))
         XCTAssertTrue(workflow.parameters.contains(where: { $0.id == "project_root" && ($0.defaultValue?.contains("/Projects/") ?? false) }))
         XCTAssertFalse(workflow.parameters.contains(where: { $0.id == "project_root" && ($0.defaultValue?.contains("new_project") ?? false) }))
     }
@@ -62,7 +63,6 @@ final class WorkflowRegistryTests: XCTestCase {
         state.textValues["activity_state"] = "active"
         state.textValues["workflow_stage"] = "lead"
         state.textValues["inactive_reason"] = ""
-        state.textValues["status"] = "active"
         state.textValues["project_type"] = "data_journalism"
         state.textValues["started"] = "2026-07-12"
         state.textValues["deliverable"] = "A short summary."
@@ -79,6 +79,7 @@ final class WorkflowRegistryTests: XCTestCase {
         XCTAssertTrue(resolved.arguments.contains("--workflow-stage"))
         XCTAssertTrue(resolved.arguments.contains("lead"))
         XCTAssertTrue(resolved.arguments.contains("--inactive-reason"))
+        XCTAssertFalse(resolved.arguments.contains("--status"))
         XCTAssertTrue(resolved.arguments.contains("--section-answer-1"))
         XCTAssertTrue(resolved.arguments.contains("Main question"))
         XCTAssertTrue(resolved.arguments.contains("--section-answer-2"))

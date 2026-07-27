@@ -282,7 +282,6 @@ struct ScaffoldProjectWizardDraft: Hashable {
         state.textValues["activity_state"] = "active"
         state.textValues["workflow_stage"] = "lead"
         state.textValues["inactive_reason"] = ""
-        state.textValues["status"] = "active"
         state.textValues["project_type"] = mappedProjectType
         state.textValues["started"] = currentProjectDate()
         state.textValues["deliverable"] = deliverableText
