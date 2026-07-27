@@ -506,7 +506,7 @@ struct CaptureView: View {
                         .foregroundStyle(AppPalette.title)
                         .textSelection(.enabled)
 
-                    Text("Check the source, add a short note if useful, then file this item into one active project or area. Notes are kept when you move between items.")
+                    Text("Check the source, add a short note if useful, then either file this item into one active project or area or turn it into a placeholder project. Notes are kept when you move between items.")
                         .foregroundStyle(AppPalette.subtle)
 
                     VStack(alignment: .leading, spacing: 6) {
@@ -555,7 +555,7 @@ struct CaptureView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Assign to project or area")
+                        Text("Assign to existing project or area")
                             .font(.subheadline.weight(.semibold))
 
                         Picker("Project", selection: $selectedProjectPath) {
@@ -586,6 +586,11 @@ struct CaptureView: View {
 
                         Button("Delete…", role: .destructive) {
                             beginDeleteSelectedTriageRecord()
+                        }
+                        .disabled(!canResolveSelectedRecord)
+
+                        Button("Create placeholder project") {
+                            createPlaceholderProjectFromSelectedTriageRecord()
                         }
                         .disabled(!canResolveSelectedRecord)
 
@@ -824,6 +829,22 @@ struct CaptureView: View {
         }
     }
 
+    private func createPlaceholderProjectFromSelectedTriageRecord() {
+        guard let selectedCaptureRecord else { return }
+
+        persistReviewNoteForSelection()
+        let currentRecordID = selectedCaptureRecord.id
+        let note = reviewNoteText
+
+        Task {
+            let didCreate = await store.createPlaceholderProjectFromCaptureRecord(currentRecordID, note: note)
+            guard didCreate else { return }
+            await MainActor.run {
+                advanceTriageSession(afterRemoving: currentRecordID)
+            }
+        }
+    }
+
     private func archiveSelectedTriageRecord() {
         guard let selectedCaptureRecord else { return }
 
@@ -929,6 +950,7 @@ struct OverviewView: View {
                 standaloneAuditSection
             }
             activeProjectsSection
+            openProjectsSection
             lowerSections
         }
         .frame(maxWidth: 900, alignment: .leading)
@@ -1047,6 +1069,59 @@ struct OverviewView: View {
                         }
                     }
                     .padding(.horizontal, 2)
+                }
+            }
+        }
+    }
+
+    private var openProjectsSection: some View {
+        SectionCard(title: "Open Projects") {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Everything not archived or finished, kept as a long compact list and grouped by workflow stage.")
+                    .font(.subheadline)
+                    .foregroundStyle(AppPalette.subtle)
+
+                if store.overviewOpenProjectGroups.isEmpty {
+                    Text("No additional open projects are visible right now.")
+                        .font(.body)
+                        .foregroundStyle(AppPalette.subtle)
+                } else {
+                    VStack(alignment: .leading, spacing: 14) {
+                        ForEach(store.overviewOpenProjectGroups) { group in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(group.title)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(AppPalette.subtle)
+                                    .textCase(.uppercase)
+
+                                VStack(alignment: .leading, spacing: 0) {
+                                    ForEach(Array(group.items.enumerated()), id: \.element.id) { index, item in
+                                        Button {
+                                            store.select(.workspace(item.id))
+                                        } label: {
+                                            HStack {
+                                                Text(item.title)
+                                                    .font(.body.weight(.medium))
+                                                    .foregroundStyle(AppPalette.title)
+                                                    .multilineTextAlignment(.leading)
+                                                Spacer(minLength: 0)
+                                            }
+                                            .contentShape(Rectangle())
+                                            .padding(.vertical, 9)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .help("Open this project in the app")
+
+                                        if index < group.items.count - 1 {
+                                            Divider()
+                                                .padding(.leading, 2)
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal, 2)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -2260,6 +2335,17 @@ struct OverviewProjectRow: View {
                             .textSelection(.enabled)
                             .lineLimit(isExpanded ? 3 : 2)
                     }
+
+                    if !trustBadges.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(trustBadges, id: \.self) { badge in
+                                    WorkspaceBadge(text: badge)
+                                }
+                            }
+                            .padding(.vertical, 1)
+                        }
+                    }
                 }
                 Spacer()
 
@@ -2386,7 +2472,7 @@ struct OverviewProjectRow: View {
             }
         } label: {
             OverviewProjectActionLabel(
-                title: "Change status",
+                title: "Quick state change",
                 systemImage: "arrow.triangle.2.circlepath",
                 trailingSystemImage: "chevron.down"
             )
@@ -2412,11 +2498,11 @@ struct OverviewProjectRow: View {
     private var collapsedShortcuts: [OverviewProjectShortcut] {
         var shortcuts: [OverviewProjectShortcut] = []
 
-        if summary.item.canonicalDraftDocument != nil {
+        if let draft = summary.item.canonicalDraftDocument {
             shortcuts.append(
                 OverviewProjectShortcut(
                     id: "\(summary.id)-draft",
-                    label: "Draft",
+                    label: draft.provider == .googleDocPointer ? "Google draft" : "Local draft",
                     iconName: "doc.text",
                     helpText: "Open the canonical draft target",
                     action: { store.openPreferredDraft(for: summary.item) }
@@ -2424,7 +2510,30 @@ struct OverviewProjectRow: View {
             )
         }
 
+        if summary.item.dossierSlug != nil {
+            shortcuts.append(
+                OverviewProjectShortcut(
+                    id: "\(summary.id)-dossier",
+                    label: "Dossier",
+                    iconName: "tray.full",
+                    helpText: "Open the linked dossier",
+                    action: { store.openLinkedDossier(for: summary.item) }
+                )
+            )
+        }
+
         return shortcuts
+    }
+
+    private var trustBadges: [String] {
+        var badges: [String] = []
+        if let draft = summary.item.canonicalDraftDocument {
+            badges.append("Draft: \(draft.provider.label)")
+        }
+        if let dossierSlug = summary.item.dossierSlug {
+            badges.append("Dossier: \(dossierSlug)")
+        }
+        return badges
     }
 }
 
@@ -2595,15 +2704,16 @@ struct ProjectOffboardingSheet: View {
                     .font(.system(.title2, design: .serif).weight(.semibold))
                     .foregroundStyle(AppPalette.title)
 
-                Text("Close out \(state.projectTitle) before it leaves the active desk. Required decisions stay small; the reporting notes stay optional.")
+                Text("Close out \(state.projectTitle) before it leaves the active desk. Project state is the source of truth here; legacy status is kept only as a compatibility field during migration.")
                     .font(.subheadline)
                     .foregroundStyle(AppPalette.subtle)
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                statusRow("Current status", value: state.currentStatus.label)
-                statusRow("New status", value: state.targetStatus.label)
                 statusRow("Current project state", value: state.currentProjectState.detailLabel)
+                statusRow("Resulting project state", value: resultingProjectState.detailLabel)
+                statusRow("Workspace action", value: workspaceActionLabel)
+                statusRow("Compatibility status", value: state.targetStatus.label)
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Outcome")
@@ -2696,11 +2806,40 @@ struct ProjectOffboardingSheet: View {
     }
 
     private var sheetTitle: String {
-        state.targetStatus == .archived ? "Archive Project" : "Finish Project"
+        state.targetStatus == .archived ? "Archive Project" : "Project Closeout"
     }
 
     private var confirmButtonTitle: String {
-        state.targetStatus == .archived ? "Archive project" : "Mark finished"
+        state.targetStatus == .archived ? "Archive project" : "Save closeout"
+    }
+
+    private var resultingProjectState: ProjectState {
+        if outcome != .published, state.currentProjectState.workflowStage == .published {
+            return ProjectState(
+                activityState: .inactive,
+                workflowStage: .activeInvestigation,
+                inactiveReason: .finished
+            )
+        }
+
+        return ProjectState(
+            activityState: .inactive,
+            workflowStage: outcome == .published ? .published : state.currentProjectState.workflowStage,
+            inactiveReason: .finished
+        )
+    }
+
+    private var workspaceActionLabel: String {
+        switch state.targetStatus {
+        case .archived:
+            return "Move project folder into Archives"
+        case .done:
+            return "Keep project folder in Projects"
+        case .active:
+            return "Keep project active"
+        case .onHold:
+            return "Keep project inactive in Projects"
+        }
     }
 
     private func statusRow(_ title: String, value: String) -> some View {

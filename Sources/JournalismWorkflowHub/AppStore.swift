@@ -75,7 +75,7 @@ final class AppStore: ObservableObject {
         self.maintenanceStore = maintenanceStore ?? MaintenanceStore(workspaceRoot: configuration.workspaceRoot)
         self.runner = CommandRunner(workspaceRoot: configuration.workspaceRoot, appProfile: configuration.profile)
         AppDebugLog.record(
-            "[jwh] launch profile=\(configuration.profile.rawValue) workspaceMode=\(configuration.isUsingDemoWorkspace ? \"demo\" : \"connected\")",
+            "[jwh] launch profile=\(configuration.profile.rawValue) workspaceMode=\(configuration.isUsingDemoWorkspace ? "demo" : "connected")",
             enabled: self.isDiagnosticsLoggingEnabled,
             supportDirectory: appSupportDirectory
         )
@@ -160,6 +160,10 @@ final class AppStore: ObservableObject {
         OverviewDeriver.projectSummaries(from: workspaceQueries.snapshot, runs: runs)
     }
 
+    var overviewOpenProjectGroups: [OverviewOpenProjectGroup] {
+        OverviewDeriver.openProjectGroups(from: workspaceQueries.snapshot)
+    }
+
     var overviewActions: [OverviewActionSummary] {
         OverviewDeriver.suggestedActions(from: workspaceQueries.snapshot, runs: runs)
     }
@@ -231,11 +235,11 @@ final class AppStore: ObservableObject {
     var defaultOnboardingDraft: OnboardingDraft {
         var draft = OnboardingDraft.initial(defaultNewWorkspacePath: defaultNewWorkspacePath())
         draft.documentMode = documentMode
+        draft.diagnosticsLoggingEnabled = isDiagnosticsLoggingEnabled
         if isUsingDemoWorkspace {
             draft.startMode = .demo
             draft.firstAction = .inspectFirstProject
         } else if appProfile == .standard {
-        draft.diagnosticsLoggingEnabled = isDiagnosticsLoggingEnabled
             draft.startMode = .existingWorkspace
             draft.workspacePath = workspaceRoot.path
         }
@@ -511,11 +515,11 @@ final class AppStore: ObservableObject {
 
         isRunning = true
         statusMessage = "Running \(workflow.label)…"
+        logDiagnostics("workflow-start id=\(workflow.id) writeAction=\(workflow.isWriteAction)")
         let selectionAtRun = selectedWorkspaceItem
         let scaffoldContext = makeScaffoldCompletionContext(
             workflow: workflow,
             state: state,
-        logDiagnostics("workflow-start id=\(workflow.id) writeAction=\(workflow.isWriteAction)")
             draft: scaffoldProjectWizardDraft
         )
 
@@ -531,11 +535,11 @@ final class AppStore: ObservableObject {
                 }
             } catch {
                 await MainActor.run {
+                    self.logDiagnostics("workflow-launch-failed id=\(workflow.id)")
                     self.statusMessage = error.localizedDescription
                     self.activeAlert = AppAlert(
                         title: workflow.id == "scaffold-project" ? "Project creation failed" : "Workflow failed",
                         message: error.localizedDescription
-                    self.logDiagnostics("workflow-launch-failed id=\(workflow.id)")
                     )
                     self.isRunning = false
                 }
@@ -552,17 +556,17 @@ final class AppStore: ObservableObject {
         applyConfiguration(configuration)
         OnboardingPreferences.persist(draft: draft, defaults: userDefaults)
         documentMode = draft.documentMode
+        isDiagnosticsLoggingEnabled = draft.diagnosticsLoggingEnabled
         hasCompletedOnboarding = true
         onboardingLaunchMode = nil
         statusMessage = "Workspace ready"
-
-        isDiagnosticsLoggingEnabled = draft.diagnosticsLoggingEnabled
-        switch draft.firstAction {
-        case .openOverview:
-            select(.overview)
         logDiagnostics(
             "onboarding-complete startMode=\(draft.startMode.rawValue) documentMode=\(draft.documentMode.rawValue)"
         )
+
+        switch draft.firstAction {
+        case .openOverview:
+            select(.overview)
         case .inspectFirstProject:
             if let firstItem = firstWorkspaceItem {
                 select(.workspace(firstItem.id))
@@ -617,10 +621,6 @@ final class AppStore: ObservableObject {
         NSWorkspace.shared.activateFileViewerSelecting([captureStorageDirectory])
     }
 
-    func openURL(_ url: URL) {
-        NSWorkspace.shared.open(url)
-    }
-
     func setDiagnosticsLoggingEnabled(_ enabled: Bool) {
         guard enabled != isDiagnosticsLoggingEnabled else { return }
         OnboardingPreferences.setDiagnosticsLoggingEnabled(enabled, defaults: userDefaults)
@@ -661,6 +661,10 @@ final class AppStore: ObservableObject {
 
         let picker = NSSharingServicePicker(items: [logURL])
         picker.show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
+    }
+
+    func openURL(_ url: URL) {
+        NSWorkspace.shared.open(url)
     }
 
     func openDocument(_ document: WorkspaceDocument) {
@@ -1115,6 +1119,168 @@ final class AppStore: ObservableObject {
         }
     }
 
+    func createPlaceholderProjectFromCaptureRecord(_ recordID: String, note: String) async -> Bool {
+        guard let current = captureRecords.first(where: { $0.id == recordID }) else { return false }
+        guard current.state != .assigned else { return false }
+        guard let importedStoragePath = current.importedStoragePath, !importedStoragePath.isEmpty else {
+            statusMessage = "This capture item is not ready to turn into a project yet."
+            return false
+        }
+
+        let registry = WorkflowRegistry(workspaceRoot: workspaceRoot, appProfile: appProfile)
+        guard let workflow = registry.allWorkflows().first(where: { $0.id == "scaffold-project" }) else {
+            let message = "The scaffold-project workflow is not available in this workspace."
+            statusMessage = message
+            activeAlert = AppAlert(title: "Could not create placeholder project", message: message)
+            return false
+        }
+
+        let normalizedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let draft = placeholderScaffoldDraft(for: current, note: normalizedNote)
+        let state = draft.mappedState(for: workflow, workspaceRoot: workspaceRoot)
+        let report = WorkflowPreflightEvaluator.evaluate(
+            workflow: workflow,
+            workspaceRoot: workspaceRoot,
+            selection: selectedWorkspaceItem,
+            state: state
+        )
+        if !report.isRunnable {
+            statusMessage = report.summary
+            return false
+        }
+
+        if workflow.isWriteAction {
+            do {
+                let resolved = try registry.resolveCommand(
+                    workflow: workflow,
+                    state: state,
+                    selection: selectedWorkspaceItem
+                )
+                _ = try createWorkflowWriteBackups(
+                    paths: resolved.estimatedOutputs,
+                    workspaceRoot: workspaceRoot,
+                    supportDirectory: supportDirectory()
+                )
+            } catch {
+                statusMessage = error.localizedDescription
+                activeAlert = AppAlert(
+                    title: "Could not back up files before project creation",
+                    message: error.localizedDescription
+                )
+                return false
+            }
+        }
+
+        updateCaptureRecord(recordID) { existing in
+            CaptureRecord(
+                id: existing.id,
+                displayName: existing.displayName,
+                originalSourcePath: existing.originalSourcePath,
+                importedStoragePath: existing.importedStoragePath,
+                capturedAt: existing.capturedAt,
+                captureType: existing.captureType,
+                state: .processing,
+                failureDescription: nil,
+                userNote: normalizedNote.isEmpty ? nil : normalizedNote,
+                assignedTargetPath: existing.assignedTargetPath,
+                assignedAt: existing.assignedAt,
+                assignedDestinationPath: existing.assignedDestinationPath
+            )
+        }
+
+        let projectRoot = state.stringValue(for: "project_root").trimmingCharacters(in: .whitespacesAndNewlines)
+        let projectTitle = state.stringValue(for: "title").trimmingCharacters(in: .whitespacesAndNewlines)
+        let sourceURL = URL(fileURLWithPath: importedStoragePath)
+
+        isRunning = true
+        statusMessage = "Creating placeholder project…"
+        logDiagnostics("workflow-start id=\(workflow.id) writeAction=\(workflow.isWriteAction) source=capture")
+        defer { isRunning = false }
+
+        do {
+            let run = try runner.run(workflow: workflow, state: state, selection: selectedWorkspaceItem)
+            reloadRuns()
+
+            guard run.exitCode == 0 else {
+                logDiagnostics("workflow-finished id=\(workflow.id) exitCode=\(run.exitCode) source=capture")
+                updateCaptureRecord(recordID) { existing in
+                    CaptureRecord(
+                        id: existing.id,
+                        displayName: existing.displayName,
+                        originalSourcePath: existing.originalSourcePath,
+                        importedStoragePath: existing.importedStoragePath,
+                        capturedAt: existing.capturedAt,
+                        captureType: existing.captureType,
+                        state: .needsReview,
+                        failureDescription: "The scaffold script exited with code \(run.exitCode).",
+                        userNote: normalizedNote.isEmpty ? nil : normalizedNote,
+                        assignedTargetPath: existing.assignedTargetPath,
+                        assignedAt: existing.assignedAt,
+                        assignedDestinationPath: existing.assignedDestinationPath
+                    )
+                }
+                statusMessage = "Could not create placeholder project"
+                activeAlert = AppAlert(
+                    title: "Placeholder project creation failed",
+                    message: "The scaffold script exited with code \(run.exitCode). Open the latest run for details."
+                )
+                return false
+            }
+
+            logDiagnostics("workflow-finished id=\(workflow.id) exitCode=\(run.exitCode) source=capture")
+
+            let destinationURL = try await copyCaptureRecord(
+                from: sourceURL,
+                into: URL(fileURLWithPath: projectRoot).appendingPathComponent("docs", isDirectory: true)
+            )
+
+            updateCaptureRecord(recordID) { existing in
+                CaptureRecord(
+                    id: existing.id,
+                    displayName: existing.displayName,
+                    originalSourcePath: existing.originalSourcePath,
+                    importedStoragePath: existing.importedStoragePath,
+                    capturedAt: existing.capturedAt,
+                    captureType: existing.captureType,
+                    state: .assigned,
+                    failureDescription: nil,
+                    userNote: normalizedNote.isEmpty ? nil : normalizedNote,
+                    assignedTargetPath: projectRoot,
+                    assignedAt: .now,
+                    assignedDestinationPath: destinationURL.path
+                )
+            }
+
+            reloadWorkspace()
+            statusMessage = "Created placeholder project \(projectTitle)"
+            return true
+        } catch {
+            updateCaptureRecord(recordID) { existing in
+                CaptureRecord(
+                    id: existing.id,
+                    displayName: existing.displayName,
+                    originalSourcePath: existing.originalSourcePath,
+                    importedStoragePath: existing.importedStoragePath,
+                    capturedAt: existing.capturedAt,
+                    captureType: existing.captureType,
+                    state: .needsReview,
+                    failureDescription: error.localizedDescription,
+                    userNote: normalizedNote.isEmpty ? nil : normalizedNote,
+                    assignedTargetPath: existing.assignedTargetPath,
+                    assignedAt: existing.assignedAt,
+                    assignedDestinationPath: existing.assignedDestinationPath
+                )
+            }
+            statusMessage = "Could not create placeholder project"
+            activeAlert = AppAlert(
+                title: "Could not create placeholder project",
+                message: error.localizedDescription
+            )
+            logDiagnostics("workflow-launch-failed id=\(workflow.id) source=capture")
+            return false
+        }
+    }
+
     func assignCaptureRecord(_ recordID: String, to target: WorkspaceItem, note: String) async {
         guard let current = captureRecords.first(where: { $0.id == recordID }) else { return }
         guard current.state != .assigned else { return }
@@ -1205,6 +1371,51 @@ final class AppStore: ObservableObject {
         let relativeComponents = Array(itemComponents.dropFirst(rootComponents.count))
         guard relativeComponents.first == "Areas" else { return false }
         return relativeComponents.count == 2
+    }
+
+    private func placeholderScaffoldDraft(for record: CaptureRecord, note: String) -> ScaffoldProjectWizardDraft {
+        var draft = ScaffoldProjectWizardDraft()
+        draft.updateWorkingTitle(placeholderProjectTitle(from: record), workspaceRoot: workspaceRoot)
+        draft.summaryText = placeholderProjectSummary(note: note)
+        draft.sourceMaterialChoice = .later
+        draft.syncAdvancedDefaults(workspaceRoot: workspaceRoot)
+
+        let baseFolderName = draft.derivedFolderName
+        var candidateIndex = 2
+        while !draft.derivedProjectRoot(workspaceRoot: workspaceRoot).isEmpty,
+              FileManager.default.fileExists(atPath: draft.derivedProjectRoot(workspaceRoot: workspaceRoot)) {
+            draft.updateFolderNameOverride("\(baseFolderName)-\(candidateIndex)", workspaceRoot: workspaceRoot)
+            candidateIndex += 1
+        }
+
+        return draft
+    }
+
+    private func placeholderProjectTitle(from record: CaptureRecord) -> String {
+        let rawTitle: String
+        if let displayName = record.displayName, !displayName.isEmpty {
+            rawTitle = displayName
+        } else if let importedStoragePath = record.importedStoragePath, !importedStoragePath.isEmpty {
+            rawTitle = URL(fileURLWithPath: importedStoragePath).deletingPathExtension().lastPathComponent
+        } else if let originalSourcePath = record.originalSourcePath, !originalSourcePath.isEmpty {
+            rawTitle = URL(fileURLWithPath: originalSourcePath).deletingPathExtension().lastPathComponent
+        } else {
+            rawTitle = "Story hunch"
+        }
+
+        let cleaned = rawTitle
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return cleaned.isEmpty ? "Story hunch" : cleaned
+    }
+
+    private func placeholderProjectSummary(note: String) -> String {
+        if !note.isEmpty {
+            return note
+        }
+        return "Placeholder project created from Capture. Refine the summary and reporting direction later."
     }
 
     func archiveCaptureRecord(_ recordID: String) async {
@@ -1500,6 +1711,8 @@ final class AppStore: ObservableObject {
             isRunning = false
         }
 
+        logDiagnostics("workflow-finished id=\(workflow.id) exitCode=\(run.exitCode)")
+
         if workflow.id == "scaffold-project", run.exitCode == 0, let scaffoldContext {
             completeScaffoldProject(using: scaffoldContext)
             statusMessage = scaffoldContext.sourceMaterialChoice == .now
@@ -1711,8 +1924,6 @@ final class AppStore: ObservableObject {
 
     private func copyCaptureItemToStorage(for record: CaptureRecord) async throws -> URL {
         guard let originalSourcePath = record.originalSourcePath else {
-        logDiagnostics("workflow-finished id=\(workflow.id) exitCode=\(run.exitCode)")
-
             throw NSError(
                 domain: "JournalismWorkflowHub.Capture",
                 code: 1,
@@ -2213,11 +2424,12 @@ private let projectCloseoutSectionStart = "<!-- project_closeout:start -->"
 private let projectCloseoutSectionEnd = "<!-- project_closeout:end -->"
 
 private func parseReadmeDocument(_ text: String) -> ParsedReadmeDocument {
-    guard text.hasPrefix("---\n") else {
+    let lines = text.components(separatedBy: .newlines)
+    guard let firstLine = lines.first,
+          firstLine.trimmingCharacters(in: .whitespacesAndNewlines) == "---" else {
         return ParsedReadmeDocument(frontmatter: [:], orderedKeys: [], body: text)
     }
 
-    let lines = text.components(separatedBy: .newlines)
     var frontmatter: [String: String] = [:]
     var orderedKeys: [String] = []
     var endIndex: Int?
@@ -2298,13 +2510,14 @@ private func buildProjectCloseoutSection(
 ) -> String {
     var lines = [projectCloseoutSectionStart, "## Project Closeout", ""]
     lines.append("- Closed on: `\(currentISODateString())`")
-    lines.append("- Status set to: `\(status.rawValue)`")
     lines.append("- Activity state: `\(projectState.activityState.rawValue)`")
     lines.append("- Workflow stage: `\(projectState.workflowStage.rawValue)`")
     if let inactiveReason = projectState.inactiveReason {
         lines.append("- Inactive reason: `\(inactiveReason.rawValue)`")
     }
     lines.append("- Outcome: `\(outcome.rawValue)`")
+    lines.append("- Workspace action: \(workspaceActionSummary(for: status))")
+    lines.append("- Compatibility status: `\(status.rawValue)`")
 
     if let importedPDFPath {
         lines.append("- Published PDF: `\(relativePath(importedPDFPath, from: projectRoot.path))`")
@@ -2322,6 +2535,19 @@ private func buildProjectCloseoutSection(
     lines.append("")
     lines.append(projectCloseoutSectionEnd)
     return lines.joined(separator: "\n")
+}
+
+private func workspaceActionSummary(for status: ProjectLifecycleStatus) -> String {
+    switch status {
+    case .archived:
+        return "Move project folder into Archives"
+    case .done:
+        return "Keep project folder in Projects"
+    case .active:
+        return "Keep project active"
+    case .onHold:
+        return "Keep project inactive in Projects"
+    }
 }
 
 private func applyProjectStateFrontmatter(
@@ -2499,10 +2725,11 @@ private func buildDossierHandoffNote(
         "",
         "- Added on: `\(currentISODateString())`",
         "- Project folder: `\(relativePath(projectURL.path, from: dossierURL.path))`",
-        "- Final status: `\(status.rawValue)`",
         "- Activity state: `\(projectState.activityState.rawValue)`",
         "- Workflow stage: `\(projectState.workflowStage.rawValue)`",
-        "- Outcome: `\(outcome.rawValue)`"
+        "- Outcome: `\(outcome.rawValue)`",
+        "- Workspace action: \(workspaceActionSummary(for: status))",
+        "- Compatibility status: `\(status.rawValue)`"
     ]
 
     if let inactiveReason = projectState.inactiveReason {

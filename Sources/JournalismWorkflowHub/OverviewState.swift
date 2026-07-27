@@ -41,6 +41,12 @@ struct OverviewOperationSummary: Identifiable, Hashable {
     let target: OverviewTarget
 }
 
+struct OverviewOpenProjectGroup: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let items: [WorkspaceItem]
+}
+
 enum OverviewDeriver {
     static func activeReportingProjects(from snapshot: WorkspaceSnapshot) -> [WorkspaceItem] {
         snapshot.items
@@ -50,6 +56,22 @@ enum OverviewDeriver {
                     && isReportingProjectType($0.projectType)
                     && $0.activityState == .active
             }
+    }
+
+    static func openProjectGroups(from snapshot: WorkspaceSnapshot) -> [OverviewOpenProjectGroup] {
+        let grouped = Dictionary(grouping: snapshot.items.filter(shouldIncludeInOpenProjectList)) { item in
+            item.workflowStage
+        }
+
+        return grouped
+            .map { workflowStage, items in
+                OverviewOpenProjectGroup(
+                    id: workflowStage?.rawValue ?? "unstaged",
+                    title: workflowStage?.label ?? "Unstaged",
+                    items: items.sorted(by: compareOpenProjectListItems)
+                )
+            }
+            .sorted(by: compareOpenProjectGroups)
     }
 
     static func projectSummaries(from snapshot: WorkspaceSnapshot, runs: [WorkflowRun]) -> [OverviewProjectSummary] {
@@ -140,6 +162,46 @@ enum OverviewDeriver {
         type == .journalism || type == .dataJournalism
     }
 
+    private static func shouldIncludeInOpenProjectList(_ item: WorkspaceItem) -> Bool {
+        item.section == .projects
+            && item.isProjectRoot
+            && item.lifecycleStatus != .archived
+            && item.lifecycleStatus != .done
+    }
+
+    private static func compareOpenProjectGroups(_ lhs: OverviewOpenProjectGroup, _ rhs: OverviewOpenProjectGroup) -> Bool {
+        let lhsStage = lhs.items.first?.workflowStage
+        let rhsStage = rhs.items.first?.workflowStage
+        let lhsPriority = workflowStagePriority(lhsStage)
+        let rhsPriority = workflowStagePriority(rhsStage)
+        if lhsPriority != rhsPriority {
+            return lhsPriority < rhsPriority
+        }
+        return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+    }
+
+    private static func compareOpenProjectListItems(_ lhs: WorkspaceItem, _ rhs: WorkspaceItem) -> Bool {
+        let lhsActivityPriority = activityPriority(lhs.activityState)
+        let rhsActivityPriority = activityPriority(rhs.activityState)
+        if lhsActivityPriority != rhsActivityPriority {
+            return lhsActivityPriority < rhsActivityPriority
+        }
+
+        let lhsInactivePriority = inactiveReasonPriority(lhs.inactiveReason)
+        let rhsInactivePriority = inactiveReasonPriority(rhs.inactiveReason)
+        if lhsInactivePriority != rhsInactivePriority {
+            return lhsInactivePriority < rhsInactivePriority
+        }
+
+        let lhsDate = startedDate(for: lhs)
+        let rhsDate = startedDate(for: rhs)
+        if lhsDate != rhsDate {
+            return (lhsDate ?? .distantPast) > (rhsDate ?? .distantPast)
+        }
+
+        return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+    }
+
     private static func compareProjects(_ lhs: WorkspaceItem, _ rhs: WorkspaceItem, runs: [WorkflowRun]) -> Bool {
         let lhsSeverity = severity(for: lhs, runs: runs)
         let rhsSeverity = severity(for: rhs, runs: runs)
@@ -228,6 +290,37 @@ enum OverviewDeriver {
             return 2
         }
         return 3
+    }
+
+    private static func workflowStagePriority(_ stage: ProjectWorkflowStage?) -> Int {
+        guard let stage else { return Int.max }
+        return ProjectWorkflowStage.allCases.firstIndex(of: stage) ?? Int.max
+    }
+
+    private static func activityPriority(_ state: ProjectActivityState?) -> Int {
+        switch state {
+        case .active:
+            return 0
+        case .inactive:
+            return 1
+        case nil:
+            return 2
+        }
+    }
+
+    private static func inactiveReasonPriority(_ reason: ProjectInactiveReason?) -> Int {
+        switch reason {
+        case .waiting:
+            return 0
+        case .parked:
+            return 1
+        case .discarded:
+            return 2
+        case .finished:
+            return 3
+        case nil:
+            return 4
+        }
     }
 
     private static func startedDate(for item: WorkspaceItem) -> Date? {
