@@ -861,7 +861,12 @@ final class AppStoreNavigationTests: XCTestCase {
         let destinationPath = try XCTUnwrap(assigned.assignedDestinationPath)
         XCTAssertTrue(FileManager.default.fileExists(atPath: destinationPath))
         XCTAssertTrue(destinationPath.contains("/docs/"))
-        XCTAssertTrue(store.captureAssignmentTargets.contains(where: { $0.path == projectPath }))
+        let standardizedProjectPath = URL(fileURLWithPath: projectPath).standardizedFileURL.path
+        XCTAssertTrue(
+            store.captureAssignmentTargets.contains { target in
+                URL(fileURLWithPath: target.path).standardizedFileURL.path == standardizedProjectPath
+            }
+        )
     }
 
     func testCreatePlaceholderProjectFromCaptureRecordUsesUniqueProjectFolderWhenTitleAlreadyExists() throws {
@@ -891,7 +896,7 @@ final class AppStoreNavigationTests: XCTestCase {
         let assigned = try XCTUnwrap(store.captureRecords.first)
         let projectPath = try XCTUnwrap(assigned.assignedTargetPath)
         XCTAssertNotEqual(projectPath, existingProject.path)
-        XCTAssertTrue(projectPath.hasSuffix("/Projects/2026/demo_story-2"))
+        XCTAssertTrue(projectPath.hasSuffix("/Projects/2026/demo_story_2"))
         XCTAssertTrue(FileManager.default.fileExists(atPath: projectPath))
     }
 
