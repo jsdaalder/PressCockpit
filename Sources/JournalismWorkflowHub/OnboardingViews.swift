@@ -297,8 +297,19 @@ struct OnboardingFlowView: View {
 
             onboardingInfoCard(
                 title: "Privacy and security",
-                body: "Your workspace stays in the selected local folder. The app reads local files and only writes where a workflow says it will write. It does not require moving your reporting workspace into a Journalism Workflow Hub cloud backend.\n\nThe app also keeps some lightweight local app state on this Mac, such as workspace selection, cached catalog state, workflow run logs, and write backups.\n\nIf you use Google Docs or another sync tool, that provider keeps its own network and storage behavior."
+                body: "Your workspace stays in the selected local folder. The app reads local files and only writes where a workflow says it will write. It does not require moving your reporting workspace into a Journalism Workflow Hub cloud backend.\n\nThe app also keeps some lightweight local app state on this Mac, such as workspace selection, cached catalog state, workflow run logs, and write backups. In this alpha build, local diagnostics logging is on by default, stays on this Mac, is never uploaded automatically, can be turned off here, and can be shared manually later.\n\nIf you use Google Docs or another sync tool, that provider keeps its own network and storage behavior."
             )
+
+            Toggle(isOn: $draft.diagnosticsLoggingEnabled) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Keep a local diagnostics log on this Mac for troubleshooting")
+                        .font(.headline)
+                    Text("This stores a small local text log with launches, workflow starts and finishes, and workflow failures. It does not upload anything automatically, does not capture document contents, can be turned off now as an opt-out, and can later be shared from the Workspace menu.")
+                        .font(.caption)
+                        .foregroundStyle(Color(red: 0.30, green: 0.37, blue: 0.37))
+                }
+            }
+            .toggleStyle(.switch)
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("What should happen first?")

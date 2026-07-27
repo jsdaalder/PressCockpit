@@ -92,4 +92,25 @@ final class OnboardingSupportTests: XCTestCase {
 
         XCTAssertEqual(OnboardingPreferences.documentMode(defaults: defaults), .googleDocs)
     }
+
+    func testOnboardingPreferencesDefaultDiagnosticsLoggingEnabled() {
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        XCTAssertTrue(OnboardingPreferences.diagnosticsLoggingEnabled(defaults: defaults))
+    }
+
+    func testOnboardingPreferencesPersistAndReadDiagnosticsLoggingChoice() {
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        var draft = OnboardingDraft.initial(defaultNewWorkspacePath: "/tmp/workspace")
+        draft.diagnosticsLoggingEnabled = true
+
+        OnboardingPreferences.persist(draft: draft, defaults: defaults)
+
+        XCTAssertTrue(OnboardingPreferences.diagnosticsLoggingEnabled(defaults: defaults))
+    }
 }

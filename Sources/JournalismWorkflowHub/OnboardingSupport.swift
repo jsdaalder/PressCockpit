@@ -166,6 +166,7 @@ struct OnboardingDraft: Hashable {
     var workspacePath: String
     var createBaseStructure: Bool
     var confirmedSeparateWorkspaceCreation: Bool
+    var diagnosticsLoggingEnabled: Bool
     var firstAction: OnboardingFirstAction
 
     static func initial(defaultNewWorkspacePath: String) -> OnboardingDraft {
@@ -175,6 +176,7 @@ struct OnboardingDraft: Hashable {
             workspacePath: defaultNewWorkspacePath,
             createBaseStructure: true,
             confirmedSeparateWorkspaceCreation: false,
+            diagnosticsLoggingEnabled: true,
             firstAction: .openOverview
         )
     }
@@ -230,6 +232,7 @@ struct OnboardingPreferences {
     static let documentModeKey = "onboardingDocumentMode"
     static let startModeKey = "onboardingStartMode"
     static let firstActionKey = "onboardingFirstAction"
+    static let diagnosticsLoggingEnabledKey = "diagnosticsLoggingEnabled"
 
     static func hasCompleted(defaults: UserDefaults = .standard) -> Bool {
         defaults.bool(forKey: completedKey)
@@ -240,6 +243,7 @@ struct OnboardingPreferences {
         defaults.set(draft.documentMode.rawValue, forKey: documentModeKey)
         defaults.set(draft.startMode.rawValue, forKey: startModeKey)
         defaults.set(draft.firstAction.rawValue, forKey: firstActionKey)
+        defaults.set(draft.diagnosticsLoggingEnabled, forKey: diagnosticsLoggingEnabledKey)
     }
 
     static func documentMode(defaults: UserDefaults = .standard) -> OnboardingDocumentMode {
@@ -248,6 +252,17 @@ struct OnboardingPreferences {
             return .localOnly
         }
         return mode
+    }
+
+    static func diagnosticsLoggingEnabled(defaults: UserDefaults = .standard) -> Bool {
+        guard defaults.object(forKey: diagnosticsLoggingEnabledKey) != nil else {
+            return true
+        }
+        return defaults.bool(forKey: diagnosticsLoggingEnabledKey)
+    }
+
+    static func setDiagnosticsLoggingEnabled(_ enabled: Bool, defaults: UserDefaults = .standard) {
+        defaults.set(enabled, forKey: diagnosticsLoggingEnabledKey)
     }
 
     static func reset(defaults: UserDefaults = .standard) {

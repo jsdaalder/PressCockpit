@@ -17,6 +17,14 @@ final class SupportPathsTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: logsDirectory.path))
     }
 
+    func testLogFileURLLivesUnderLogsDirectory() {
+        let supportDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let logFileURL = journalismWorkflowHubLogFileURL(supportDirectory: supportDirectory)
+
+        XCTAssertEqual(logFileURL.path, supportDirectory.appendingPathComponent("logs/app.log").path)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: logFileURL.deletingLastPathComponent().path))
+    }
+
     func testCreateWorkflowWriteBackupsCopiesExistingWorkspaceFiles() throws {
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let workspaceRoot = tmp.appendingPathComponent("workspace")

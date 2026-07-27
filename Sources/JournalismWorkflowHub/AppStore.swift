@@ -23,6 +23,7 @@ final class AppStore: ObservableObject {
     @Published var isRunning: Bool = false
     @Published var selectedRunOutput: String = ""
     @Published private(set) var documentMode: OnboardingDocumentMode
+    @Published private(set) var isDiagnosticsLoggingEnabled: Bool
     @Published var hasCompletedOnboarding: Bool
     @Published private(set) var onboardingLaunchMode: OnboardingLaunchMode?
     @Published private(set) var captureRecords: [CaptureRecord] = []
@@ -46,18 +47,26 @@ final class AppStore: ObservableObject {
     private var runner: CommandRunner
     private var backHistory: [SidebarSelection] = []
     private var forwardHistory: [SidebarSelection] = []
+    private let userDefaults: UserDefaults
+    private let appSupportDirectory: URL
 
     init(
         configuration: AppConfiguration = AppDefaults.configuration,
         catalog: (any WorkspaceCataloging)? = nil,
         captureStore: (any CapturePersisting)? = nil,
-        maintenanceStore: (any MaintenancePersisting)? = nil
+        maintenanceStore: (any MaintenancePersisting)? = nil,
+        defaults: UserDefaults = .standard,
+        supportDirectory: URL? = nil
     ) {
-        let hasCompletedOnboarding = OnboardingPreferences.hasCompleted()
+        let hasCompletedOnboarding = OnboardingPreferences.hasCompleted(defaults: defaults)
+        let appSupportDirectory = supportDirectory ?? journalismWorkflowHubSupportDirectory()
         self.appProfile = configuration.profile
         self.workspaceRoot = configuration.workspaceRoot
         self.demoWorkspaceRoot = configuration.demoWorkspaceRoot
-        self.documentMode = OnboardingPreferences.documentMode()
+        self.userDefaults = defaults
+        self.appSupportDirectory = appSupportDirectory
+        self.documentMode = OnboardingPreferences.documentMode(defaults: defaults)
+        self.isDiagnosticsLoggingEnabled = OnboardingPreferences.diagnosticsLoggingEnabled(defaults: defaults)
         self.hasCompletedOnboarding = hasCompletedOnboarding
         self.onboardingLaunchMode = hasCompletedOnboarding ? nil : .firstRun
         self.scanner = WorkspaceScanner(workspaceRoot: configuration.workspaceRoot)
@@ -65,9 +74,10 @@ final class AppStore: ObservableObject {
         self.captureStore = captureStore ?? CaptureStore(workspaceRoot: configuration.workspaceRoot)
         self.maintenanceStore = maintenanceStore ?? MaintenanceStore(workspaceRoot: configuration.workspaceRoot)
         self.runner = CommandRunner(workspaceRoot: configuration.workspaceRoot, appProfile: configuration.profile)
-        AppDebugLog.write(
-            "[jwh] launch profile=\(configuration.profile.rawValue) workspaceRoot=\(configuration.workspaceRoot.path)",
-            supportDirectory: journalismWorkflowHubSupportDirectory()
+        AppDebugLog.record(
+            "[jwh] launch profile=\(configuration.profile.rawValue) workspaceMode=\(configuration.isUsingDemoWorkspace ? \"demo\" : \"connected\")",
+            enabled: self.isDiagnosticsLoggingEnabled,
+            supportDirectory: appSupportDirectory
         )
         if configuration.profile == .standard {
             WorkspaceRootResolver.persist(configuration.workspaceRoot)
@@ -225,6 +235,7 @@ final class AppStore: ObservableObject {
             draft.startMode = .demo
             draft.firstAction = .inspectFirstProject
         } else if appProfile == .standard {
+        draft.diagnosticsLoggingEnabled = isDiagnosticsLoggingEnabled
             draft.startMode = .existingWorkspace
             draft.workspacePath = workspaceRoot.path
         }
@@ -504,6 +515,7 @@ final class AppStore: ObservableObject {
         let scaffoldContext = makeScaffoldCompletionContext(
             workflow: workflow,
             state: state,
+        logDiagnostics("workflow-start id=\(workflow.id) writeAction=\(workflow.isWriteAction)")
             draft: scaffoldProjectWizardDraft
         )
 
@@ -523,6 +535,7 @@ final class AppStore: ObservableObject {
                     self.activeAlert = AppAlert(
                         title: workflow.id == "scaffold-project" ? "Project creation failed" : "Workflow failed",
                         message: error.localizedDescription
+                    self.logDiagnostics("workflow-launch-failed id=\(workflow.id)")
                     )
                     self.isRunning = false
                 }
@@ -537,15 +550,19 @@ final class AppStore: ObservableObject {
         }
 
         applyConfiguration(configuration)
-        OnboardingPreferences.persist(draft: draft)
+        OnboardingPreferences.persist(draft: draft, defaults: userDefaults)
         documentMode = draft.documentMode
         hasCompletedOnboarding = true
         onboardingLaunchMode = nil
         statusMessage = "Workspace ready"
 
+        isDiagnosticsLoggingEnabled = draft.diagnosticsLoggingEnabled
         switch draft.firstAction {
         case .openOverview:
             select(.overview)
+        logDiagnostics(
+            "onboarding-complete startMode=\(draft.startMode.rawValue) documentMode=\(draft.documentMode.rawValue)"
+        )
         case .inspectFirstProject:
             if let firstItem = firstWorkspaceItem {
                 select(.workspace(firstItem.id))
@@ -574,7 +591,7 @@ final class AppStore: ObservableObject {
     func reopenOnboarding() {
         onboardingLaunchMode = .firstRun
         hasCompletedOnboarding = false
-        OnboardingPreferences.reset()
+        OnboardingPreferences.reset(defaults: userDefaults)
     }
 
     func refreshSelectedRun() {
@@ -602,6 +619,48 @@ final class AppStore: ObservableObject {
 
     func openURL(_ url: URL) {
         NSWorkspace.shared.open(url)
+    }
+
+    func setDiagnosticsLoggingEnabled(_ enabled: Bool) {
+        guard enabled != isDiagnosticsLoggingEnabled else { return }
+        OnboardingPreferences.setDiagnosticsLoggingEnabled(enabled, defaults: userDefaults)
+        isDiagnosticsLoggingEnabled = enabled
+        statusMessage = enabled
+            ? "Local diagnostics logging enabled"
+            : "Local diagnostics logging disabled"
+
+        if enabled {
+            logDiagnostics("diagnostics enabled from menu")
+        }
+    }
+
+    func revealDiagnosticsLog() {
+        let logURL = journalismWorkflowHubLogFileURL(supportDirectory: supportDirectory())
+        if FileManager.default.fileExists(atPath: logURL.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([logURL])
+            return
+        }
+
+        NSWorkspace.shared.activateFileViewerSelecting([
+            journalismWorkflowHubLogsDirectory(supportDirectory: supportDirectory())
+        ])
+    }
+
+    func shareDiagnosticsLog() {
+        let logURL = journalismWorkflowHubLogFileURL(supportDirectory: supportDirectory())
+        guard FileManager.default.fileExists(atPath: logURL.path) else {
+            revealDiagnosticsLog()
+            return
+        }
+
+        guard let window = NSApp.keyWindow ?? NSApp.mainWindow,
+              let view = window.contentView else {
+            revealDiagnosticsLog()
+            return
+        }
+
+        let picker = NSSharingServicePicker(items: [logURL])
+        picker.show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
     }
 
     func openDocument(_ document: WorkspaceDocument) {
@@ -1299,15 +1358,11 @@ final class AppStore: ObservableObject {
             selectedWorkspaceItemID = id
             reloadWorkspace()
             if let item = workspaceQueries.item(id: id) {
-                AppDebugLog.write(
-                    "[jwh] workspace-detail path=\(item.path) frontmatter=\(item.frontmatter.count) docs=\(item.documents.count) state=\(item.projectStateDetailLabel)",
-                    supportDirectory: supportDirectory()
+                logDiagnostics(
+                    "workspace-detail section=\(item.section.rawValue) frontmatter=\(item.frontmatter.count) docs=\(item.documents.count) state=\(item.projectStateDetailLabel)"
                 )
             } else {
-                AppDebugLog.write(
-                    "[jwh] workspace-detail missing id=\(id)",
-                    supportDirectory: supportDirectory()
-                )
+                logDiagnostics("workspace-detail missing")
             }
             reloadWorkflows()
         default:
@@ -1419,7 +1474,15 @@ final class AppStore: ObservableObject {
     }
 
     private func supportDirectory() -> URL {
-        journalismWorkflowHubSupportDirectory()
+        appSupportDirectory
+    }
+
+    private func logDiagnostics(_ message: String) {
+        AppDebugLog.record(
+            "[jwh] \(message)",
+            enabled: isDiagnosticsLoggingEnabled,
+            supportDirectory: supportDirectory()
+        )
     }
 
     private func finishWorkflowRun(
@@ -1648,6 +1711,8 @@ final class AppStore: ObservableObject {
 
     private func copyCaptureItemToStorage(for record: CaptureRecord) async throws -> URL {
         guard let originalSourcePath = record.originalSourcePath else {
+        logDiagnostics("workflow-finished id=\(workflow.id) exitCode=\(run.exitCode)")
+
             throw NSError(
                 domain: "JournalismWorkflowHub.Capture",
                 code: 1,

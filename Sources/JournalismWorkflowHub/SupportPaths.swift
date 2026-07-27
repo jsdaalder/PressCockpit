@@ -63,6 +63,16 @@ func journalismWorkflowHubLogsDirectory(
     return url
 }
 
+func journalismWorkflowHubLogFileURL(
+    supportDirectory: URL? = nil,
+    fileManager: FileManager = .default
+) -> URL {
+    journalismWorkflowHubLogsDirectory(
+        supportDirectory: supportDirectory,
+        fileManager: fileManager
+    ).appendingPathComponent("app.log")
+}
+
 @discardableResult
 func createWorkflowWriteBackups(
     paths: [String],

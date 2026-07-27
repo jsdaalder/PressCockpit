@@ -33,6 +33,23 @@ struct JournalismWorkflowHubApp: App {
                 Button("Reopen setup…") {
                     store.reopenOnboarding()
                 }
+
+                Divider()
+
+                Toggle(isOn: Binding(
+                    get: { store.isDiagnosticsLoggingEnabled },
+                    set: { store.setDiagnosticsLoggingEnabled($0) }
+                )) {
+                    Text("Local diagnostics logging")
+                }
+
+                Button("Share diagnostics log…") {
+                    store.shareDiagnosticsLog()
+                }
+
+                Button("Reveal diagnostics log in Finder") {
+                    store.revealDiagnosticsLog()
+                }
             }
         }
     }

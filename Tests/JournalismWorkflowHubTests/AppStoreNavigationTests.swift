@@ -354,6 +354,97 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: workspaceRoot.appendingPathComponent("Projects").path))
     }
 
+    func testAppStoreStartsWithDiagnosticsLoggingEnabledByDefault() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        let supportRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = AppStore(
+            configuration: AppConfiguration(
+                profile: .standalone,
+                workspaceRoot: workspaceRoot,
+                demoWorkspaceRoot: nil
+            ),
+            defaults: defaults,
+            supportDirectory: supportRoot
+        )
+
+        XCTAssertTrue(store.isDiagnosticsLoggingEnabled)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: journalismWorkflowHubLogFileURL(supportDirectory: supportRoot).path))
+    }
+
+    func testCompleteOnboardingPersistsDiagnosticsLoggingChoice() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        let supportRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = AppStore(
+            configuration: AppConfiguration(
+                profile: .standard,
+                workspaceRoot: workspaceRoot,
+                demoWorkspaceRoot: nil
+            ),
+            defaults: defaults,
+            supportDirectory: supportRoot
+        )
+
+        var draft = OnboardingDraft.initial(defaultNewWorkspacePath: workspaceRoot.path)
+        draft.startMode = .existingWorkspace
+        draft.workspacePath = workspaceRoot.path
+        draft.diagnosticsLoggingEnabled = true
+        draft.firstAction = .openOverview
+
+        try store.completeOnboarding(using: draft)
+
+        XCTAssertTrue(store.isDiagnosticsLoggingEnabled)
+        XCTAssertTrue(OnboardingPreferences.diagnosticsLoggingEnabled(defaults: defaults))
+
+        let logContents = try String(
+            contentsOf: journalismWorkflowHubLogFileURL(supportDirectory: supportRoot),
+            encoding: .utf8
+        )
+        XCTAssertTrue(logContents.contains("onboarding-complete"))
+    }
+
+    func testDisablingDiagnosticsLoggingStopsFurtherWritesAndAvoidsAbsolutePaths() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        let supportRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = AppStore(
+            configuration: AppConfiguration(
+                profile: .standalone,
+                workspaceRoot: workspaceRoot,
+                demoWorkspaceRoot: nil
+            ),
+            defaults: defaults,
+            supportDirectory: supportRoot
+        )
+        let project = try XCTUnwrap(store.snapshot.items.first(where: { $0.section == .projects }))
+
+        XCTAssertTrue(store.isDiagnosticsLoggingEnabled)
+        store.select(.workspace(project.id))
+
+        let logURL = journalismWorkflowHubLogFileURL(supportDirectory: supportRoot)
+        let enabledContents = try String(contentsOf: logURL, encoding: .utf8)
+        XCTAssertTrue(enabledContents.contains("workspace-detail"))
+        XCTAssertFalse(enabledContents.contains(workspaceRoot.path))
+
+        store.setDiagnosticsLoggingEnabled(false)
+        store.select(.overview)
+        store.select(.workspace(project.id))
+
+        let disabledContents = try String(contentsOf: logURL, encoding: .utf8)
+        XCTAssertEqual(disabledContents, enabledContents)
+        XCTAssertFalse(OnboardingPreferences.diagnosticsLoggingEnabled(defaults: defaults))
+    }
+
     func testReopenOnboardingResetsCompletionState() throws {
         OnboardingPreferences.reset()
         defer { OnboardingPreferences.reset() }
