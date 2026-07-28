@@ -166,6 +166,55 @@ final class ScaffoldProjectScriptTests: XCTestCase {
         XCTAssertFalse(overview.contains("_Old placeholder._"))
     }
 
+    func testScaffoldScriptWritesUnindentedFrontmatterAndDocsOverview() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let scriptURL = root
+            .appendingPathComponent("Sources/JournalismWorkflowHub/Resources/knowledge_ops/scripts/scaffold_project.py")
+
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let projectRoot = tmp.appendingPathComponent("Projects/2026/unindented_story")
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = [
+            "python3",
+            scriptURL.path,
+            "--project-root", projectRoot.path,
+            "--title", "Unindented Story",
+            "--owner", "Jan",
+            "--activity-state", "active",
+            "--workflow-stage", "lead",
+            "--project-type", "journalism",
+            "--started", "2026-07-14",
+            "--deliverable", "A short summary."
+        ]
+
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        try process.run()
+        process.waitUntilExit()
+
+        let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        XCTAssertEqual(process.terminationStatus, 0, stderr)
+
+        let readme = try String(contentsOf: projectRoot.appendingPathComponent("README.md"), encoding: .utf8)
+        XCTAssertTrue(readme.hasPrefix("---\n"))
+        XCTAssertFalse(readme.hasPrefix("        ---"))
+
+        let overview = try String(
+            contentsOf: projectRoot.appendingPathComponent("docs/docs_overview.md"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(overview.hasPrefix("# Docs Overview\n"))
+        XCTAssertFalse(overview.hasPrefix("        # Docs Overview"))
+    }
+
     func testBuildProjectReadmePreservesTrustedFrontmatterFields() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -232,5 +281,124 @@ final class ScaffoldProjectScriptTests: XCTestCase {
         XCTAssertTrue(updatedReadme.contains("activity_state: inactive"))
         XCTAssertTrue(updatedReadme.contains("workflow_stage: feasibility_study"))
         XCTAssertTrue(updatedReadme.contains("inactive_reason: waiting"))
+        XCTAssertTrue(updatedReadme.contains("status: on_hold"))
+    }
+
+    func testBuildProjectReadmeRecomputesLegacyStatusFromCanonicalProjectState() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let scriptURL = root
+            .appendingPathComponent("Sources/JournalismWorkflowHub/Resources/knowledge_ops/scripts/build_project_readme.py")
+
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let projectRoot = tmp.appendingPathComponent("Projects/2026/recomputed_status_story")
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true, attributes: nil)
+
+        try """
+        ---
+        type: project
+        project: Recomputed Status Story
+        activity_state: inactive
+        workflow_stage: feasibility_study
+        inactive_reason: waiting
+        status: active
+        project_type: journalism
+        safety: unknown
+        owner: Jan
+        started: 2026-07-01
+        topics: []
+        entities: []
+        deliverable: Waiting for records
+        ---
+
+        # Recomputed Status Story
+
+        Existing README body.
+        """.write(to: projectRoot.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = [
+            "python3",
+            scriptURL.path,
+            "--project-root", projectRoot.path,
+            "--write-readme",
+            "--overwrite",
+            "--skip-placeholder-cache"
+        ]
+
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        try process.run()
+        process.waitUntilExit()
+
+        let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        XCTAssertEqual(process.terminationStatus, 0, stderr)
+
+        let updatedReadme = try String(contentsOf: projectRoot.appendingPathComponent("README.md"), encoding: .utf8)
+        XCTAssertTrue(updatedReadme.contains("activity_state: inactive"))
+        XCTAssertTrue(updatedReadme.contains("workflow_stage: feasibility_study"))
+        XCTAssertTrue(updatedReadme.contains("inactive_reason: waiting"))
+        XCTAssertTrue(updatedReadme.contains("status: on_hold"))
+        XCTAssertFalse(updatedReadme.contains("status: active"))
+    }
+
+    func testSummarizeScaffoldDocsParsesLocalModelJSONWithLiteralControlCharacters() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let scriptURL = root
+            .appendingPathComponent("Sources/JournalismWorkflowHub/Resources/knowledge_ops/scripts/summarize_scaffold_docs.py")
+
+        let snippet = #"""
+        import importlib.util
+        import json
+        import pathlib
+        import sys
+
+        script_path = pathlib.Path(sys.argv[1])
+        spec = importlib.util.spec_from_file_location("summarize_scaffold_docs", script_path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+
+        payload = """{
+          "title": "Imported notes",
+          "summary": "First line
+        Second line\tTabbed",
+          "project_relevance": "Relevant to the working hypothesis.",
+          "research_questions": ["What needs verification next?"],
+          "follow_up": ["Compare against the README assumptions."],
+          "cautions": "Treat as a working note."
+        }"""
+        parsed = module.parse_summary_payload(payload)
+        assert parsed["summary"] == "First line\nSecond line\tTabbed"
+        print(json.dumps(parsed))
+        """#
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["python3", "-c", snippet, scriptURL.path]
+
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        try process.run()
+        process.waitUntilExit()
+
+        let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        XCTAssertEqual(process.terminationStatus, 0, stderr)
+
+        let stdout = String(data: stdoutPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        XCTAssertTrue(stdout.contains("\\n"))
+        XCTAssertTrue(stdout.contains("\\t"))
     }
 }

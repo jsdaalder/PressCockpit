@@ -375,10 +375,14 @@ def parse_summary_payload(raw_text: str) -> dict[str, object]:
     match = re.search(r"\{.*\}", stripped, flags=re.S)
     if not match:
         raise SystemExit("The local model did not return parseable JSON for the scaffold summary step.")
+    payload_text = match.group(0)
     try:
-        return json.loads(match.group(0))
+        return json.loads(payload_text)
     except json.JSONDecodeError as exc:
-        raise SystemExit(f"Could not parse local model JSON output: {exc}") from exc
+        try:
+            return json.loads(payload_text, strict=False)
+        except json.JSONDecodeError:
+            raise SystemExit(f"Could not parse local model JSON output: {exc}") from exc
 
 
 def strip_code_fences(text: str) -> str:

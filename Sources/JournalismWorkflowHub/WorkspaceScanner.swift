@@ -352,8 +352,11 @@ struct WorkspaceScanner {
     }
 
     private func parseFrontmatter(_ text: String) -> ([String: String], String) {
-        guard text.hasPrefix("---\n") else { return ([:], text) }
         let lines = text.components(separatedBy: .newlines)
+        guard let firstLine = lines.first,
+              firstLine.trimmingCharacters(in: .whitespacesAndNewlines) == "---" else {
+            return ([:], text)
+        }
         var frontmatter: [String: String] = [:]
         var endIndex: Int?
 

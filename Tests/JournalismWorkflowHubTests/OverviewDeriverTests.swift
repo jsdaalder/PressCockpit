@@ -247,6 +247,100 @@ final class OverviewDeriverTests: XCTestCase {
         XCTAssertEqual(operations.map(\.count), [1, 1, 3])
     }
 
+    func testOpenProjectGroupsIncludeNonFinishedProjectsAndSortByWorkflowStage() {
+        let leadProject = makeProject(
+            id: "lead-project",
+            title: "Lead Project",
+            projectType: .journalism,
+            status: "active",
+            safety: .internalOnly,
+            deliverable: "Story",
+            hasAgents: true,
+            started: "2026-07-06",
+            activityState: "active",
+            workflowStage: "lead",
+            inactiveReason: nil
+        )
+        let toolingProject = makeProject(
+            id: "tooling-project",
+            title: "Tooling Utility",
+            projectType: .tooling,
+            status: "active",
+            safety: .localSensitive,
+            deliverable: "Tool",
+            hasAgents: true,
+            started: "2026-07-05",
+            activityState: "active",
+            workflowStage: "lead",
+            inactiveReason: nil
+        )
+        let waitingProject = makeProject(
+            id: "waiting-project",
+            title: "Waiting Project",
+            projectType: .journalism,
+            status: "on_hold",
+            safety: .internalOnly,
+            deliverable: "Story",
+            hasAgents: true,
+            started: "2026-07-04",
+            activityState: "inactive",
+            workflowStage: "feasibility_study",
+            inactiveReason: "waiting"
+        )
+        let investigationProject = makeProject(
+            id: "investigation-project",
+            title: "Investigation Project",
+            projectType: .journalism,
+            status: "active",
+            safety: .unknown,
+            deliverable: "Story",
+            hasAgents: true,
+            started: "2026-07-03",
+            activityState: "active",
+            workflowStage: "active_investigation",
+            inactiveReason: nil
+        )
+        let finishedProject = makeProject(
+            id: "finished-project",
+            title: "Finished Project",
+            projectType: .journalism,
+            status: "done",
+            safety: .internalOnly,
+            deliverable: "Story",
+            hasAgents: true,
+            started: "2026-07-02",
+            activityState: "inactive",
+            workflowStage: "published",
+            inactiveReason: "finished"
+        )
+        let archivedProject = makeProject(
+            id: "archived-project",
+            title: "Archived Project",
+            projectType: .journalism,
+            status: "archived",
+            safety: .internalOnly,
+            deliverable: "Story",
+            hasAgents: true,
+            started: "2026-07-01",
+            activityState: "inactive",
+            workflowStage: "published",
+            inactiveReason: "finished"
+        )
+
+        let snapshot = WorkspaceSnapshot(
+            scannedAt: .now,
+            items: [finishedProject, waitingProject, toolingProject, archivedProject, investigationProject, leadProject],
+            publication: .empty
+        )
+
+        let groups = OverviewDeriver.openProjectGroups(from: snapshot)
+
+        XCTAssertEqual(groups.map(\.title), ["Lead", "Feasibility study", "Investigation"])
+        XCTAssertEqual(groups[0].items.map(\.title), ["Lead Project", "Tooling Utility"])
+        XCTAssertEqual(groups[1].items.map(\.title), ["Waiting Project"])
+        XCTAssertEqual(groups[2].items.map(\.title), ["Investigation Project"])
+    }
+
     func testProjectSummariesCarryPrimaryDocuments() throws {
         let project = makeProject(
             id: "docs",
@@ -623,7 +717,10 @@ final class OverviewDeriverTests: XCTestCase {
         safety: WorkspaceSafetyPosture,
         deliverable: String,
         hasAgents: Bool,
-        started: String
+        started: String,
+        activityState: String? = nil,
+        workflowStage: String? = nil,
+        inactiveReason: String? = nil
     ) -> WorkspaceItem {
         let frontmatter = [
             "type": "project",
@@ -631,7 +728,10 @@ final class OverviewDeriverTests: XCTestCase {
             "status": status,
             "started": started,
             "owner": "Jan",
-            "deliverable": deliverable
+            "deliverable": deliverable,
+            "activity_state": activityState ?? "",
+            "workflow_stage": workflowStage ?? "",
+            "inactive_reason": inactiveReason ?? ""
         ].filter { !$0.value.isEmpty }
 
         return WorkspaceItem(

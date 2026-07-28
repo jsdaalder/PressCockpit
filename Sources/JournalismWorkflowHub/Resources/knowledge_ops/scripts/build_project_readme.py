@@ -154,10 +154,22 @@ def derive_project_state(existing_metadata: dict[str, str]) -> tuple[str, str, s
     return activity_state, workflow_stage, inactive_reason
 
 
+def derive_legacy_status(
+    activity_state: str,
+    workflow_stage: str,
+    inactive_reason: str,
+) -> str:
+    if activity_state == "active":
+        return "active"
+    if inactive_reason == "finished" or workflow_stage == "published":
+        return "done"
+    return "on_hold"
+
+
 def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
-    if not text.startswith("---\n"):
-        return {}, text
     lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return {}, text
     metadata: dict[str, str] = {}
     end_index = None
     for idx in range(1, len(lines)):
@@ -511,6 +523,7 @@ def build_frontmatter(inventory: ProjectInventory, existing_metadata: dict[str, 
     project_slug = inventory.project_root.name
     started_default = existing_metadata.get("started") or f"{inventory.project_root.parent.name}-01-01"
     activity_state, workflow_stage, inactive_reason = derive_project_state(existing_metadata)
+    legacy_status = derive_legacy_status(activity_state, workflow_stage, inactive_reason)
     lines = [
         "---",
         f"type: {existing_metadata.get('type', 'project')}",
@@ -521,7 +534,7 @@ def build_frontmatter(inventory: ProjectInventory, existing_metadata: dict[str, 
     if inactive_reason and activity_state == "inactive":
         lines.append(f"inactive_reason: {inactive_reason}")
     lines.extend([
-        f"status: {existing_metadata.get('status', 'active')}",
+        f"status: {legacy_status}",
         f"project_type: {existing_metadata.get('project_type', 'journalism')}",
         f"dossier: {existing_metadata.get('dossier', '')}",
         f"safety: {existing_metadata.get('safety', 'unknown')}",

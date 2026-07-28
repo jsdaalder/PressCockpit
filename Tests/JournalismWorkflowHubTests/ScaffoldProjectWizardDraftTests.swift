@@ -85,6 +85,7 @@ final class ScaffoldProjectWizardDraftTests: XCTestCase {
             workspaceRoot: URL(fileURLWithPath: "/tmp/workspace")
         )
 
+        XCTAssertNil(state.textValues["status"])
         XCTAssertEqual(state.textValues["section_answer_1"], "")
         XCTAssertEqual(state.textValues["section_answer_2"], "")
         XCTAssertEqual(state.textValues["section_answer_3"], "")
@@ -109,6 +110,7 @@ final class ScaffoldProjectWizardDraftTests: XCTestCase {
             workspaceRoot: URL(fileURLWithPath: "/tmp/workspace")
         )
 
+        XCTAssertNil(state.textValues["status"])
         XCTAssertEqual(state.textValues["section_answer_1"], "Main reporting question")
         XCTAssertEqual(state.textValues["section_answer_2"], "Working hypothesis")
         XCTAssertEqual(state.textValues["section_answer_3"], "Why this matters now")

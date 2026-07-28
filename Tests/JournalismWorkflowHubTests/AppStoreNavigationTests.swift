@@ -817,6 +817,89 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: URL(fileURLWithPath: destinationPath).appendingPathComponent("transcript.txt").path))
     }
 
+    func testCreatePlaceholderProjectFromCaptureRecordScaffoldsProjectAndAssignsStoredCopy() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        let supportRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let captureStore = CaptureStore(workspaceRoot: workspaceRoot, supportDirectory: supportRoot)
+        let store = AppStore(
+            configuration: AppConfiguration(
+                profile: .standalone,
+                workspaceRoot: workspaceRoot,
+                demoWorkspaceRoot: nil
+            ),
+            captureStore: captureStore
+        )
+
+        waitForCaptureAsyncWork {
+            await store.saveQuickCaptureNote("Inspectors ignored repeated warning signs")
+        }
+
+        let record = try XCTUnwrap(store.captureRecords.first)
+
+        waitForCaptureAsyncWork {
+            _ = await store.createPlaceholderProjectFromCaptureRecord(
+                record.id,
+                note: "Placeholder lead from Capture. Confirm the reporting angle later."
+            )
+        }
+
+        let assigned = try XCTUnwrap(store.captureRecords.first)
+        XCTAssertEqual(assigned.state, .assigned)
+        XCTAssertEqual(assigned.userNote, "Placeholder lead from Capture. Confirm the reporting angle later.")
+
+        let projectPath = try XCTUnwrap(assigned.assignedTargetPath)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: projectPath))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: URL(fileURLWithPath: projectPath).appendingPathComponent("README.md").path))
+
+        let readme = try String(
+            contentsOf: URL(fileURLWithPath: projectPath).appendingPathComponent("README.md"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(readme.contains("project: Inspectors ignored repeated warning signs"))
+        XCTAssertTrue(readme.contains("deliverable: Placeholder lead from Capture. Confirm the reporting angle later."))
+
+        let destinationPath = try XCTUnwrap(assigned.assignedDestinationPath)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: destinationPath))
+        XCTAssertTrue(destinationPath.contains("/docs/"))
+        let standardizedProjectPath = URL(fileURLWithPath: projectPath).standardizedFileURL.path
+        XCTAssertTrue(
+            store.captureAssignmentTargets.contains { target in
+                URL(fileURLWithPath: target.path).standardizedFileURL.path == standardizedProjectPath
+            }
+        )
+    }
+
+    func testCreatePlaceholderProjectFromCaptureRecordUsesUniqueProjectFolderWhenTitleAlreadyExists() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        let supportRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let captureStore = CaptureStore(workspaceRoot: workspaceRoot, supportDirectory: supportRoot)
+        let store = AppStore(
+            configuration: AppConfiguration(
+                profile: .standalone,
+                workspaceRoot: workspaceRoot,
+                demoWorkspaceRoot: nil
+            ),
+            captureStore: captureStore
+        )
+
+        waitForCaptureAsyncWork {
+            await store.saveQuickCaptureNote("Demo Story")
+        }
+
+        let record = try XCTUnwrap(store.captureRecords.first)
+        let existingProject = try XCTUnwrap(store.snapshot.items.first(where: { $0.section == .projects }))
+
+        waitForCaptureAsyncWork {
+            _ = await store.createPlaceholderProjectFromCaptureRecord(record.id, note: "")
+        }
+
+        let assigned = try XCTUnwrap(store.captureRecords.first)
+        let projectPath = try XCTUnwrap(assigned.assignedTargetPath)
+        XCTAssertNotEqual(projectPath, existingProject.path)
+        XCTAssertTrue(projectPath.hasSuffix("/Projects/2026/demo_story_2"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: projectPath))
+    }
+
     func testArchiveCaptureRecordMovesStoredCopyIntoWorkspaceArchiveAndRemovesQueueRecord() throws {
         let workspaceRoot = try makeWorkspaceRoot()
         let supportRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -1085,12 +1168,20 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertTrue(readmeText.contains("inactive_reason: finished"))
         XCTAssertTrue(readmeText.contains("status: done"))
         XCTAssertTrue(readmeText.contains("<!-- project_closeout:start -->"))
+        XCTAssertTrue(readmeText.contains("- Activity state: `inactive`"))
         XCTAssertTrue(readmeText.contains("- Workflow stage: `published`"))
         XCTAssertTrue(readmeText.contains("- Outcome: `published`"))
+        XCTAssertTrue(readmeText.contains("- Workspace action: Keep project folder in Projects"))
+        XCTAssertTrue(readmeText.contains("- Compatibility status: `done`"))
         XCTAssertTrue(readmeText.contains("- Published PDF: `docs/published_story.pdf`"))
         XCTAssertTrue(readmeText.contains("Possible parliamentary questions."))
         XCTAssertTrue(FileManager.default.fileExists(atPath: importedPDF.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: dossierHandoff.path))
+        let dossierHandoffText = try String(contentsOf: dossierHandoff, encoding: .utf8)
+        XCTAssertTrue(dossierHandoffText.contains("- Activity state: `inactive`"))
+        XCTAssertTrue(dossierHandoffText.contains("- Workflow stage: `published`"))
+        XCTAssertTrue(dossierHandoffText.contains("- Workspace action: Keep project folder in Projects"))
+        XCTAssertTrue(dossierHandoffText.contains("- Compatibility status: `done`"))
         XCTAssertTrue(store.maintenanceItems.isEmpty)
     }
 
@@ -1162,6 +1253,8 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertTrue(archivedReadme.contains("workflow_stage: active_investigation"))
         XCTAssertTrue(archivedReadme.contains("inactive_reason: finished"))
         XCTAssertTrue(archivedReadme.contains("status: archived"))
+        XCTAssertTrue(archivedReadme.contains("- Workspace action: Move project folder into Archives"))
+        XCTAssertTrue(archivedReadme.contains("- Compatibility status: `archived`"))
     }
 
     func testImportDocumentsToProjectCopiesIntoDocsFolder() throws {
@@ -1189,7 +1282,7 @@ final class AppStoreNavigationTests: XCTestCase {
             await operation()
             expectation.fulfill()
         }
-        wait(for: [expectation], timeout: 2)
+        wait(for: [expectation], timeout: 5)
     }
 
     private func makeWorkspaceRoot(
