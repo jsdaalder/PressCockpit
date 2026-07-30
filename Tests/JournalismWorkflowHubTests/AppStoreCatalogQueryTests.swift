@@ -19,7 +19,7 @@ final class AppStoreCatalogQueryTests: XCTestCase {
             frontmatter: liveItem.frontmatter,
             googleDriveFolderURL: liveItem.googleDriveFolderURL,
             projectType: liveItem.projectType,
-            lifecycleStage: liveItem.lifecycleStage,
+            displayStateLabel: liveItem.displayStateLabel,
             safetyPosture: liveItem.safetyPosture,
             directFileCount: liveItem.directFileCount,
             directFolderCount: liveItem.directFolderCount,

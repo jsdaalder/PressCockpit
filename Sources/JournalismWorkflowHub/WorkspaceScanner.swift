@@ -107,7 +107,7 @@ struct WorkspaceScanner {
             readmeBody: body,
             agentsText: agentsText
         )
-        let lifecycleStage = inferLifecycleStage(section: section, frontmatter: frontmatter, readmeBody: body)
+        let displayStateLabel = inferLifecycleStage(section: section, frontmatter: frontmatter, readmeBody: body)
         let safetyPosture = inferSafetyPosture(
             section: section,
             projectType: projectType,
@@ -131,7 +131,7 @@ struct WorkspaceScanner {
             frontmatter: frontmatter,
             googleDriveFolderURL: extractGoogleDriveFolderURL(from: frontmatter, body: body),
             projectType: projectType,
-            lifecycleStage: lifecycleStage,
+            displayStateLabel: displayStateLabel,
             safetyPosture: safetyPosture,
             directFileCount: counts.fileCount,
             directFolderCount: counts.folderCount,

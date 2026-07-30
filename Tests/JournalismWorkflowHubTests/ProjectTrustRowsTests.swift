@@ -165,7 +165,7 @@ final class ProjectTrustRowsTests: XCTestCase {
             frontmatter: mergedFrontmatter,
             googleDriveFolderURL: nil,
             projectType: .journalism,
-            lifecycleStage: "Active",
+            displayStateLabel: "Active",
             safetyPosture: .unknown,
             directFileCount: documents.count,
             directFolderCount: 1,

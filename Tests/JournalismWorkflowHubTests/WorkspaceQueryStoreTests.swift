@@ -58,7 +58,7 @@ final class WorkspaceQueryStoreTests: XCTestCase {
             frontmatter: mergedFrontmatter,
             googleDriveFolderURL: nil,
             projectType: .journalism,
-            lifecycleStage: "Active",
+            displayStateLabel: "Active",
             safetyPosture: .unknown,
             directFileCount: 1,
             directFolderCount: 1,

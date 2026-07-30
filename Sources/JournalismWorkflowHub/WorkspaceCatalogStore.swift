@@ -22,7 +22,7 @@ struct WorkspaceCatalogRecord: Codable, Hashable {
     let section: WorkspaceSection
     let title: String
     let projectType: WorkspaceProjectType
-    let lifecycleStage: String
+    let displayStateLabel: String
     let activityState: ProjectActivityState?
     let workflowStage: ProjectWorkflowStage?
     let inactiveReason: ProjectInactiveReason?
@@ -39,7 +39,7 @@ struct WorkspaceCatalogRecord: Codable, Hashable {
         case section
         case title
         case projectType
-        case lifecycleStage
+        case displayStateLabel = "lifecycleStage"
         case activityState
         case workflowStage
         case inactiveReason
@@ -133,7 +133,7 @@ struct WorkspaceCatalogStore {
             section: item.section,
             title: item.title,
             projectType: item.projectType,
-            lifecycleStage: item.projectStateDetailLabel,
+            displayStateLabel: item.projectStateDetailLabel,
             activityState: item.activityState,
             workflowStage: item.workflowStage,
             inactiveReason: item.inactiveReason,

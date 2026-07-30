@@ -834,7 +834,7 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
     let frontmatter: [String: String]
     let googleDriveFolderURL: String?
     let projectType: WorkspaceProjectType
-    let lifecycleStage: String
+    let displayStateLabel: String
     let safetyPosture: WorkspaceSafetyPosture
     let directFileCount: Int
     let directFolderCount: Int
@@ -844,6 +844,30 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
     let csvFiles: Int
     let xlsxFiles: Int
     let documents: [WorkspaceDocument]
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case section
+        case path
+        case readmePath
+        case agentsPath
+        case title
+        case summary
+        case agentsSummary
+        case frontmatter
+        case googleDriveFolderURL
+        case projectType
+        case displayStateLabel = "lifecycleStage"
+        case safetyPosture
+        case directFileCount
+        case directFolderCount
+        case markdownFiles
+        case pdfFiles
+        case gdocFiles
+        case csvFiles
+        case xlsxFiles
+        case documents
+    }
 
     var url: URL { URL(fileURLWithPath: path) }
     var readmeURL: URL? { readmePath.map(URL.init(fileURLWithPath:)) }
@@ -866,7 +890,7 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
     var workspaceSummary: String {
         let bits = [
             projectType.label,
-            projectState?.detailLabel ?? (lifecycleStage.isEmpty ? nil : lifecycleStage),
+            projectState?.detailLabel ?? (displayStateLabel.isEmpty ? nil : displayStateLabel),
             agentsSummary.isEmpty ? nil : agentsSummary
         ].compactMap { $0 }
         return bits.joined(separator: " • ")
@@ -936,11 +960,11 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
     }
 
     var projectStateBadgeLabel: String {
-        projectState?.badgeLabel ?? lifecycleStage
+        projectState?.badgeLabel ?? displayStateLabel
     }
 
     var projectStateDetailLabel: String {
-        projectState?.detailLabel ?? lifecycleStage
+        projectState?.detailLabel ?? displayStateLabel
     }
 
     var compatibilityStatus: ProjectLifecycleStatus? {

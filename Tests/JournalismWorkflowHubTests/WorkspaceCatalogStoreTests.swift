@@ -36,7 +36,7 @@ final class WorkspaceCatalogStoreTests: XCTestCase {
         XCTAssertEqual(catalog.snapshot.items.count, 1)
         XCTAssertEqual(catalog.records.count, 1)
         XCTAssertEqual(catalog.records.first?.projectType, .journalism)
-        XCTAssertEqual(catalog.records.first?.lifecycleStage, "Inactive · Feasibility study · Waiting")
+        XCTAssertEqual(catalog.records.first?.displayStateLabel, "Inactive · Feasibility study · Waiting")
         XCTAssertEqual(catalog.records.first?.activityState, .inactive)
         XCTAssertEqual(catalog.records.first?.workflowStage, .feasibilityStudy)
         XCTAssertEqual(catalog.records.first?.inactiveReason, .waiting)

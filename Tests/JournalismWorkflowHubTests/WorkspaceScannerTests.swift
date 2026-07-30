@@ -33,7 +33,7 @@ final class WorkspaceScannerTests: XCTestCase {
         XCTAssertEqual(snapshot.items.first?.workflowStage, .activeInvestigation)
         XCTAssertNil(snapshot.items.first?.inactiveReason)
         XCTAssertEqual(snapshot.items.first?.projectType, .journalism)
-        XCTAssertEqual(snapshot.items.first?.lifecycleStage, "Active · Investigation")
+        XCTAssertEqual(snapshot.items.first?.displayStateLabel, "Active · Investigation")
         XCTAssertEqual(snapshot.items.first?.safetyPosture, .unknown)
     }
 
@@ -129,7 +129,7 @@ final class WorkspaceScannerTests: XCTestCase {
         XCTAssertEqual(item.activityState, .inactive)
         XCTAssertEqual(item.workflowStage, .activeInvestigation)
         XCTAssertEqual(item.inactiveReason, .waiting)
-        XCTAssertEqual(item.lifecycleStage, "Inactive · Investigation · Waiting")
+        XCTAssertEqual(item.displayStateLabel, "Inactive · Investigation · Waiting")
         XCTAssertEqual(item.safetyPosture, .publishableReviewed)
     }
 
@@ -159,7 +159,7 @@ final class WorkspaceScannerTests: XCTestCase {
         XCTAssertEqual(item.activityState, .inactive)
         XCTAssertEqual(item.workflowStage, .feasibilityStudy)
         XCTAssertEqual(item.inactiveReason, .waiting)
-        XCTAssertEqual(item.lifecycleStage, "Inactive · Feasibility study · Waiting")
+        XCTAssertEqual(item.displayStateLabel, "Inactive · Feasibility study · Waiting")
     }
 
     func testHumanizesSlugLikeFrontmatterProjectTitle() throws {
@@ -380,7 +380,7 @@ final class WorkspaceScannerTests: XCTestCase {
         let item = try XCTUnwrap(snapshot.items.first)
 
         XCTAssertEqual(item.projectType, .area)
-        XCTAssertEqual(item.lifecycleStage, "Ongoing")
+        XCTAssertEqual(item.displayStateLabel, "Ongoing")
         XCTAssertEqual(item.safetyPosture, .internalOnly)
     }
 
