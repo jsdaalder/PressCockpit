@@ -959,6 +959,16 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
         return ProjectState.from(frontmatter: frontmatter, isArchivedStorage: section == .archives)
     }
 
+    var hasExplicitProjectStateFrontmatter: Bool {
+        [
+            frontmatter["activity_state"],
+            frontmatter["workflow_stage"],
+            frontmatter["inactive_reason"]
+        ]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .contains { !$0.isEmpty }
+    }
+
     var projectStateBadgeLabel: String {
         projectState?.badgeLabel ?? displayStateLabel
     }
@@ -985,6 +995,15 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
 
         if activityState == .inactive {
             rows.append(("Inactive reason", inactiveReason?.label ?? "Not set"))
+        }
+
+        if projectState != nil {
+            rows.append((
+                "State source",
+                hasExplicitProjectStateFrontmatter
+                    ? "Explicit frontmatter"
+                    : "Compatibility fallback from `status`"
+            ))
         }
 
         rows.append(("Dossier", dossierSlug ?? "None linked yet"))

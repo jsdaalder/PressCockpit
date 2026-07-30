@@ -15,6 +15,7 @@ final class ProjectTrustRowsTests: XCTestCase {
         XCTAssertEqual(value(for: "Activity state", in: item.projectTrustRows), "Active")
         XCTAssertEqual(value(for: "Workflow stage", in: item.projectTrustRows), "Investigation")
         XCTAssertNil(value(for: "Inactive reason", in: item.projectTrustRows))
+        XCTAssertEqual(value(for: "State source", in: item.projectTrustRows), "Explicit frontmatter")
         XCTAssertEqual(value(for: "Dossier", in: item.projectTrustRows), "None linked yet")
         XCTAssertEqual(value(for: "Canonical draft", in: item.projectTrustRows), "Not decided yet")
         XCTAssertEqual(value(for: "Handling", in: item.projectTrustRows), "Needs review")
@@ -34,6 +35,7 @@ final class ProjectTrustRowsTests: XCTestCase {
         XCTAssertEqual(value(for: "Activity state", in: item.projectTrustRows), "Inactive")
         XCTAssertEqual(value(for: "Workflow stage", in: item.projectTrustRows), "Feasibility study")
         XCTAssertEqual(value(for: "Inactive reason", in: item.projectTrustRows), "Waiting")
+        XCTAssertEqual(value(for: "State source", in: item.projectTrustRows), "Explicit frontmatter")
     }
 
     func testFinishedProjectTrustRowsRespectLegacyFallback() {
@@ -48,6 +50,7 @@ final class ProjectTrustRowsTests: XCTestCase {
         XCTAssertEqual(value(for: "Activity state", in: item.projectTrustRows), "Inactive")
         XCTAssertEqual(value(for: "Workflow stage", in: item.projectTrustRows), "Published")
         XCTAssertEqual(value(for: "Inactive reason", in: item.projectTrustRows), "Finished")
+        XCTAssertEqual(value(for: "State source", in: item.projectTrustRows), "Compatibility fallback from `status`")
     }
 
     func testProjectTrustRowsShowLinkedDossier() {
