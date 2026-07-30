@@ -31,4 +31,5 @@ Canonical planning docs live in the workspace-level project:
 - `docs/architecture.md`
 - `docs/roadmap.md`
 - `docs/backlog.md`
-- `docs/verification.md`
+- `docs/process/planning_workflow.md`
+- `docs/process/verification.md`

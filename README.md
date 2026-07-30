@@ -184,6 +184,8 @@ Presets can also set `availability` to:
 
 ## Planning
 
-The full product plan for this app lives in `Projects/2026/journalism_workflow_hub_plan/` in the private newsroom workspace.
+The full product plan for this app lives in the workspace-level `Projects/2026/journalism_workflow_hub_plan/` project in the private newsroom workspace, outside this app repo.
+
+The repo-local `Projects/2026/journalism_workflow_hub_plan/` folder is only an archived pointer copy kept for older references.
 
 In standalone mode, the app does not require that planning project to exist.

@@ -31,7 +31,7 @@ Make sure `Journalism Workflow Hub` can run outside Jan's personal newsroom setu
 
 ### Private or local-only
 
-- planning project in `Projects/2026/journalism_workflow_hub_plan/`
+- workspace-level planning project in `Projects/2026/journalism_workflow_hub_plan/` outside this app repo
 - `knowledge_ops` Python workflows
 - `article_brain` workflows
 - `TRACES` workflows
