@@ -567,8 +567,8 @@ struct ProjectStatusChangeState: Identifiable, Hashable {
     let projectPath: String
     let readmePath: String
     let projectTitle: String
-    let currentStatus: ProjectLifecycleStatus
-    let targetStatus: ProjectLifecycleStatus
+    let currentCompatibilityStatus: ProjectLifecycleStatus
+    let targetCompatibilityStatus: ProjectLifecycleStatus
     let currentProjectState: ProjectState
     let projectType: WorkspaceProjectType
     let dossierSlug: String?

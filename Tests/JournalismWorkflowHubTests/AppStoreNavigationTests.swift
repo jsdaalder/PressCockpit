@@ -1056,8 +1056,8 @@ final class AppStoreNavigationTests: XCTestCase {
 
         let state = try XCTUnwrap(store.projectStatusChangeState)
         XCTAssertEqual(state.projectTitle, "Demo Story")
-        XCTAssertEqual(state.currentStatus, .active)
-        XCTAssertEqual(state.targetStatus, .done)
+        XCTAssertEqual(state.currentCompatibilityStatus, .active)
+        XCTAssertEqual(state.targetCompatibilityStatus, .done)
         XCTAssertEqual(state.dossierSlug, "voedselcrisis_2027")
         XCTAssertEqual(state.archiveYear, "2026")
     }

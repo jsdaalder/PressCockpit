@@ -2713,7 +2713,7 @@ struct ProjectOffboardingSheet: View {
                 statusRow("Current project state", value: state.currentProjectState.detailLabel)
                 statusRow("Resulting project state", value: resultingProjectState.detailLabel)
                 statusRow("Workspace action", value: workspaceActionLabel)
-                statusRow("Compatibility status", value: state.targetStatus.label)
+                statusRow("Compatibility status", value: state.targetCompatibilityStatus.label)
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Outcome")
@@ -2806,11 +2806,11 @@ struct ProjectOffboardingSheet: View {
     }
 
     private var sheetTitle: String {
-        state.targetStatus == .archived ? "Archive Project" : "Project Closeout"
+        state.targetCompatibilityStatus == .archived ? "Archive Project" : "Project Closeout"
     }
 
     private var confirmButtonTitle: String {
-        state.targetStatus == .archived ? "Archive project" : "Save closeout"
+        state.targetCompatibilityStatus == .archived ? "Archive project" : "Save closeout"
     }
 
     private var resultingProjectState: ProjectState {
@@ -2830,7 +2830,7 @@ struct ProjectOffboardingSheet: View {
     }
 
     private var workspaceActionLabel: String {
-        switch state.targetStatus {
+        switch state.targetCompatibilityStatus {
         case .archived:
             return "Move project folder into Archives"
         case .done:

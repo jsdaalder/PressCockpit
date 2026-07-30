@@ -306,15 +306,15 @@ final class AppStore: ObservableObject {
             workflowStage: .activeInvestigation,
             inactiveReason: nil
         )
-        let currentStatus = currentProjectState.legacyLifecycleStatus(isArchivedStorage: item.section == .archives)
+        let currentCompatibilityStatus = currentProjectState.legacyLifecycleStatus(isArchivedStorage: item.section == .archives)
         if targetStatus.requiresOffboarding {
             projectStatusChangeState = ProjectStatusChangeState(
                 projectID: item.id,
                 projectPath: item.path,
                 readmePath: readmePath,
                 projectTitle: item.title,
-                currentStatus: currentStatus,
-                targetStatus: targetStatus,
+                currentCompatibilityStatus: currentCompatibilityStatus,
+                targetCompatibilityStatus: targetStatus,
                 currentProjectState: currentProjectState,
                 projectType: item.projectType,
                 dossierSlug: item.dossierSlug,
@@ -327,7 +327,7 @@ final class AppStore: ObservableObject {
         updateProjectState(
             updatedState,
             for: item,
-            legacyStatusOverride: updatedState.legacyLifecycleStatus(isArchivedStorage: item.section == .archives)
+            compatibilityStatusOverride: updatedState.legacyLifecycleStatus(isArchivedStorage: item.section == .archives)
         )
     }
 
@@ -396,7 +396,7 @@ final class AppStore: ObservableObject {
         updateProjectState(
             normalizedState,
             for: item,
-            legacyStatusOverride: normalizedState.legacyLifecycleStatus(isArchivedStorage: state.isArchivedStorage)
+            compatibilityStatusOverride: normalizedState.legacyLifecycleStatus(isArchivedStorage: state.isArchivedStorage)
         )
         projectStateEditState = nil
     }
@@ -425,7 +425,7 @@ final class AppStore: ObservableObject {
         remainingOpenSummary: String,
         impactSummary: String
     ) async {
-        statusMessage = state.targetStatus == .archived
+        statusMessage = state.targetCompatibilityStatus == .archived
             ? "Archiving \(state.projectTitle)…"
             : "Finishing \(state.projectTitle)…"
 
@@ -446,16 +446,16 @@ final class AppStore: ObservableObject {
             if let finalProjectPath = closeout?.finalProjectPath,
                let itemID = workspaceItemID(forPath: finalProjectPath) {
                 select(.workspace(itemID))
-            } else if state.targetStatus == .archived {
+            } else if state.targetCompatibilityStatus == .archived {
                 select(.overview)
             }
 
             if let closeout, let importedPDFPath = closeout.importedPDFPath {
-                statusMessage = "\(state.targetStatus.label) — copied \(URL(fileURLWithPath: importedPDFPath).lastPathComponent)"
+                statusMessage = "\(state.targetCompatibilityStatus.label) — copied \(URL(fileURLWithPath: importedPDFPath).lastPathComponent)"
             } else if let closeout, closeout.maintenanceItemCount > 0 {
-                statusMessage = "\(state.projectTitle) marked \(state.targetStatus.label.lowercased()) with \(closeout.maintenanceItemCount) follow-up \(closeout.maintenanceItemCount == 1 ? "item" : "items")"
+                statusMessage = "\(state.projectTitle) marked \(state.targetCompatibilityStatus.label.lowercased()) with \(closeout.maintenanceItemCount) follow-up \(closeout.maintenanceItemCount == 1 ? "item" : "items")"
             } else {
-                statusMessage = "\(state.projectTitle) marked \(state.targetStatus.label.lowercased())"
+                statusMessage = "\(state.projectTitle) marked \(state.targetCompatibilityStatus.label.lowercased())"
             }
         } catch {
             activeAlert = AppAlert(
@@ -2130,7 +2130,7 @@ final class AppStore: ObservableObject {
     private func updateProjectState(
         _ projectState: ProjectState,
         for item: WorkspaceItem,
-        legacyStatusOverride: ProjectLifecycleStatus? = nil
+        compatibilityStatusOverride: ProjectLifecycleStatus? = nil
     ) {
         guard let readmePath = item.readmePath else {
             activeAlert = AppAlert(
@@ -2144,11 +2144,11 @@ final class AppStore: ObservableObject {
             let readmeURL = URL(fileURLWithPath: readmePath)
             let currentText = try String(contentsOf: readmeURL, encoding: .utf8)
             let updatedText = updateFrontmatter(in: currentText) { frontmatter, orderedKeys in
-                let legacyStatus = legacyStatusOverride
+                let compatibilityStatus = compatibilityStatusOverride
                     ?? projectState.legacyLifecycleStatus(isArchivedStorage: item.section == .archives)
                 applyProjectStateFrontmatter(
                     projectState,
-                    legacyStatus: legacyStatus,
+                    compatibilityStatus: compatibilityStatus,
                     to: &frontmatter,
                     orderedKeys: &orderedKeys
                 )
@@ -2245,7 +2245,7 @@ final class AppStore: ObservableObject {
             )
         }
         let managedSection = buildProjectCloseoutSection(
-            status: state.targetStatus,
+            compatibilityStatus: state.targetCompatibilityStatus,
             projectState: finalProjectState,
             outcome: outcome,
             projectRoot: projectURL,
@@ -2258,7 +2258,7 @@ final class AppStore: ObservableObject {
         let updatedText = updateFrontmatter(in: currentText) { frontmatter, orderedKeys in
             applyProjectStateFrontmatter(
                 finalProjectState,
-                legacyStatus: state.targetStatus,
+                compatibilityStatus: state.targetCompatibilityStatus,
                 to: &frontmatter,
                 orderedKeys: &orderedKeys
             )
@@ -2273,7 +2273,7 @@ final class AppStore: ObservableObject {
         try finalText.write(to: readmeURL, atomically: true, encoding: .utf8)
 
         var finalProjectURL = projectURL
-        if state.targetStatus == .archived {
+        if state.targetCompatibilityStatus == .archived {
             let archiveDestination = archiveDestinationURL(
                 for: projectURL,
                 year: state.archiveYear,
@@ -2302,7 +2302,7 @@ final class AppStore: ObservableObject {
                 to: dossierURL,
                 projectTitle: state.projectTitle,
                 projectURL: finalProjectURL,
-                status: state.targetStatus,
+                compatibilityStatus: state.targetCompatibilityStatus,
                 projectState: finalProjectState,
                 outcome: outcome,
                 importedPDFPath: importedPDFPath,
@@ -2499,7 +2499,7 @@ private func upsertingManagedSection(
 }
 
 private func buildProjectCloseoutSection(
-    status: ProjectLifecycleStatus,
+    compatibilityStatus: ProjectLifecycleStatus,
     projectState: ProjectState,
     outcome: ProjectOffboardingOutcome,
     projectRoot: URL,
@@ -2516,8 +2516,8 @@ private func buildProjectCloseoutSection(
         lines.append("- Inactive reason: `\(inactiveReason.rawValue)`")
     }
     lines.append("- Outcome: `\(outcome.rawValue)`")
-    lines.append("- Workspace action: \(workspaceActionSummary(for: status))")
-    lines.append("- Compatibility status: `\(status.rawValue)`")
+    lines.append("- Workspace action: \(workspaceActionSummary(for: compatibilityStatus))")
+    lines.append("- Compatibility status: `\(compatibilityStatus.rawValue)`")
 
     if let importedPDFPath {
         lines.append("- Published PDF: `\(relativePath(importedPDFPath, from: projectRoot.path))`")
@@ -2552,7 +2552,7 @@ private func workspaceActionSummary(for status: ProjectLifecycleStatus) -> Strin
 
 private func applyProjectStateFrontmatter(
     _ projectState: ProjectState,
-    legacyStatus: ProjectLifecycleStatus,
+    compatibilityStatus: ProjectLifecycleStatus,
     to frontmatter: inout [String: String],
     orderedKeys: inout [String]
 ) {
@@ -2563,7 +2563,7 @@ private func applyProjectStateFrontmatter(
     } else {
         frontmatter.removeValue(forKey: "inactive_reason")
     }
-    frontmatter["status"] = legacyStatus.rawValue
+    frontmatter["status"] = compatibilityStatus.rawValue
 
     for key in ["activity_state", "workflow_stage", "inactive_reason", "status"] where !orderedKeys.contains(key) {
         orderedKeys.append(key)
@@ -2679,7 +2679,7 @@ private func writeDossierHandoffNote(
     to dossierURL: URL,
     projectTitle: String,
     projectURL: URL,
-    status: ProjectLifecycleStatus,
+    compatibilityStatus: ProjectLifecycleStatus,
     projectState: ProjectState,
     outcome: ProjectOffboardingOutcome,
     importedPDFPath: String?,
@@ -2697,7 +2697,7 @@ private func writeDossierHandoffNote(
         dossierURL: dossierURL,
         projectTitle: projectTitle,
         projectURL: projectURL,
-        status: status,
+        compatibilityStatus: compatibilityStatus,
         projectState: projectState,
         outcome: outcome,
         importedPDFPath: importedPDFPath,
@@ -2712,7 +2712,7 @@ private func buildDossierHandoffNote(
     dossierURL: URL,
     projectTitle: String,
     projectURL: URL,
-    status: ProjectLifecycleStatus,
+    compatibilityStatus: ProjectLifecycleStatus,
     projectState: ProjectState,
     outcome: ProjectOffboardingOutcome,
     importedPDFPath: String?,
@@ -2728,8 +2728,8 @@ private func buildDossierHandoffNote(
         "- Activity state: `\(projectState.activityState.rawValue)`",
         "- Workflow stage: `\(projectState.workflowStage.rawValue)`",
         "- Outcome: `\(outcome.rawValue)`",
-        "- Workspace action: \(workspaceActionSummary(for: status))",
-        "- Compatibility status: `\(status.rawValue)`"
+        "- Workspace action: \(workspaceActionSummary(for: compatibilityStatus))",
+        "- Compatibility status: `\(compatibilityStatus.rawValue)`"
     ]
 
     if let inactiveReason = projectState.inactiveReason {
