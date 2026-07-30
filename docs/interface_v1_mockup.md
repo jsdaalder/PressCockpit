@@ -73,6 +73,7 @@ be the calm editorial home screen for active work first, while still supporting 
 Contents:
 
 - active project cards
+- secondary open-project board grouped by workflow state
 - suggested next actions
 - compact operational follow-up
 - restrained new-project entry point
@@ -92,6 +93,11 @@ Wireframe:
 | - Housing permits              Missing project basics    Next: update README      |
 | - Agro lobby timeline          Ready to move             Next: draft chronology   |
 | - Methane enforcement          Workflow follow-up        Next: inspect failed run |
+|----------------------------------------------------------------------------------|
+| Open projects                                                                    |
+| [Inbox]     [Scoped]     [Reporting]     [Drafting]     [Review]     [Ready]    |
+| - Permit log - Soil map - School heat - Budget cuts - Lobby memo - Export pack  |
+| - River data - Farm deal - Council Q&A                                           |
 +---------------------------------------------+------------------------------------+
 | Suggested next actions                       | Operations                         |
 | - Needs review before sharing   2 projects   | - Publishing follow-up     3       |
@@ -106,15 +112,25 @@ Wireframe:
 Screen contract:
 
 - Overview should foreground active projects before global counts or abstract system state.
+- Active projects stay at the top as the highest-priority dispatch surface; the broader open-project view belongs below them.
 - Overview should prioritize trust, drift, and next actions over comprehensive browsing.
 - If a user lands here and still does not know what to do next, the screen is failing.
 - Overview should stay curated; it should not become a second Workspace screen or a dashboard of unrelated metrics.
+- The secondary open-projects area should read as a horizontal kanban board, not a long vertical backlog list.
+- The board should always render one column per workflow state, even when a state currently has no projects.
+- Empty workflow-state columns should remain visible with a lightweight empty state so the process model stays legible.
+- Projects in the open-projects board should use the same collapsible pattern as the active-project cards, so dense scanning and deeper inspection can coexist.
+- Dragging a project card into the next workflow-state column should update its workflow state directly from the overview.
+- Dragging should optimize for adjacent forward movement first; broader reordering or arbitrary state jumps can wait until the workflow rules are clearer.
 - Flagged projects should always say why they are flagged.
 - Operational and bureaucratic tasks should be visible but clearly secondary to story work.
 - Future brainstorming and intake directions may start here, but should move out if they create clutter.
 
 Future additions worth validating:
 
+- The open-projects board may need a clear rule for horizontal overflow: either scroll the board as one strip or compress columns only down to a defined minimum width.
+- If drag-to-advance is added, the card should show a clear drop target and confirm the state change without forcing the user into the workspace detail view.
+- Some workflow states may eventually need WIP counts, column-level warnings, or stage-specific empty-copy, but that should be additive to the stable state-column structure rather than replacing it.
 - The per-project `More` expansion may need lightweight lifecycle controls such as:
   - lower priority or standard priority
   - archive because the work is finished
