@@ -244,7 +244,9 @@ final class OverviewDeriverTests: XCTestCase {
         )
 
         XCTAssertEqual(actions.map(\.count), [1, 1])
-        XCTAssertEqual(operations.map(\.count), [1, 1, 3])
+        XCTAssertEqual(operations.map(\.count), [1, 1, 2, 3])
+        XCTAssertEqual(operations[2].title, "Project state cleanup")
+        XCTAssertEqual(operations[2].target, .workspace(reviewProject.id))
     }
 
     func testOpenProjectGroupsIncludeNonFinishedProjectsAndSortByWorkflowStage() {

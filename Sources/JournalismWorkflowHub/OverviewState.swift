@@ -122,6 +122,7 @@ enum OverviewDeriver {
     static func operationSummaries(from snapshot: WorkspaceSnapshot, runs: [WorkflowRun]) -> [OverviewOperationSummary] {
         let activeProjects = activeReportingProjects(from: snapshot)
         let adminProjects = snapshot.items.filter { $0.section == .projects && $0.isProjectRoot && $0.agentsPath == nil }
+        let stateMigrationProjects = snapshot.items.filter(needsProjectStateMigration)
         let failedRuns = latestFailedRunsByScope(from: runs)
 
         return [
@@ -144,6 +145,16 @@ enum OverviewDeriver {
                 buttonTitle: "Open project",
                 count: adminProjects.count,
                 target: adminProjects.first.map { .workspace($0.id) } ?? activeProjects.first.map { .workspace($0.id) } ?? .overview
+            ),
+            OverviewOperationSummary(
+                id: "state-cleanup",
+                title: "Project state cleanup",
+                detail: stateMigrationProjects.isEmpty
+                    ? "No projects are still relying on compatibility status fallback."
+                    : "\(stateMigrationProjects.count) project \(pluralized("root", count: stateMigrationProjects.count)) still rely on compatibility status instead of explicit project-state fields.",
+                buttonTitle: "Open project",
+                count: stateMigrationProjects.count,
+                target: stateMigrationProjects.first.map { .workspace($0.id) } ?? activeProjects.first.map { .workspace($0.id) } ?? .overview
             ),
             OverviewOperationSummary(
                 id: "publication-review",
@@ -282,6 +293,13 @@ enum OverviewDeriver {
         let started = item.frontmatter["started"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let deliverable = item.frontmatter["deliverable"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return started.isEmpty || deliverable.isEmpty
+    }
+
+    private static func needsProjectStateMigration(_ item: WorkspaceItem) -> Bool {
+        item.section == .projects
+            && item.isProjectRoot
+            && item.projectState != nil
+            && !item.hasExplicitProjectStateFrontmatter
     }
 
     private static func severity(for item: WorkspaceItem, runs: [WorkflowRun]) -> Int {
