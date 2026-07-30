@@ -26,10 +26,28 @@ struct WorkspaceCatalogRecord: Codable, Hashable {
     let activityState: ProjectActivityState?
     let workflowStage: ProjectWorkflowStage?
     let inactiveReason: ProjectInactiveReason?
-    let lifecycleStatus: ProjectLifecycleStatus?
+    let compatibilityStatus: ProjectLifecycleStatus?
     let safetyPosture: WorkspaceSafetyPosture
     let readmeModifiedAt: Date?
     let agentsModifiedAt: Date?
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case path
+        case readmePath
+        case agentsPath
+        case section
+        case title
+        case projectType
+        case lifecycleStage
+        case activityState
+        case workflowStage
+        case inactiveReason
+        case compatibilityStatus = "lifecycleStatus"
+        case safetyPosture
+        case readmeModifiedAt
+        case agentsModifiedAt
+    }
 }
 
 struct WorkspaceCatalogStore {
@@ -119,7 +137,7 @@ struct WorkspaceCatalogStore {
             activityState: item.activityState,
             workflowStage: item.workflowStage,
             inactiveReason: item.inactiveReason,
-            lifecycleStatus: item.lifecycleStatus,
+            compatibilityStatus: item.compatibilityStatus,
             safetyPosture: item.safetyPosture,
             readmeModifiedAt: modificationDate(for: item.readmePath),
             agentsModifiedAt: modificationDate(for: item.agentsPath)

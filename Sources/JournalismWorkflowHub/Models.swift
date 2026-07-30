@@ -943,7 +943,7 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
         projectState?.detailLabel ?? lifecycleStage
     }
 
-    var lifecycleStatus: ProjectLifecycleStatus? {
+    var compatibilityStatus: ProjectLifecycleStatus? {
         projectState?.legacyLifecycleStatus(isArchivedStorage: section == .archives)
             ?? ProjectLifecycleStatus.from(frontmatterStatus: frontmatter["status"])
     }

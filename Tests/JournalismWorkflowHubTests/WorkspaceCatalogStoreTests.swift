@@ -40,7 +40,7 @@ final class WorkspaceCatalogStoreTests: XCTestCase {
         XCTAssertEqual(catalog.records.first?.activityState, .inactive)
         XCTAssertEqual(catalog.records.first?.workflowStage, .feasibilityStudy)
         XCTAssertEqual(catalog.records.first?.inactiveReason, .waiting)
-        XCTAssertEqual(catalog.records.first?.lifecycleStatus, .onHold)
+        XCTAssertEqual(catalog.records.first?.compatibilityStatus, .onHold)
         XCTAssertEqual(catalog.records.first?.safetyPosture, .unknown)
         XCTAssertNotNil(catalog.records.first?.readmeModifiedAt)
     }

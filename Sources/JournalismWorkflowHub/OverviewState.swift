@@ -168,7 +168,7 @@ enum OverviewDeriver {
         }
 
         guard let projectState = item.projectState else {
-            return item.lifecycleStatus != .archived && item.lifecycleStatus != .done
+            return item.compatibilityStatus != .archived && item.compatibilityStatus != .done
         }
 
         return !(projectState.activityState == .inactive && projectState.inactiveReason == .finished)
