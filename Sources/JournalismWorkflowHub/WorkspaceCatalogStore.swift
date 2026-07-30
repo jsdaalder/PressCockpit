@@ -23,6 +23,10 @@ struct WorkspaceCatalogRecord: Codable, Hashable {
     let title: String
     let projectType: WorkspaceProjectType
     let lifecycleStage: String
+    let activityState: ProjectActivityState?
+    let workflowStage: ProjectWorkflowStage?
+    let inactiveReason: ProjectInactiveReason?
+    let lifecycleStatus: ProjectLifecycleStatus?
     let safetyPosture: WorkspaceSafetyPosture
     let readmeModifiedAt: Date?
     let agentsModifiedAt: Date?
@@ -111,7 +115,11 @@ struct WorkspaceCatalogStore {
             section: item.section,
             title: item.title,
             projectType: item.projectType,
-            lifecycleStage: item.lifecycleStage,
+            lifecycleStage: item.projectStateDetailLabel,
+            activityState: item.activityState,
+            workflowStage: item.workflowStage,
+            inactiveReason: item.inactiveReason,
+            lifecycleStatus: item.lifecycleStatus,
             safetyPosture: item.safetyPosture,
             readmeModifiedAt: modificationDate(for: item.readmePath),
             agentsModifiedAt: modificationDate(for: item.agentsPath)

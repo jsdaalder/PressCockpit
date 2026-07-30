@@ -13,7 +13,10 @@ final class WorkspaceCatalogStoreTests: XCTestCase {
         ---
         type: project
         project: Demo Story
-        status: active
+        status: on_hold
+        activity_state: inactive
+        workflow_stage: feasibility_study
+        inactive_reason: waiting
         project_type: journalism
         safety: unknown
         ---
@@ -33,6 +36,11 @@ final class WorkspaceCatalogStoreTests: XCTestCase {
         XCTAssertEqual(catalog.snapshot.items.count, 1)
         XCTAssertEqual(catalog.records.count, 1)
         XCTAssertEqual(catalog.records.first?.projectType, .journalism)
+        XCTAssertEqual(catalog.records.first?.lifecycleStage, "Inactive · Feasibility study · Waiting")
+        XCTAssertEqual(catalog.records.first?.activityState, .inactive)
+        XCTAssertEqual(catalog.records.first?.workflowStage, .feasibilityStudy)
+        XCTAssertEqual(catalog.records.first?.inactiveReason, .waiting)
+        XCTAssertEqual(catalog.records.first?.lifecycleStatus, .onHold)
         XCTAssertEqual(catalog.records.first?.safetyPosture, .unknown)
         XCTAssertNotNil(catalog.records.first?.readmeModifiedAt)
     }
