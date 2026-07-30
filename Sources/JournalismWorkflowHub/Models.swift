@@ -877,17 +877,34 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
         if let project = frontmatter["project"], !project.isEmpty {
             values.append(project)
         }
-        if let status = frontmatter["status"], !status.isEmpty {
+
+        if isProjectRoot {
+            let hasExplicitProjectStateFrontmatter = [
+                frontmatter["activity_state"],
+                frontmatter["workflow_stage"],
+                frontmatter["inactive_reason"]
+            ]
+                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .contains { !$0.isEmpty }
+
+            if let activityState {
+                values.append(activityState.rawValue)
+            }
+            if let workflowStage {
+                values.append(workflowStage.rawValue)
+            }
+            if let inactiveReason {
+                values.append(inactiveReason.rawValue)
+            }
+
+            // Keep legacy status searchable only for unmigrated project metadata.
+            if !hasExplicitProjectStateFrontmatter,
+               let status = frontmatter["status"],
+               !status.isEmpty {
+                values.append(status)
+            }
+        } else if let status = frontmatter["status"], !status.isEmpty {
             values.append(status)
-        }
-        if let activityState {
-            values.append(activityState.rawValue)
-        }
-        if let workflowStage {
-            values.append(workflowStage.rawValue)
-        }
-        if let inactiveReason {
-            values.append(inactiveReason.rawValue)
         }
         if let started = frontmatter["started"], !started.isEmpty {
             values.append(started)

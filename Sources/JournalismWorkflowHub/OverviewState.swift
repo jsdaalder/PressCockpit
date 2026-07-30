@@ -163,10 +163,15 @@ enum OverviewDeriver {
     }
 
     private static func shouldIncludeInOpenProjectList(_ item: WorkspaceItem) -> Bool {
-        item.section == .projects
-            && item.isProjectRoot
-            && item.lifecycleStatus != .archived
-            && item.lifecycleStatus != .done
+        guard item.section == .projects, item.isProjectRoot else {
+            return false
+        }
+
+        guard let projectState = item.projectState else {
+            return item.lifecycleStatus != .archived && item.lifecycleStatus != .done
+        }
+
+        return !(projectState.activityState == .inactive && projectState.inactiveReason == .finished)
     }
 
     private static func compareOpenProjectGroups(_ lhs: OverviewOpenProjectGroup, _ rhs: OverviewOpenProjectGroup) -> Bool {
