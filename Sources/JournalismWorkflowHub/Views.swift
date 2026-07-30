@@ -239,7 +239,7 @@ struct DetailView: View {
         case .capture:
             return "A dedicated intake surface for unassigned reporting material. Add files, folders, or a quick note now; items are stored locally in Capture first, then reviewed and filed into a project."
         case .planCenter:
-            return "Roadmap, backlog, architecture notes, and automation ideas."
+            return "Current priorities, roadmap, architecture notes, and planning workflow."
         case .publication:
             return "PDF-first archive mapping and missing-project review."
         case .workspace(let id):
@@ -1891,7 +1891,7 @@ struct PlanningCenterView: View {
         VStack(alignment: .leading, spacing: 18) {
             StatGridView(
                 stats: [
-                    StatCard(title: "Plan docs", value: "\(store.planningSnapshot.docs.count)", detail: "roadmap, backlog, decisions, automation"),
+                    StatCard(title: "Plan docs", value: "\(store.planningSnapshot.docs.count)", detail: "queue, roadmap, architecture, process"),
                     StatCard(title: "Project", value: store.planningSnapshot.projectTitle, detail: "living planning workspace"),
                     StatCard(title: "Location", value: shortPath(store.planningSnapshot.projectPath), detail: "separate from execution code")
                 ]

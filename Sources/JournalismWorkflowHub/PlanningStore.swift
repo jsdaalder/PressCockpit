@@ -27,17 +27,20 @@ struct PlanningStore {
         guard FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDirectory), isDirectory.boolValue else {
             return nil
         }
+        guard !isRepoLocalPlanningPointer(at: candidate) else {
+            return nil
+        }
         return candidate
     }
 
     private func loadDocuments(from projectRoot: URL) -> [PlanningDocument] {
         let docsDirectory = projectRoot.appendingPathComponent("docs", isDirectory: true)
         let orderedFiles = [
+            "current_priorities.md",
             "roadmap.md",
             "backlog.md",
             "architecture.md",
-            "automation_ideas.md",
-            "current_priorities.md"
+            "process/planning_workflow.md"
         ]
 
         return orderedFiles.compactMap { fileName -> PlanningDocument? in
@@ -65,6 +68,19 @@ struct PlanningStore {
 
         let fallbackTitle = "Journalism Workflow Hub Plan"
         return extractMarkdownTitle(from: text, fallback: fallbackTitle)
+    }
+
+    private func isRepoLocalPlanningPointer(at projectRoot: URL) -> Bool {
+        let readmeURL = projectRoot.appendingPathComponent("README.md")
+        guard let text = try? String(contentsOf: readmeURL, encoding: .utf8) else {
+            return false
+        }
+
+        if markdownFrontmatterValue(named: "project", in: text) == "journalism_workflow_hub_plan_repo_pointer" {
+            return true
+        }
+
+        return extractMarkdownTitle(from: text, fallback: "") == "Repo-Local Planning Pointer"
     }
 }
 
@@ -117,4 +133,25 @@ private func stripFrontmatter(from text: String) -> String {
     }
     guard let endIndex else { return text }
     return lines.dropFirst(endIndex + 1).joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+private func markdownFrontmatterValue(named key: String, in text: String) -> String? {
+    guard text.hasPrefix("---\n") else { return nil }
+
+    for line in text.components(separatedBy: .newlines).dropFirst() {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed == "---" {
+            return nil
+        }
+        guard let separatorIndex = trimmed.firstIndex(of: ":") else {
+            continue
+        }
+        let candidateKey = trimmed[..<separatorIndex].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard candidateKey == key else {
+            continue
+        }
+        return trimmed[trimmed.index(after: separatorIndex)...].trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    return nil
 }
