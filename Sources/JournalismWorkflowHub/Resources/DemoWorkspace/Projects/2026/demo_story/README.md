@@ -2,6 +2,7 @@
 type: project
 project: Demo Story
 status: active
+daily_focus: true
 project_type: journalism
 safety: internal
 started: 2026-07-06

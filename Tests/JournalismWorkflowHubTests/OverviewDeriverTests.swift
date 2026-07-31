@@ -22,7 +22,7 @@ final class OverviewDeriverTests: XCTestCase {
         )
     }
 
-    func testActiveProjectsExcludeToolingAndInactiveStatusesAndCapAtFour() {
+    func testFocusProjectsOnlyIncludeFocusedActiveReportingProjects() {
         let activeUnknown = makeProject(
             id: "active-unknown",
             title: "Active Unknown",
@@ -31,7 +31,8 @@ final class OverviewDeriverTests: XCTestCase {
             safety: .unknown,
             deliverable: "Story",
             hasAgents: true,
-            started: "2026-07-06"
+            started: "2026-07-06",
+            dailyFocus: true
         )
         let activeClear = makeProject(
             id: "active-clear",
@@ -41,7 +42,8 @@ final class OverviewDeriverTests: XCTestCase {
             safety: .internalOnly,
             deliverable: "Dataset",
             hasAgents: true,
-            started: "2026-07-05"
+            started: "2026-07-05",
+            dailyFocus: true
         )
         let activeNeedsBasics = makeProject(
             id: "active-basics",
@@ -51,7 +53,8 @@ final class OverviewDeriverTests: XCTestCase {
             safety: .internalOnly,
             deliverable: "",
             hasAgents: true,
-            started: "2026-07-04"
+            started: "2026-07-04",
+            dailyFocus: true
         )
         let activeNoStarted = makeProject(
             id: "active-no-started",
@@ -61,7 +64,8 @@ final class OverviewDeriverTests: XCTestCase {
             safety: .internalOnly,
             deliverable: "Story",
             hasAgents: true,
-            started: ""
+            started: "",
+            dailyFocus: true
         )
         let activeFifth = makeProject(
             id: "active-fifth",
@@ -115,7 +119,8 @@ final class OverviewDeriverTests: XCTestCase {
             safety: .unknown,
             deliverable: "",
             hasAgents: false,
-            started: "2026-07-06"
+            started: "2026-07-06",
+            dailyFocus: true
         )
         let snapshot = WorkspaceSnapshot(
             scannedAt: .now,
@@ -249,7 +254,7 @@ final class OverviewDeriverTests: XCTestCase {
         XCTAssertEqual(operations[2].target, .workspace(reviewProject.id))
     }
 
-    func testOpenProjectGroupsIncludeNonFinishedProjectsAndSortByWorkflowStage() {
+    func testOpenProjectGroupsShowNonFocusedActiveReportingProjectsByWorkflowStage() {
         let leadProject = makeProject(
             id: "lead-project",
             title: "Lead Project",
@@ -300,7 +305,8 @@ final class OverviewDeriverTests: XCTestCase {
             started: "2026-07-03",
             activityState: "active",
             workflowStage: "active_investigation",
-            inactiveReason: nil
+            inactiveReason: nil,
+            dailyFocus: true
         )
         let finishedProject = makeProject(
             id: "finished-project",
@@ -335,12 +341,10 @@ final class OverviewDeriverTests: XCTestCase {
             publication: .empty
         )
 
-        let groups = OverviewDeriver.openProjectGroups(from: snapshot)
+        let groups = OverviewDeriver.openProjectGroups(from: snapshot, runs: [])
 
-        XCTAssertEqual(groups.map(\.title), ["Lead", "Feasibility study", "Investigation"])
-        XCTAssertEqual(groups[0].items.map(\.title), ["Lead Project", "Tooling Utility"])
-        XCTAssertEqual(groups[1].items.map(\.title), ["Waiting Project"])
-        XCTAssertEqual(groups[2].items.map(\.title), ["Investigation Project"])
+        XCTAssertEqual(groups.map(\.title), ["Lead"])
+        XCTAssertEqual(groups[0].items.map(\.item.title), ["Lead Project"])
     }
 
     func testProjectSummariesCarryPrimaryDocuments() throws {
@@ -352,7 +356,8 @@ final class OverviewDeriverTests: XCTestCase {
             safety: .internalOnly,
             deliverable: "Story",
             hasAgents: true,
-            started: "2026-07-06"
+            started: "2026-07-06",
+            dailyFocus: true
         )
         let draft = WorkspaceDocument(
             id: "/tmp/docs/Artikel.gdoc",
@@ -434,7 +439,8 @@ final class OverviewDeriverTests: XCTestCase {
             safety: .internalOnly,
             deliverable: "Story",
             hasAgents: true,
-            started: "2026-07-06"
+            started: "2026-07-06",
+            dailyFocus: true
         )
         let pointerDraft = WorkspaceDocument(
             id: "/tmp/snapshot/Artikel.gdoc",
@@ -500,7 +506,8 @@ final class OverviewDeriverTests: XCTestCase {
             safety: .internalOnly,
             deliverable: "Story",
             hasAgents: true,
-            started: "2026-07-06"
+            started: "2026-07-06",
+            dailyFocus: true
         )
         let localDraft = WorkspaceDocument(
             id: "/tmp/promoted-google-draft/Draft - Promoted Google Draft.docx",
@@ -564,7 +571,8 @@ final class OverviewDeriverTests: XCTestCase {
             safety: .internalOnly,
             deliverable: "Story",
             hasAgents: true,
-            started: "2026-07-06"
+            started: "2026-07-06",
+            dailyFocus: true
         )
         let localDraft = WorkspaceDocument(
             id: "/tmp/mixed-draft-ownership/Draft - Mixed Draft Ownership.docx",
@@ -628,7 +636,8 @@ final class OverviewDeriverTests: XCTestCase {
             safety: .internalOnly,
             deliverable: "Story",
             hasAgents: true,
-            started: "2026-07-06"
+            started: "2026-07-06",
+            dailyFocus: true
         )
         let localDraft = WorkspaceDocument(
             id: "/tmp/local-draft/Draft.md",
@@ -680,7 +689,8 @@ final class OverviewDeriverTests: XCTestCase {
             safety: .unknown,
             deliverable: "",
             hasAgents: false,
-            started: "2026-07-06"
+            started: "2026-07-06",
+            dailyFocus: true
         )
         let failedRun = WorkflowRun(
             id: "run-1",
@@ -722,7 +732,8 @@ final class OverviewDeriverTests: XCTestCase {
         started: String,
         activityState: String? = nil,
         workflowStage: String? = nil,
-        inactiveReason: String? = nil
+        inactiveReason: String? = nil,
+        dailyFocus: Bool = false
     ) -> WorkspaceItem {
         let frontmatter = [
             "type": "project",
@@ -733,7 +744,8 @@ final class OverviewDeriverTests: XCTestCase {
             "deliverable": deliverable,
             "activity_state": activityState ?? "",
             "workflow_stage": workflowStage ?? "",
-            "inactive_reason": inactiveReason ?? ""
+            "inactive_reason": inactiveReason ?? "",
+            "daily_focus": dailyFocus ? "true" : ""
         ].filter { !$0.value.isEmpty }
 
         return WorkspaceItem(

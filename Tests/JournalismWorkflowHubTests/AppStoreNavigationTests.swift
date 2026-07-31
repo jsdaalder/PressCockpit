@@ -1078,7 +1078,7 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertEqual(store.selection, .workspace(dossier.id))
     }
 
-    func testPuttingProjectOnHoldUpdatesReadmeStatus() throws {
+    func testPuttingProjectOnHoldOpensCanonicalStateEditorBeforeWrite() throws {
         let workspaceRoot = try makeWorkspaceRoot()
         let store = AppStore(configuration: AppConfiguration(
             profile: .standalone,
@@ -1087,13 +1087,34 @@ final class AppStoreNavigationTests: XCTestCase {
         ))
 
         let project = try XCTUnwrap(store.snapshot.items.first(where: { $0.section == .projects }))
-        waitForCaptureAsyncWork {
-            store.beginProjectStatusChange(for: project, targetStatus: .onHold)
-        }
+        store.beginProjectStatusChange(for: project, targetStatus: .onHold)
 
-        let readmePath = workspaceRoot.appendingPathComponent("Projects/2026/demo_story/README.md").path
-        let readmeText = try String(contentsOfFile: readmePath, encoding: .utf8)
+        let state = try XCTUnwrap(store.projectStateEditState)
+        XCTAssertNil(store.projectStatusChangeState)
+        XCTAssertEqual(state.currentState.activityState, .active)
+        XCTAssertEqual(state.currentState.workflowStage, .activeInvestigation)
+        XCTAssertNil(state.currentState.inactiveReason)
+        XCTAssertFalse(state.currentIsInDailyFocus)
+        XCTAssertEqual(state.initialState.activityState, .inactive)
+        XCTAssertEqual(state.initialState.workflowStage, .activeInvestigation)
+        XCTAssertEqual(state.initialState.inactiveReason, .waiting)
+        XCTAssertFalse(state.initialIsInDailyFocus)
 
+        let readmePath = workspaceRoot.appendingPathComponent("Projects/2026/demo_story/README.md")
+        let unchangedReadmeText = try String(contentsOf: readmePath, encoding: .utf8)
+        XCTAssertTrue(unchangedReadmeText.contains("status: active"))
+
+        store.saveProjectStateEdit(
+            state,
+            activityState: state.initialState.activityState,
+            workflowStage: state.initialState.workflowStage,
+            inactiveReason: state.initialState.inactiveReason,
+            isInDailyFocus: state.initialIsInDailyFocus
+        )
+
+        let readmeText = try String(contentsOf: readmePath, encoding: .utf8)
+
+        XCTAssertNil(store.projectStateEditState)
         XCTAssertNil(store.projectStatusChangeState)
         XCTAssertTrue(readmeText.contains("activity_state: inactive"))
         XCTAssertTrue(readmeText.contains("workflow_stage: active_investigation"))
@@ -1117,7 +1138,8 @@ final class AppStoreNavigationTests: XCTestCase {
             state,
             activityState: .inactive,
             workflowStage: .feasibilityStudy,
-            inactiveReason: .discarded
+            inactiveReason: .discarded,
+            isInDailyFocus: true
         )
 
         let readmePath = workspaceRoot.appendingPathComponent("Projects/2026/demo_story/README.md")
@@ -1128,6 +1150,33 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertTrue(readmeText.contains("workflow_stage: feasibility_study"))
         XCTAssertTrue(readmeText.contains("inactive_reason: discarded"))
         XCTAssertTrue(readmeText.contains("status: on_hold"))
+        XCTAssertTrue(readmeText.contains("daily_focus: true"))
+    }
+
+    func testTogglingDailyFocusWritesTrustedFrontmatter() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+
+        let project = try XCTUnwrap(store.snapshot.items.first(where: { $0.section == .projects }))
+        XCTAssertFalse(project.isInDailyFocus)
+
+        store.toggleDailyFocus(for: project)
+
+        let readmePath = workspaceRoot.appendingPathComponent("Projects/2026/demo_story/README.md")
+        let focusedReadmeText = try String(contentsOf: readmePath, encoding: .utf8)
+        XCTAssertTrue(focusedReadmeText.contains("daily_focus: true"))
+
+        let refreshedProject = try XCTUnwrap(store.snapshot.items.first(where: { $0.id == project.id }))
+        XCTAssertTrue(refreshedProject.isInDailyFocus)
+
+        store.toggleDailyFocus(for: refreshedProject)
+
+        let unfocusedReadmeText = try String(contentsOf: readmePath, encoding: .utf8)
+        XCTAssertFalse(unfocusedReadmeText.contains("daily_focus: true"))
     }
 
     func testCompletingOffboardingUpdatesStatusAndCopiesPublishedPDF() throws {

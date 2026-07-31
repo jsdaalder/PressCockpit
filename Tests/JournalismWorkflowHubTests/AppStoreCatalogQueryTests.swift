@@ -90,6 +90,7 @@ final class AppStoreCatalogQueryTests: XCTestCase {
         type: project
         project: \(projectTitle)
         status: active
+        daily_focus: true
         project_type: journalism
         started: 2026-07-06
         deliverable: Story

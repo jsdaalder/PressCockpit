@@ -1,6 +1,20 @@
 import SwiftUI
 import AppKit
 
+func shouldShowHeaderActionMenu(
+    for selection: SidebarSelection,
+    workspaceItem: WorkspaceItem?
+) -> Bool {
+    switch selection {
+    case .overview, .capture:
+        return false
+    case .workspace:
+        return !(workspaceItem?.isProjectRoot ?? false)
+    default:
+        return true
+    }
+}
+
 struct SidebarView: View {
     @EnvironmentObject private var store: AppStore
 
@@ -293,12 +307,14 @@ struct DetailView: View {
     }
 
     private var showsHeaderActionMenu: Bool {
-        switch store.selection {
-        case .overview, .capture:
-            return false
-        default:
-            return true
+        let workspaceItem: WorkspaceItem?
+        if case .workspace(let id) = store.selection {
+            workspaceItem = store.workspaceItem(for: id)
+        } else {
+            workspaceItem = nil
         }
+
+        return shouldShowHeaderActionMenu(for: store.selection, workspaceItem: workspaceItem)
     }
 }
 
@@ -960,7 +976,7 @@ struct OverviewView: View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Active reporting projects first, then the next actions and follow-up work that should not surprise you later.")
+                    Text("Keep daily-focus stories on top, then handle the next actions and follow-up work that should not surprise you later.")
                         .font(.body)
                         .foregroundStyle(AppPalette.subtle)
 
@@ -970,7 +986,7 @@ struct OverviewView: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                Text("Active reporting projects first, then the next actions and follow-up work that should not surprise you later.")
+                Text("Keep daily-focus stories on top, then handle the next actions and follow-up work that should not surprise you later.")
                     .font(.body)
                     .foregroundStyle(AppPalette.subtle)
 
@@ -1040,16 +1056,16 @@ struct OverviewView: View {
     }
 
     private var activeProjectsSection: some View {
-        SectionCard(title: "Active Projects") {
+        SectionCard(title: "Focus Stories") {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Keep the live reporting desk in view first: a few active projects, compact and expandable.")
+                Text("Star the stories you are actively pushing right now so they stay at the top of the desk.")
                     .font(.subheadline)
                     .foregroundStyle(AppPalette.subtle)
 
                 if store.overviewProjectSummaries.isEmpty {
                     EmptyStateView(
-                        title: "No active reporting projects",
-                        message: "Add or activate a journalism project to make the home screen feel like a real editorial desk."
+                        title: "No focus stories yet",
+                        message: "Star the projects you are working on every day to keep them in the top section."
                     )
                     .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
@@ -1057,6 +1073,7 @@ struct OverviewView: View {
                         ForEach(Array(store.overviewProjectSummaries.enumerated()), id: \.element.id) { index, summary in
                             OverviewProjectRow(
                                 summary: summary,
+                                stateMenuLabel: "Project state",
                                 isExpanded: expandedProjectIDs.contains(summary.id),
                                 toggleExpanded: { toggleExpanded(for: summary.id) },
                                 primaryAction: { store.openOverviewTarget(summary.primaryTarget) }
@@ -1075,42 +1092,34 @@ struct OverviewView: View {
     }
 
     private var openProjectsSection: some View {
-        SectionCard(title: "Open Projects") {
+        SectionCard(title: "Other Active Projects") {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Everything not archived or finished, kept as a long compact list and grouped by workflow stage.")
+                Text("Active reporting projects that are still live, but not currently in your daily focus, grouped by workflow stage.")
                     .font(.subheadline)
                     .foregroundStyle(AppPalette.subtle)
 
                 if store.overviewOpenProjectGroups.isEmpty {
-                    Text("No additional open projects are visible right now.")
+                    Text("No additional active projects are visible right now.")
                         .font(.body)
                         .foregroundStyle(AppPalette.subtle)
                 } else {
                     VStack(alignment: .leading, spacing: 14) {
                         ForEach(store.overviewOpenProjectGroups) { group in
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(group.title)
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(AppPalette.subtle)
-                                    .textCase(.uppercase)
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(group.title)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(AppPalette.subtle)
+                                        .textCase(.uppercase)
 
                                 VStack(alignment: .leading, spacing: 0) {
-                                    ForEach(Array(group.items.enumerated()), id: \.element.id) { index, item in
-                                        Button {
-                                            store.select(.workspace(item.id))
-                                        } label: {
-                                            HStack {
-                                                Text(item.title)
-                                                    .font(.body.weight(.medium))
-                                                    .foregroundStyle(AppPalette.title)
-                                                    .multilineTextAlignment(.leading)
-                                                Spacer(minLength: 0)
-                                            }
-                                            .contentShape(Rectangle())
-                                            .padding(.vertical, 9)
-                                        }
-                                        .buttonStyle(.plain)
-                                        .help("Open this project in the app")
+                                    ForEach(Array(group.items.enumerated()), id: \.element.id) { index, summary in
+                                        OverviewProjectRow(
+                                            summary: summary,
+                                            stateMenuLabel: "Project state",
+                                            isExpanded: expandedProjectIDs.contains(summary.id),
+                                            toggleExpanded: { toggleExpanded(for: summary.id) },
+                                            primaryAction: { store.openOverviewTarget(summary.primaryTarget) }
+                                        )
 
                                         if index < group.items.count - 1 {
                                             Divider()
@@ -2300,6 +2309,7 @@ struct SuggestedActionRow: View {
 struct OverviewProjectRow: View {
     @EnvironmentObject private var store: AppStore
     let summary: OverviewProjectSummary
+    let stateMenuLabel: String
     let isExpanded: Bool
     let toggleExpanded: () -> Void
     let primaryAction: () -> Void
@@ -2348,6 +2358,19 @@ struct OverviewProjectRow: View {
                     }
                 }
                 Spacer()
+
+                Button {
+                    store.toggleDailyFocus(for: summary.item)
+                } label: {
+                    Image(systemName: summary.item.isInDailyFocus ? "star.fill" : "star")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(summary.item.isInDailyFocus ? Color.accentColor : AppPalette.subtle)
+                        .frame(width: 28, height: 28)
+                        .background(AppPalette.card.opacity(0.98), in: Circle())
+                        .overlay(Circle().stroke(AppPalette.border))
+                }
+                .buttonStyle(.plain)
+                .help(summary.item.isInDailyFocus ? "Remove from daily focus" : "Add to daily focus")
 
                 Button(action: toggleExpanded) {
                     Label(isExpanded ? "Less" : "More", systemImage: isExpanded ? "chevron.up" : "chevron.down")
@@ -2418,7 +2441,7 @@ struct OverviewProjectRow: View {
                         }
                         .buttonStyle(.plain)
 
-                        changeStatusMenu
+                        stateMenu
                     }
 
                     HStack(spacing: 12) {
@@ -2455,8 +2478,30 @@ struct OverviewProjectRow: View {
         .padding(.vertical, 12)
     }
 
-    private var changeStatusMenu: some View {
+    private var stateMenu: some View {
         Menu {
+            Button("Edit project state…") {
+                store.beginProjectStateEditing(for: summary.item)
+            }
+
+            Divider()
+
+            Button(summary.item.isInDailyFocus ? "Remove from daily focus" : "Add to daily focus") {
+                store.toggleDailyFocus(for: summary.item)
+            }
+
+            Divider()
+
+            Button("Mark active") {
+                store.beginProjectStatusChange(for: summary.item, targetStatus: .active)
+            }
+
+            Button("Put on hold") {
+                store.beginProjectStatusChange(for: summary.item, targetStatus: .onHold)
+            }
+
+            Divider()
+
             Button("Mark finished…") {
                 store.beginProjectStatusChange(for: summary.item, targetStatus: .done)
             }
@@ -2464,16 +2509,10 @@ struct OverviewProjectRow: View {
             Button("Archive…") {
                 store.beginProjectStatusChange(for: summary.item, targetStatus: .archived)
             }
-
-            Divider()
-
-            Button("Put on hold") {
-                store.beginProjectStatusChange(for: summary.item, targetStatus: .onHold)
-            }
         } label: {
             OverviewProjectActionLabel(
-                title: "Quick state change",
-                systemImage: "arrow.triangle.2.circlepath",
+                title: stateMenuLabel,
+                systemImage: "slider.horizontal.3",
                 trailingSystemImage: "chevron.down"
             )
         }
@@ -2577,12 +2616,14 @@ struct ProjectStateEditorSheet: View {
     @State private var activityState: ProjectActivityState
     @State private var workflowStage: ProjectWorkflowStage
     @State private var inactiveReason: ProjectInactiveReason?
+    @State private var isInDailyFocus: Bool
 
     init(state: ProjectStateEditState) {
         self.state = state
-        _activityState = State(initialValue: state.currentState.activityState)
-        _workflowStage = State(initialValue: state.currentState.workflowStage)
-        _inactiveReason = State(initialValue: state.currentState.inactiveReason)
+        _activityState = State(initialValue: state.initialState.activityState)
+        _workflowStage = State(initialValue: state.initialState.workflowStage)
+        _inactiveReason = State(initialValue: state.initialState.inactiveReason)
+        _isInDailyFocus = State(initialValue: state.initialIsInDailyFocus)
     }
 
     var body: some View {
@@ -2592,7 +2633,7 @@ struct ProjectStateEditorSheet: View {
                     .font(.system(.title2, design: .serif).weight(.semibold))
                     .foregroundStyle(AppPalette.title)
 
-                Text("Use activity, workflow stage, and inactive reason to describe the project accurately. Safety stays separate.")
+                Text("Use activity, workflow stage, inactive reason, and daily focus to describe the project accurately. Safety stays separate.")
                     .font(.subheadline)
                     .foregroundStyle(AppPalette.subtle)
             }
@@ -2623,6 +2664,9 @@ struct ProjectStateEditorSheet: View {
                     .pickerStyle(.menu)
                 }
 
+                Toggle("Show in daily focus", isOn: $isInDailyFocus)
+                    .toggleStyle(.switch)
+
                 if activityState == .inactive {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Inactive reason")
@@ -2650,7 +2694,8 @@ struct ProjectStateEditorSheet: View {
                         state,
                         activityState: activityState,
                         workflowStage: workflowStage,
-                        inactiveReason: inactiveReason
+                        inactiveReason: inactiveReason,
+                        isInDailyFocus: isInDailyFocus
                     )
                 }
                 .keyboardShortcut(.defaultAction)

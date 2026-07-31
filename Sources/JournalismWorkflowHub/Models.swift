@@ -582,6 +582,9 @@ struct ProjectStateEditState: Identifiable, Hashable {
     let readmePath: String
     let projectTitle: String
     let currentState: ProjectState
+    let initialState: ProjectState
+    let currentIsInDailyFocus: Bool
+    let initialIsInDailyFocus: Bool
     let isArchivedStorage: Bool
 }
 
@@ -933,6 +936,9 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
         if let started = frontmatter["started"], !started.isEmpty {
             values.append(started)
         }
+        if isInDailyFocus {
+            values.append("daily_focus")
+        }
         values.append(projectType.label)
         values.append(safetyPosture.label)
         return values
@@ -982,6 +988,11 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
             ?? ProjectLifecycleStatus.from(frontmatterStatus: frontmatter["status"])
     }
 
+    var isInDailyFocus: Bool {
+        guard isProjectRoot else { return false }
+        return frontmatterBoolean(frontmatter["daily_focus"])
+    }
+
     var dossierSlug: String? {
         let value = frontmatter["dossier"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return value.isEmpty ? nil : value
@@ -1006,6 +1017,7 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
             ))
         }
 
+        rows.append(("Daily focus", isInDailyFocus ? "Yes" : "No"))
         rows.append(("Dossier", dossierSlug ?? "None linked yet"))
 
         if let draft = canonicalDraftDocument {
@@ -1279,6 +1291,20 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
         return String(mappedScalars)
             .replacingOccurrences(of: "_+", with: "_", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+    }
+}
+
+private func frontmatterBoolean(_ value: String?) -> Bool {
+    guard let normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+          !normalized.isEmpty else {
+        return false
+    }
+
+    switch normalized {
+    case "true", "yes", "1", "on":
+        return true
+    default:
+        return false
     }
 }
 

@@ -161,7 +161,7 @@ final class AppStore: ObservableObject {
     }
 
     var overviewOpenProjectGroups: [OverviewOpenProjectGroup] {
-        OverviewDeriver.openProjectGroups(from: workspaceQueries.snapshot)
+        OverviewDeriver.openProjectGroups(from: workspaceQueries.snapshot, runs: runs)
     }
 
     var overviewActions: [OverviewActionSummary] {
@@ -324,20 +324,20 @@ final class AppStore: ObservableObject {
         }
 
         let updatedState = quickProjectState(for: targetStatus, basedOn: currentProjectState)
-        updateProjectState(
-            updatedState,
-            for: item,
-            compatibilityStatusOverride: updatedState.legacyLifecycleStatus(isArchivedStorage: item.section == .archives)
-        )
+        beginProjectStateEditing(for: item, initialState: updatedState, readmePathOverride: readmePath)
     }
 
     func dismissProjectStatusChange() {
         projectStatusChangeState = nil
     }
 
-    func beginProjectStateEditing(for item: WorkspaceItem) {
+    func beginProjectStateEditing(
+        for item: WorkspaceItem,
+        initialState: ProjectState? = nil,
+        readmePathOverride: String? = nil
+    ) {
         guard item.isProjectRoot else { return }
-        guard let readmePath = item.readmePath else {
+        guard let readmePath = readmePathOverride ?? item.readmePath else {
             activeAlert = AppAlert(
                 title: "Missing README",
                 message: "This project does not have a root README.md to update."
@@ -357,6 +357,9 @@ final class AppStore: ObservableObject {
             readmePath: readmePath,
             projectTitle: item.title,
             currentState: currentState,
+            initialState: initialState ?? currentState,
+            currentIsInDailyFocus: item.isInDailyFocus,
+            initialIsInDailyFocus: item.isInDailyFocus,
             isArchivedStorage: item.section == .archives
         )
     }
@@ -365,11 +368,16 @@ final class AppStore: ObservableObject {
         projectStateEditState = nil
     }
 
+    func toggleDailyFocus(for item: WorkspaceItem) {
+        updateProjectDailyFocus(!item.isInDailyFocus, for: item)
+    }
+
     func saveProjectStateEdit(
         _ state: ProjectStateEditState,
         activityState: ProjectActivityState,
         workflowStage: ProjectWorkflowStage,
-        inactiveReason: ProjectInactiveReason?
+        inactiveReason: ProjectInactiveReason?,
+        isInDailyFocus: Bool
     ) {
         guard let item = snapshot.items.first(where: { $0.id == state.projectID }) else {
             activeAlert = AppAlert(
@@ -393,8 +401,9 @@ final class AppStore: ObservableObject {
             inactiveReason: activityState == .active ? nil : inactiveReason
         )
 
-        updateProjectState(
+        updateProjectMetadata(
             normalizedState,
+            isInDailyFocus: isInDailyFocus,
             for: item,
             compatibilityStatusOverride: normalizedState.legacyLifecycleStatus(isArchivedStorage: state.isArchivedStorage)
         )
@@ -2132,6 +2141,36 @@ final class AppStore: ObservableObject {
         for item: WorkspaceItem,
         compatibilityStatusOverride: ProjectLifecycleStatus? = nil
     ) {
+        updateProjectMetadata(
+            projectState,
+            isInDailyFocus: item.isInDailyFocus,
+            for: item,
+            compatibilityStatusOverride: compatibilityStatusOverride
+        )
+    }
+
+    private func updateProjectDailyFocus(_ isInDailyFocus: Bool, for item: WorkspaceItem) {
+        let projectState = item.projectState ?? ProjectState(
+            activityState: .active,
+            workflowStage: .activeInvestigation,
+            inactiveReason: nil
+        )
+        let compatibilityStatus = item.compatibilityStatus
+            ?? projectState.legacyLifecycleStatus(isArchivedStorage: item.section == .archives)
+        updateProjectMetadata(
+            projectState,
+            isInDailyFocus: isInDailyFocus,
+            for: item,
+            compatibilityStatusOverride: compatibilityStatus
+        )
+    }
+
+    private func updateProjectMetadata(
+        _ projectState: ProjectState,
+        isInDailyFocus: Bool,
+        for item: WorkspaceItem,
+        compatibilityStatusOverride: ProjectLifecycleStatus? = nil
+    ) {
         guard let readmePath = item.readmePath else {
             activeAlert = AppAlert(
                 title: "Missing README",
@@ -2152,10 +2191,16 @@ final class AppStore: ObservableObject {
                     to: &frontmatter,
                     orderedKeys: &orderedKeys
                 )
+                applyDailyFocusFrontmatter(
+                    isInDailyFocus,
+                    to: &frontmatter,
+                    orderedKeys: &orderedKeys
+                )
             }
             try updatedText.write(to: readmeURL, atomically: true, encoding: .utf8)
             reloadWorkspace()
-            statusMessage = "\(item.title) updated to \(projectState.detailLabel.lowercased())"
+            let focusSummary = isInDailyFocus ? "in daily focus" : "out of daily focus"
+            statusMessage = "\(item.title) updated to \(projectState.detailLabel.lowercased()) and \(focusSummary)"
         } catch {
             activeAlert = AppAlert(
                 title: "Could not update project state",
@@ -2567,6 +2612,21 @@ private func applyProjectStateFrontmatter(
 
     for key in ["activity_state", "workflow_stage", "inactive_reason", "status"] where !orderedKeys.contains(key) {
         orderedKeys.append(key)
+    }
+}
+
+private func applyDailyFocusFrontmatter(
+    _ isInDailyFocus: Bool,
+    to frontmatter: inout [String: String],
+    orderedKeys: inout [String]
+) {
+    if isInDailyFocus {
+        frontmatter["daily_focus"] = "true"
+        if !orderedKeys.contains("daily_focus") {
+            orderedKeys.append("daily_focus")
+        }
+    } else {
+        frontmatter.removeValue(forKey: "daily_focus")
     }
 }
 

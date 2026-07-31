@@ -44,7 +44,7 @@ struct OverviewOperationSummary: Identifiable, Hashable {
 struct OverviewOpenProjectGroup: Identifiable, Hashable {
     let id: String
     let title: String
-    let items: [WorkspaceItem]
+    let items: [OverviewProjectSummary]
 }
 
 enum OverviewDeriver {
@@ -58,7 +58,7 @@ enum OverviewDeriver {
             }
     }
 
-    static func openProjectGroups(from snapshot: WorkspaceSnapshot) -> [OverviewOpenProjectGroup] {
+    static func openProjectGroups(from snapshot: WorkspaceSnapshot, runs: [WorkflowRun]) -> [OverviewOpenProjectGroup] {
         let grouped = Dictionary(grouping: snapshot.items.filter(shouldIncludeInOpenProjectList)) { item in
             item.workflowStage
         }
@@ -68,26 +68,19 @@ enum OverviewDeriver {
                 OverviewOpenProjectGroup(
                     id: workflowStage?.rawValue ?? "unstaged",
                     title: workflowStage?.label ?? "Unstaged",
-                    items: items.sorted(by: compareOpenProjectListItems)
+                    items: items
+                        .sorted(by: compareOpenProjectListItems)
+                        .map { summary(for: $0, runs: runs) }
                 )
             }
             .sorted(by: compareOpenProjectGroups)
     }
 
     static func projectSummaries(from snapshot: WorkspaceSnapshot, runs: [WorkflowRun]) -> [OverviewProjectSummary] {
-        Array(activeReportingProjects(from: snapshot).sorted { compareProjects($0, $1, runs: runs) }.prefix(4)).map { item in
-            let flags = projectFlags(for: item, runs: runs)
-            return OverviewProjectSummary(
-                item: item,
-                flags: flags,
-                displayFlags: displayFlags(from: flags),
-                stateBadgeText: item.projectStateBadgeLabel,
-                nextStep: nextStep(for: item, flags: flags),
-                primaryDocuments: item.primaryDocuments,
-                primaryTarget: .workspace(item.id),
-                primaryButtonTitle: "Open in app"
-            )
-        }
+        activeReportingProjects(from: snapshot)
+            .filter(\.isInDailyFocus)
+            .sorted { compareProjects($0, $1, runs: runs) }
+            .map { summary(for: $0, runs: runs) }
     }
 
     static func suggestedActions(from snapshot: WorkspaceSnapshot, runs: [WorkflowRun]) -> [OverviewActionSummary] {
@@ -174,20 +167,19 @@ enum OverviewDeriver {
     }
 
     private static func shouldIncludeInOpenProjectList(_ item: WorkspaceItem) -> Bool {
-        guard item.section == .projects, item.isProjectRoot else {
+        guard item.section == .projects,
+              item.isProjectRoot,
+              isReportingProjectType(item.projectType),
+              item.activityState == .active else {
             return false
         }
 
-        guard let projectState = item.projectState else {
-            return item.compatibilityStatus != .archived && item.compatibilityStatus != .done
-        }
-
-        return !(projectState.activityState == .inactive && projectState.inactiveReason == .finished)
+        return !item.isInDailyFocus
     }
 
     private static func compareOpenProjectGroups(_ lhs: OverviewOpenProjectGroup, _ rhs: OverviewOpenProjectGroup) -> Bool {
-        let lhsStage = lhs.items.first?.workflowStage
-        let rhsStage = rhs.items.first?.workflowStage
+        let lhsStage = lhs.items.first?.item.workflowStage
+        let rhsStage = rhs.items.first?.item.workflowStage
         let lhsPriority = workflowStagePriority(lhsStage)
         let rhsPriority = workflowStagePriority(rhsStage)
         if lhsPriority != rhsPriority {
@@ -232,6 +224,20 @@ enum OverviewDeriver {
         }
 
         return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+    }
+
+    private static func summary(for item: WorkspaceItem, runs: [WorkflowRun]) -> OverviewProjectSummary {
+        let flags = projectFlags(for: item, runs: runs)
+        return OverviewProjectSummary(
+            item: item,
+            flags: flags,
+            displayFlags: displayFlags(from: flags),
+            stateBadgeText: item.projectStateBadgeLabel,
+            nextStep: nextStep(for: item, flags: flags),
+            primaryDocuments: item.primaryDocuments,
+            primaryTarget: .workspace(item.id),
+            primaryButtonTitle: "Open in app"
+        )
     }
 
     private static func projectFlags(for item: WorkspaceItem, runs: [WorkflowRun]) -> [String] {

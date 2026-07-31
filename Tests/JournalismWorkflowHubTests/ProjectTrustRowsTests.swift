@@ -16,6 +16,7 @@ final class ProjectTrustRowsTests: XCTestCase {
         XCTAssertEqual(value(for: "Workflow stage", in: item.projectTrustRows), "Investigation")
         XCTAssertNil(value(for: "Inactive reason", in: item.projectTrustRows))
         XCTAssertEqual(value(for: "State source", in: item.projectTrustRows), "Explicit frontmatter")
+        XCTAssertEqual(value(for: "Daily focus", in: item.projectTrustRows), "No")
         XCTAssertEqual(value(for: "Dossier", in: item.projectTrustRows), "None linked yet")
         XCTAssertEqual(value(for: "Canonical draft", in: item.projectTrustRows), "Not decided yet")
         XCTAssertEqual(value(for: "Handling", in: item.projectTrustRows), "Needs review")
@@ -36,6 +37,20 @@ final class ProjectTrustRowsTests: XCTestCase {
         XCTAssertEqual(value(for: "Workflow stage", in: item.projectTrustRows), "Feasibility study")
         XCTAssertEqual(value(for: "Inactive reason", in: item.projectTrustRows), "Waiting")
         XCTAssertEqual(value(for: "State source", in: item.projectTrustRows), "Explicit frontmatter")
+    }
+
+    func testProjectTrustRowsShowDailyFocusWhenEnabled() {
+        let item = makeProject(
+            id: "focus-project",
+            title: "Focus Project",
+            frontmatter: [
+                "activity_state": "active",
+                "workflow_stage": "active_investigation",
+                "daily_focus": "true"
+            ]
+        )
+
+        XCTAssertEqual(value(for: "Daily focus", in: item.projectTrustRows), "Yes")
     }
 
     func testFinishedProjectTrustRowsRespectLegacyFallback() {
