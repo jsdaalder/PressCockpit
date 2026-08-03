@@ -1040,6 +1040,38 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
         return value.isEmpty ? nil : value
     }
 
+    var projectDetailRows: [(String, String)] {
+        var rows: [(String, String)] = [
+            ("Project", title),
+            ("Project kind", projectType.label),
+            ("Activity state", activityState?.label ?? "Not set"),
+            ("Workflow stage", workflowStage?.label ?? "Not set")
+        ]
+
+        if activityState == .inactive {
+            rows.append(("Inactive reason", inactiveReason?.label ?? "Not set"))
+        }
+
+        rows.append(("Daily focus", isInDailyFocus ? "Yes" : "No"))
+        rows.append(("Dossier", dossierSlug ?? "None linked yet"))
+        rows.append(("Handling", safetyPosture.label))
+        return rows
+    }
+
+    var workingDocumentRows: [(String, String)] {
+        var rows: [(String, String)] = []
+
+        if let draft = canonicalDraftDocument {
+            rows.append(("Canonical draft", draft.title))
+            rows.append(("Draft target", draftOwnershipSummary(for: draft)))
+        } else {
+            rows.append(("Canonical draft", "Not decided yet"))
+        }
+
+        rows.append(("Pitch", pitchDocument?.title ?? "None linked yet"))
+        return rows
+    }
+
     var projectTrustRows: [(String, String)] {
         var rows: [(String, String)] = [
             ("Project", title),
@@ -1084,6 +1116,10 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
 
     var canonicalDraftDocument: WorkspaceDocument? {
         preferredCanonicalDocument(for: .draft)
+    }
+
+    var pitchDocument: WorkspaceDocument? {
+        preferredCanonicalDocument(for: .pitch)
     }
 
     var overviewShortcutDocuments: [WorkspaceDocument] {

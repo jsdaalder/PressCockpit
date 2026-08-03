@@ -1189,7 +1189,7 @@ struct WorkspaceDetailView: View {
                         )
                     }
 
-                    SectionCard(title: "Project trust") {
+                    SectionCard(title: "Project details") {
                         if let editState, editState.projectID == item.id {
                             Button("Cancel") {
                                 store.dismissProjectDetailsEdit()
@@ -1210,7 +1210,7 @@ struct WorkspaceDetailView: View {
                         }
                     } content: {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("This is the trusted project surface: keep the title, project kind, newsroom state, draft ownership, and dossier context accurate here before you do anything else.")
+                            Text("Keep the trusted project title, newsroom state, dossier link, and handling accurate here.")
                                 .font(.subheadline)
                                 .foregroundStyle(AppPalette.subtle)
 
@@ -1218,21 +1218,9 @@ struct WorkspaceDetailView: View {
                                 ProjectTrustInlineEditor(item: item, state: editState)
                                     .environmentObject(store)
                             } else {
-                                MetadataGrid(rows: item.projectTrustRows)
+                                MetadataGrid(rows: item.projectDetailRows)
 
                                 HStack(spacing: 12) {
-                                    if item.canonicalDraftDocument != nil {
-                                        Button {
-                                            store.openPreferredDraft(for: item)
-                                        } label: {
-                                            Label("Open draft", systemImage: "doc.text")
-                                        }
-                                    }
-                                    Button {
-                                        store.openPath(item.docsDirectoryURL.path)
-                                    } label: {
-                                        Label("Open docs folder", systemImage: "folder")
-                                    }
                                     projectActionMenu
                                 }
                                 .buttonStyle(.bordered)
@@ -1242,11 +1230,38 @@ struct WorkspaceDetailView: View {
                         }
                     }
 
-                    SectionCard(title: "Supporting documents") {
+                    SectionCard(title: "Working documents") {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("These are the root-level drafts, notes, pointers, and local copies the scanner found.")
+                            Text("Keep the canonical draft, pitch, and root-level project documents aligned here.")
                                 .font(.subheadline)
                                 .foregroundStyle(AppPalette.subtle)
+
+                            MetadataGrid(rows: item.workingDocumentRows)
+
+                            HStack(spacing: 12) {
+                                if item.canonicalDraftDocument != nil {
+                                    Button {
+                                        store.openPreferredDraft(for: item)
+                                    } label: {
+                                        Label("Open draft", systemImage: "doc.text")
+                                    }
+                                }
+                                if let pitch = item.pitchDocument {
+                                    Button {
+                                        store.openDocument(pitch)
+                                    } label: {
+                                        Label("Open pitch", systemImage: "note.text")
+                                    }
+                                }
+                                Button {
+                                    store.openPath(item.docsDirectoryURL.path)
+                                } label: {
+                                    Label("Open docs folder", systemImage: "folder")
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .tint(AppPalette.title)
 
                             HStack(spacing: 12) {
                                 Button("Attach docs…") {
@@ -1255,6 +1270,16 @@ struct WorkspaceDetailView: View {
                                 if let googleDriveURL = item.googleDriveURL {
                                     Button("Open Drive folder") {
                                         store.openURL(googleDriveURL)
+                                    }
+                                }
+                                if item.hasDocsOverview {
+                                    Button("Open docs overview") {
+                                        store.openDocsOverview(for: item)
+                                    }
+                                }
+                                if store.shouldOfferGoogleDraftPromotion(for: item) {
+                                    Button("Promote Google draft…") {
+                                        store.promoteGoogleDraft(for: item)
                                     }
                                 }
                             }
@@ -1348,16 +1373,6 @@ struct WorkspaceDetailView: View {
                 if item.dossierSlug != nil {
                     Button("Open dossier") {
                         store.openLinkedDossier(for: item)
-                    }
-                }
-                if item.hasDocsOverview {
-                    Button("Open docs overview") {
-                        store.openDocsOverview(for: item)
-                    }
-                }
-                if store.shouldOfferGoogleDraftPromotion(for: item) {
-                    Button("Promote Google draft…") {
-                        store.promoteGoogleDraft(for: item)
                     }
                 }
 
@@ -2754,7 +2769,10 @@ struct ProjectTrustInlineEditor: View {
             "Activity state",
             "Workflow stage",
             "Inactive reason",
-            "Daily focus"
+            "Daily focus",
+            "Canonical draft",
+            "Draft target",
+            "Pitch"
         ]
         return item.projectTrustRows.filter { !editableKeys.contains($0.0) }
     }
