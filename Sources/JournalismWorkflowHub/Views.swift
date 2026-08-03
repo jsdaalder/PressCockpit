@@ -1182,6 +1182,19 @@ struct WorkspaceDetailView: View {
             if let item {
                 VStack(alignment: .leading, spacing: 16) {
                     SectionCard(title: "Project trust") {
+                        if let editState, editState.projectID == item.id {
+                            EmptyView()
+                        } else {
+                            Button {
+                                store.beginProjectDetailsEditing(for: item)
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                            .buttonStyle(.borderless)
+                            .controlSize(.small)
+                            .tint(AppPalette.title)
+                        }
+                    } content: {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("This is the trusted project surface: keep the title, project kind, newsroom state, draft ownership, and dossier context accurate here before you do anything else.")
                                 .font(.subheadline)
@@ -1195,15 +1208,16 @@ struct WorkspaceDetailView: View {
 
                                 HStack(spacing: 12) {
                                     if item.canonicalDraftDocument != nil {
-                                        Button("Open draft") {
+                                        Button {
                                             store.openPreferredDraft(for: item)
+                                        } label: {
+                                            Label("Open draft", systemImage: "doc.text")
                                         }
                                     }
-                                    Button("Open docs folder") {
+                                    Button {
                                         store.openPath(item.docsDirectoryURL.path)
-                                    }
-                                    Button("Edit project details…") {
-                                        store.beginProjectDetailsEditing(for: item)
+                                    } label: {
+                                        Label("Open docs folder", systemImage: "folder")
                                     }
                                     projectActionMenu
                                 }
@@ -1984,20 +1998,36 @@ struct WorkflowAvailabilityBadge: View {
     }
 }
 
-struct SectionCard<Content: View>: View {
+struct SectionCard<HeaderAccessory: View, Content: View>: View {
     let title: String
+    let headerAccessory: HeaderAccessory
     let content: Content
 
-    init(title: String, @ViewBuilder content: () -> Content) {
+    init(title: String, @ViewBuilder content: () -> Content) where HeaderAccessory == EmptyView {
         self.title = title
+        self.headerAccessory = EmptyView()
+        self.content = content()
+    }
+
+    init(
+        title: String,
+        @ViewBuilder headerAccessory: () -> HeaderAccessory,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.headerAccessory = headerAccessory()
         self.content = content()
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(title)
-                .font(.headline)
-                .foregroundStyle(AppPalette.title)
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(AppPalette.title)
+                Spacer()
+                headerAccessory
+            }
             content
         }
         .padding(18)
@@ -2069,6 +2099,7 @@ struct KeyValueRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             Spacer()
         }
+        .frame(minHeight: 28, alignment: .topLeading)
     }
 
     private var displayValue: String {
@@ -2499,6 +2530,7 @@ struct ProjectTrustInlineEditor: View {
             EditableMetadataRow(label: "Project") {
                 TextField("Project title", text: $projectTitle)
                     .textFieldStyle(.roundedBorder)
+                    .controlSize(.small)
             }
 
             EditableMetadataRow(label: "Project kind") {
@@ -2509,6 +2541,7 @@ struct ProjectTrustInlineEditor: View {
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
+                .controlSize(.small)
             }
 
             EditableMetadataRow(label: "Activity state") {
@@ -2519,6 +2552,7 @@ struct ProjectTrustInlineEditor: View {
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
+                .controlSize(.small)
             }
 
             EditableMetadataRow(label: "Workflow stage") {
@@ -2529,6 +2563,7 @@ struct ProjectTrustInlineEditor: View {
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
+                .controlSize(.small)
             }
 
             EditableMetadataRow(label: "Daily focus") {
@@ -2539,7 +2574,7 @@ struct ProjectTrustInlineEditor: View {
                         Image(systemName: isInDailyFocus ? "star.fill" : "star")
                             .font(.body.weight(.semibold))
                             .foregroundStyle(isInDailyFocus ? Color.accentColor : AppPalette.subtle)
-                            .frame(width: 28, height: 28)
+                            .frame(width: 24, height: 24)
                             .background(AppPalette.card.opacity(0.98), in: Circle())
                             .overlay(Circle().stroke(AppPalette.border))
 
@@ -2561,6 +2596,7 @@ struct ProjectTrustInlineEditor: View {
                     }
                     .pickerStyle(.menu)
                     .labelsHidden()
+                    .controlSize(.small)
                 }
             }
 
@@ -2639,6 +2675,7 @@ struct EditableMetadataRow<Content: View>: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             Spacer()
         }
+        .frame(minHeight: 28, alignment: .topLeading)
     }
 }
 
