@@ -867,6 +867,49 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: URL(fileURLWithPath: destinationPath).appendingPathComponent("transcript.txt").path))
     }
 
+    func testAssignCaptureRecordFailureKeepsItemInTriage() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        let supportRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let captureStore = CaptureStore(workspaceRoot: workspaceRoot, supportDirectory: supportRoot)
+        let store = AppStore(
+            configuration: AppConfiguration(
+                profile: .standalone,
+                workspaceRoot: workspaceRoot,
+                demoWorkspaceRoot: nil
+            ),
+            captureStore: captureStore
+        )
+
+        let incomingRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: incomingRoot, withIntermediateDirectories: true, attributes: nil)
+        let fileURL = incomingRoot.appendingPathComponent("source_story.pdf")
+        try Data("pdf".utf8).write(to: fileURL)
+
+        waitForCaptureAsyncWork {
+            await store.importCaptureItems(from: [fileURL])
+        }
+
+        let record = try XCTUnwrap(store.captureRecords.first)
+        let project = try XCTUnwrap(store.captureAssignmentTargets.first(where: { $0.section == .projects }))
+        let docsPath = URL(fileURLWithPath: project.path).appendingPathComponent("docs").path
+        try "block docs folder creation".write(toFile: docsPath, atomically: true, encoding: .utf8)
+
+        waitForCaptureAsyncWork {
+            await store.assignCaptureRecord(record.id, to: project, note: "Useful for the main story.")
+        }
+
+        let failedAssignment = try XCTUnwrap(store.captureRecords.first)
+        let alert = try XCTUnwrap(store.activeAlert)
+
+        XCTAssertEqual(failedAssignment.state, .needsReview)
+        XCTAssertEqual(failedAssignment.userNote, "Useful for the main story.")
+        XCTAssertNotNil(failedAssignment.failureDescription)
+        XCTAssertEqual(store.captureTriageRecords.count, 1)
+        XCTAssertEqual(store.captureFailedRecords.count, 0)
+        XCTAssertEqual(alert.title, "Could not assign capture item")
+        XCTAssertEqual(store.statusMessage, "Could not assign source_story.pdf")
+    }
+
     func testCreatePlaceholderProjectFromCaptureRecordScaffoldsProjectAndAssignsStoredCopy() throws {
         let workspaceRoot = try makeWorkspaceRoot()
         let supportRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -997,6 +1040,23 @@ final class AppStoreNavigationTests: XCTestCase {
             includeArchivedProject: true,
             includeNestedAreaReadmes: true
         )
+        let discardedProject = workspaceRoot.appendingPathComponent("Projects/2026/discarded_lead")
+        try FileManager.default.createDirectory(at: discardedProject, withIntermediateDirectories: true, attributes: nil)
+        try """
+        ---
+        type: project
+        project: Discarded Lead
+        activity_state: inactive
+        workflow_stage: feasibility_study
+        inactive_reason: discarded
+        status: on_hold
+        ---
+
+        # Discarded Lead
+
+        This should stay out of Capture assignment targets.
+        """.write(to: discardedProject.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
         let store = AppStore(configuration: AppConfiguration(
             profile: .standalone,
             workspaceRoot: workspaceRoot,
@@ -1004,10 +1064,14 @@ final class AppStoreNavigationTests: XCTestCase {
         ))
 
         let targetTitles = store.captureAssignmentTargets.map(\.title)
+        let targetLabels = store.captureAssignmentTargets.map(store.captureAssignmentLabel(for:))
         XCTAssertTrue(targetTitles.contains("Demo Story"))
         XCTAssertTrue(targetTitles.contains("Voedselcrisis 2027"))
         XCTAssertFalse(targetTitles.contains("Archived Story"))
+        XCTAssertFalse(targetTitles.contains("Discarded Lead"))
         XCTAssertFalse(targetTitles.contains("Area Notes"))
+        XCTAssertTrue(targetLabels.contains("Demo Story • Active · Investigation"))
+        XCTAssertTrue(targetLabels.contains("Voedselcrisis 2027 • Area"))
     }
 
     func testAssignCaptureRecordCopiesFileIntoTopLevelAreaDocs() throws {
@@ -1173,6 +1237,51 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertTrue(readmeText.contains("activity_state: inactive"))
         XCTAssertTrue(readmeText.contains("workflow_stage: active_investigation"))
         XCTAssertTrue(readmeText.contains("inactive_reason: waiting"))
+        XCTAssertTrue(readmeText.contains("status: on_hold"))
+    }
+
+    func testDiscardingProjectOpensCanonicalStateEditorBeforeWrite() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+
+        let project = try XCTUnwrap(store.snapshot.items.first(where: { $0.section == .projects }))
+        store.beginDiscardingProject(project)
+
+        let state = try XCTUnwrap(store.projectDetailsEditState)
+        XCTAssertNil(store.projectStatusChangeState)
+        XCTAssertEqual(state.currentDisplayTitle, "Demo Story")
+        XCTAssertEqual(state.currentProjectType, .journalism)
+        XCTAssertEqual(state.currentState.activityState, .active)
+        XCTAssertEqual(state.currentState.workflowStage, .activeInvestigation)
+        XCTAssertNil(state.currentState.inactiveReason)
+        XCTAssertEqual(state.initialState.activityState, .inactive)
+        XCTAssertEqual(state.initialState.workflowStage, .activeInvestigation)
+        XCTAssertEqual(state.initialState.inactiveReason, .discarded)
+
+        let readmePath = workspaceRoot.appendingPathComponent("Projects/2026/demo_story/README.md")
+        let unchangedReadmeText = try String(contentsOf: readmePath, encoding: .utf8)
+        XCTAssertTrue(unchangedReadmeText.contains("status: active"))
+
+        store.saveProjectDetailsEdit(
+            state,
+            projectTitle: state.initialDisplayTitle,
+            projectType: state.initialProjectType,
+            activityState: state.initialState.activityState,
+            workflowStage: state.initialState.workflowStage,
+            inactiveReason: state.initialState.inactiveReason,
+            isInDailyFocus: state.initialIsInDailyFocus
+        )
+
+        let readmeText = try String(contentsOf: readmePath, encoding: .utf8)
+
+        XCTAssertNil(store.projectDetailsEditState)
+        XCTAssertTrue(readmeText.contains("activity_state: inactive"))
+        XCTAssertTrue(readmeText.contains("workflow_stage: active_investigation"))
+        XCTAssertTrue(readmeText.contains("inactive_reason: discarded"))
         XCTAssertTrue(readmeText.contains("status: on_hold"))
     }
 
@@ -1344,6 +1453,46 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertEqual(store.overviewOperations.first(where: { $0.id == "workspace-maintenance" })?.count, 5)
     }
 
+    func testCompletingOffboardingRequiresExplicitOutcome() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+
+        let project = try XCTUnwrap(store.snapshot.items.first(where: { $0.section == .projects }))
+        store.beginProjectStatusChange(for: project, targetStatus: .archived)
+        let state = try XCTUnwrap(store.projectStatusChangeState)
+        let originalProjectPath = workspaceRoot.appendingPathComponent("Projects/2026/demo_story")
+        let archivedProjectPath = workspaceRoot.appendingPathComponent("Archives/2026/demo_story")
+        let readmePath = originalProjectPath.appendingPathComponent("README.md")
+        let originalReadme = try String(contentsOf: readmePath, encoding: .utf8)
+
+        waitForCaptureAsyncWork {
+            await store.completeProjectOffboarding(
+                state,
+                outcome: .unknown,
+                publishedPDFURL: nil,
+                routeToDossier: false,
+                producedSummary: "",
+                remainingOpenSummary: "",
+                impactSummary: ""
+            )
+        }
+
+        let alert = try XCTUnwrap(store.activeAlert)
+        let unchangedReadme = try String(contentsOf: readmePath, encoding: .utf8)
+
+        XCTAssertEqual(alert.title, "Outcome required")
+        XCTAssertEqual(store.statusMessage, "Choose an explicit offboarding outcome first.")
+        XCTAssertNotNil(store.projectStatusChangeState)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: originalProjectPath.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: archivedProjectPath.path))
+        XCTAssertEqual(unchangedReadme, originalReadme)
+        XCTAssertFalse(unchangedReadme.contains("<!-- project_closeout:start -->"))
+    }
+
     func testArchivingProjectMovesFolderIntoArchiveDestination() throws {
         let workspaceRoot = try makeWorkspaceRoot(includeArea: true)
         let store = AppStore(configuration: AppConfiguration(
@@ -1382,6 +1531,41 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertTrue(archivedReadme.contains("- Compatibility status: `archived`"))
     }
 
+    func testSupersededOffboardingWritesDiscardedInactiveReason() throws {
+        let workspaceRoot = try makeWorkspaceRoot(includeArea: true)
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+
+        let project = try XCTUnwrap(store.snapshot.items.first(where: { $0.section == .projects }))
+        store.beginProjectStatusChange(for: project, targetStatus: .archived)
+        let state = try XCTUnwrap(store.projectStatusChangeState)
+        let archivedProjectPath = workspaceRoot.appendingPathComponent("Archives/2026/unpublished/demo_story")
+
+        waitForCaptureAsyncWork {
+            await store.completeProjectOffboarding(
+                state,
+                outcome: .superseded,
+                publishedPDFURL: nil,
+                routeToDossier: false,
+                producedSummary: "Lead was overtaken by a stronger angle.",
+                remainingOpenSummary: "",
+                impactSummary: ""
+            )
+        }
+
+        let archivedReadme = try String(contentsOf: archivedProjectPath.appendingPathComponent("README.md"), encoding: .utf8)
+
+        XCTAssertTrue(archivedReadme.contains("activity_state: inactive"))
+        XCTAssertTrue(archivedReadme.contains("workflow_stage: active_investigation"))
+        XCTAssertTrue(archivedReadme.contains("inactive_reason: discarded"))
+        XCTAssertTrue(archivedReadme.contains("status: archived"))
+        XCTAssertTrue(archivedReadme.contains("- Outcome: `superseded`"))
+        XCTAssertTrue(archivedReadme.contains("- Inactive reason: `discarded`"))
+    }
+
     func testImportDocumentsToProjectCopiesIntoDocsFolder() throws {
         let workspaceRoot = try makeWorkspaceRoot()
         let store = AppStore(configuration: AppConfiguration(
@@ -1399,6 +1583,74 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertEqual(importedPaths.count, 1)
         XCTAssertTrue(importedPaths[0].hasSuffix("/Projects/2026/demo_story/docs/transcript.txt"))
         XCTAssertTrue(FileManager.default.fileExists(atPath: importedPaths[0]))
+    }
+
+    func testFinalizeAttachedDocumentsUpdatesDocsOverviewForExistingProject() async throws {
+        setenv("JWH_SCAFFOLD_SUMMARY_FAKE", "1", 1)
+        defer { unsetenv("JWH_SCAFFOLD_SUMMARY_FAKE") }
+
+        let workspaceRoot = try makeWorkspaceRoot()
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+        let project = try XCTUnwrap(store.snapshot.items.first)
+
+        let sourceFile = workspaceRoot.appendingPathComponent("source_note.md")
+        try """
+        Lead finding from the imported note.
+
+        Supporting detail that should appear in a working summary.
+        """.write(to: sourceFile, atomically: true, encoding: .utf8)
+
+        let importedPaths = try store.importDocumentsToProject([sourceFile], item: project)
+        await store.finalizeAttachedDocuments(for: project, importedPaths: importedPaths)
+
+        let overviewPath = workspaceRoot.appendingPathComponent("Projects/2026/demo_story/docs/docs_overview.md")
+        let overviewText = try String(contentsOf: overviewPath, encoding: .utf8)
+        let feedback = try XCTUnwrap(store.projectDocumentImportFeedback(for: project))
+
+        XCTAssertTrue(overviewText.contains("## Imported document synthesis"))
+        XCTAssertTrue(overviewText.contains("Working summary from source_note.md"))
+        XCTAssertEqual(store.statusMessage, "Attached 1 item to Demo Story and updated docs overview")
+        XCTAssertEqual(feedback.title, "Docs attached")
+        XCTAssertEqual(feedback.style, .success)
+        XCTAssertTrue(feedback.showsOpenDocsOverviewAction)
+    }
+
+    func testFinalizeAttachedDocumentsFallsBackWhenModelReturnsInvalidJSON() async throws {
+        setenv("JWH_SCAFFOLD_SUMMARY_FORCE_INVALID_JSON", "1", 1)
+        defer { unsetenv("JWH_SCAFFOLD_SUMMARY_FORCE_INVALID_JSON") }
+
+        let workspaceRoot = try makeWorkspaceRoot()
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+        let project = try XCTUnwrap(store.snapshot.items.first)
+
+        let sourceFile = workspaceRoot.appendingPathComponent("source_note.md")
+        try """
+        Lead finding from the imported note.
+
+        Supporting detail that should survive the fallback summary path.
+        """.write(to: sourceFile, atomically: true, encoding: .utf8)
+
+        let importedPaths = try store.importDocumentsToProject([sourceFile], item: project)
+        await store.finalizeAttachedDocuments(for: project, importedPaths: importedPaths)
+
+        let overviewPath = workspaceRoot.appendingPathComponent("Projects/2026/demo_story/docs/docs_overview.md")
+        let overviewText = try String(contentsOf: overviewPath, encoding: .utf8)
+        let feedback = try XCTUnwrap(store.projectDocumentImportFeedback(for: project))
+
+        XCTAssertTrue(overviewText.contains("Fallback summary from source_note.md"))
+        XCTAssertTrue(overviewText.contains("parseable JSON"))
+        XCTAssertEqual(store.statusMessage, "Attached 1 item to Demo Story and updated docs overview")
+        XCTAssertNil(store.activeAlert)
+        XCTAssertEqual(feedback.title, "Docs attached")
+        XCTAssertEqual(feedback.style, .success)
     }
 
     private func waitForCaptureAsyncWork(_ operation: @escaping @MainActor () async -> Void) {

@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import subprocess
 import textwrap
+import unicodedata
 
 
 MANAGED_START = "<!-- scaffold-doc-summaries:start -->"
@@ -33,6 +34,8 @@ SUPPORTED_TEXT_EXTENSIONS = {
 }
 PREFERRED_MODELS = ("llama3.2:latest", "mistral:latest")
 FAKE_MODE_ENV = "JWH_SCAFFOLD_SUMMARY_FAKE"
+FORCE_INVALID_JSON_ENV = "JWH_SCAFFOLD_SUMMARY_FORCE_INVALID_JSON"
+ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
 
 @dataclass(frozen=True)
@@ -84,13 +87,22 @@ def main() -> int:
         raise SystemExit("No supported imported files were provided for scaffold summarization.")
 
     context_docs = load_context_documents(project_root, max_chars=args.max_context_chars)
-    model = args.model.strip() or resolve_ollama_model()
+    fake_mode = os.environ.get(FAKE_MODE_ENV) == "1"
+    force_invalid_json = os.environ.get(FORCE_INVALID_JSON_ENV) == "1"
+    model: str | None = None
+    model_issue: str | None = None
+    if not fake_mode and not force_invalid_json:
+        try:
+            model = args.model.strip() or resolve_ollama_model()
+        except SystemExit as exc:
+            model_issue = str(exc)
     summaries = [
         summarize_source(
             source_path,
             project_root=project_root,
             context_docs=context_docs,
             model=model,
+            model_issue=model_issue,
             max_source_chars=args.max_source_chars,
         )
         for source_path in imported_paths
@@ -184,11 +196,11 @@ def find_context_candidate(project_root: Path, role: str) -> Path | None:
 def extract_text(path: Path) -> str:
     ext = path.suffix.lower()
     if ext in SUPPORTED_TEXT_EXTENSIONS:
-        return read_text_file(path)
+        return sanitize_multiline_text(read_text_file(path))
     if ext in {".docx", ".odt", ".rtf", ".html", ".htm"}:
-        return run_textutil(path)
+        return sanitize_multiline_text(run_textutil(path))
     if ext == ".pdf":
-        return run_pdftotext(path)
+        return sanitize_multiline_text(run_pdftotext(path))
     return ""
 
 
@@ -258,7 +270,8 @@ def summarize_source(
     *,
     project_root: Path,
     context_docs: list[ContextDocument],
-    model: str,
+    model: str | None,
+    model_issue: str | None,
     max_source_chars: int,
 ) -> SourceSummary:
     source_text = truncate_text(extract_text(source_path), max_source_chars)
@@ -276,14 +289,49 @@ def summarize_source(
     if os.environ.get(FAKE_MODE_ENV) == "1":
         return fake_summary(source_path, project_root=project_root, source_text=source_text)
 
+    if os.environ.get(FORCE_INVALID_JSON_ENV) == "1":
+        try:
+            parse_summary_payload("This is not valid JSON.")
+        except SystemExit as exc:
+            return fallback_summary(
+                source_path,
+                project_root=project_root,
+                source_text=source_text,
+                reason=str(exc),
+            )
+
+    if model_issue:
+        return fallback_summary(
+            source_path,
+            project_root=project_root,
+            source_text=source_text,
+            reason=model_issue,
+        )
+
+    if not model:
+        return fallback_summary(
+            source_path,
+            project_root=project_root,
+            source_text=source_text,
+            reason="No local model was available for structured summarization.",
+        )
+
     prompt = build_prompt(
         source_path,
         project_root=project_root,
         context_docs=context_docs,
         source_text=source_text,
     )
-    response = run_ollama_prompt(model=model, prompt=prompt)
-    payload = parse_summary_payload(response)
+    try:
+        response = run_ollama_prompt(model=model, prompt=prompt)
+        payload = parse_summary_payload(response)
+    except SystemExit as exc:
+        return fallback_summary(
+            source_path,
+            project_root=project_root,
+            source_text=source_text,
+            reason=str(exc),
+        )
 
     return SourceSummary(
         relative_path=relative_label(source_path, project_root),
@@ -309,6 +357,28 @@ def fake_summary(source_path: Path, *, project_root: Path, source_text: str) -> 
         ),
         follow_up=("Check the source against the README assumptions.",),
         cautions="Fake summary mode was used for verification only.",
+    )
+
+
+def fallback_summary(
+    source_path: Path,
+    *,
+    project_root: Path,
+    source_text: str,
+    reason: str,
+) -> SourceSummary:
+    lead = compact_text(source_text.splitlines()[0] if source_text.splitlines() else source_text) or "No readable lead."
+    return SourceSummary(
+        relative_path=relative_label(source_path, project_root),
+        title=source_path.name,
+        summary=f"Fallback summary from {source_path.name}: {lead}",
+        project_relevance="Imported into this project, but the structured local-model summary was unavailable. Review the source directly before relying on this note.",
+        research_questions=(
+            f"What does {source_path.name} change or confirm for this project?",
+            "Which claims or figures from this source need manual verification?",
+        ),
+        follow_up=("Open the file and capture the key takeaways in a note or README update.",),
+        cautions=f"{compact_text(reason) or 'The local summary step failed.'} A text-based fallback summary was written instead.",
     )
 
 
@@ -372,17 +442,24 @@ def run_ollama_prompt(*, model: str, prompt: str) -> str:
 
 def parse_summary_payload(raw_text: str) -> dict[str, object]:
     stripped = strip_code_fences(raw_text.strip())
-    match = re.search(r"\{.*\}", stripped, flags=re.S)
-    if not match:
+    payload = extract_json_payload(stripped)
+    if payload is None:
         raise SystemExit("The local model did not return parseable JSON for the scaffold summary step.")
-    payload_text = match.group(0)
-    try:
-        return json.loads(payload_text)
-    except json.JSONDecodeError as exc:
+    return payload
+
+
+def extract_json_payload(text: str) -> dict[str, object] | None:
+    decoder = json.JSONDecoder(strict=False)
+    for index, char in enumerate(text):
+        if char != "{":
+            continue
         try:
-            return json.loads(payload_text, strict=False)
+            payload, _ = decoder.raw_decode(text[index:])
         except json.JSONDecodeError:
-            raise SystemExit(f"Could not parse local model JSON output: {exc}") from exc
+            continue
+        if isinstance(payload, dict):
+            return payload
+    return None
 
 
 def strip_code_fences(text: str) -> str:
@@ -401,14 +478,32 @@ def clean_list(raw_value: object) -> list[str]:
 def compact_text(raw_value: object | None) -> str:
     if raw_value is None:
         return ""
-    return re.sub(r"\s+", " ", str(raw_value)).strip()
+    sanitized = sanitize_multiline_text(str(raw_value))
+    return re.sub(r"\s+", " ", sanitized).strip()
 
 
 def truncate_text(text: str, max_chars: int) -> str:
-    compact = text.strip()
+    compact = sanitize_multiline_text(text).strip()
     if len(compact) <= max_chars:
         return compact
     return compact[: max_chars - 1].rstrip() + "…"
+
+
+def sanitize_multiline_text(text: str) -> str:
+    if not text:
+        return ""
+
+    stripped = ANSI_ESCAPE_RE.sub("", text)
+    normalized: list[str] = []
+    for char in stripped:
+        if char in ("\n", "\r", "\t"):
+            normalized.append(char)
+            continue
+        if unicodedata.category(char).startswith("C"):
+            normalized.append(" ")
+            continue
+        normalized.append(char)
+    return "".join(normalized)
 
 
 def merge_docs_overview(

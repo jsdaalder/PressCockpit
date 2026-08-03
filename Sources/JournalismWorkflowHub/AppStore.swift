@@ -20,6 +20,7 @@ final class AppStore: ObservableObject {
     @Published var selectedInputs: [String: WorkflowParameterState] = [:]
     @Published var statusMessage: String = "Ready"
     @Published var activeAlert: AppAlert?
+    @Published var projectDocumentImportFeedback: ProjectDocumentImportFeedback?
     @Published var isRunning: Bool = false
     @Published var selectedRunOutput: String = ""
     @Published private(set) var documentMode: OnboardingDocumentMode
@@ -139,6 +140,18 @@ final class AppStore: ObservableObject {
         workspaceQueries.item(id: selectedWorkspaceItemID)
     }
 
+    func projectDocumentImportFeedback(for item: WorkspaceItem?) -> ProjectDocumentImportFeedback? {
+        guard let item else { return nil }
+        guard projectDocumentImportFeedback?.projectPath == item.path else { return nil }
+        return projectDocumentImportFeedback
+    }
+
+    func dismissProjectDocumentImportFeedback(for item: WorkspaceItem?) {
+        guard let item else { return }
+        guard projectDocumentImportFeedback?.projectPath == item.path else { return }
+        projectDocumentImportFeedback = nil
+    }
+
     var selectedWorkflow: WorkflowDefinition? {
         guard let selectedWorkflowID else { return nil }
         return workflows.first(where: { $0.id == selectedWorkflowID })
@@ -212,6 +225,19 @@ final class AppStore: ObservableObject {
         workspaceQueries.items
             .filter(isCaptureAssignmentTarget)
             .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+    }
+
+    func captureAssignmentLabel(for item: WorkspaceItem) -> String {
+        switch item.section {
+        case .projects:
+            return "\(item.title) • \(item.projectStateDetailLabel)"
+        case .areas:
+            return "\(item.title) • Area"
+        case .resources:
+            return "\(item.title) • Resource"
+        case .archives:
+            return "\(item.title) • Archive"
+        }
     }
 
     func maintenanceItems(for item: WorkspaceItem?) -> [MaintenanceItem] {
@@ -331,6 +357,20 @@ final class AppStore: ObservableObject {
 
     func dismissProjectStatusChange() {
         projectStatusChangeState = nil
+    }
+
+    func beginDiscardingProject(_ item: WorkspaceItem) {
+        let currentState = item.projectState ?? ProjectState(
+            activityState: .active,
+            workflowStage: .activeInvestigation,
+            inactiveReason: nil
+        )
+        let discardedState = ProjectState(
+            activityState: .inactive,
+            workflowStage: currentState.workflowStage,
+            inactiveReason: .discarded
+        )
+        beginProjectDetailsEditing(for: item, initialState: discardedState)
     }
 
     func beginProjectDetailsEditing(
@@ -456,6 +496,15 @@ final class AppStore: ObservableObject {
         remainingOpenSummary: String,
         impactSummary: String
     ) async {
+        guard outcome != .unknown else {
+            activeAlert = AppAlert(
+                title: "Outcome required",
+                message: "Choose whether this project ended published, unpublished, or superseded before saving closeout."
+            )
+            statusMessage = "Choose an explicit offboarding outcome first."
+            return
+        }
+
         statusMessage = state.targetCompatibilityStatus == .archived
             ? "Archiving \(state.projectTitle)…"
             : "Finishing \(state.projectTitle)…"
@@ -830,7 +879,10 @@ final class AppStore: ObservableObject {
         statusMessage = "Summarizing imported docs into docs overview…"
 
         do {
-            try await summarizeScaffoldDocsOverview(for: state)
+            try await summarizeImportedDocsOverview(
+                projectRoot: state.projectRoot,
+                importedPaths: state.importedPaths
+            )
             reloadWorkspace()
             statusMessage = "Updated docs overview from imported materials"
             scaffoldPostCreateState = nil
@@ -1027,10 +1079,64 @@ final class AppStore: ObservableObject {
             }
 
             let count = importedPaths.count
-            statusMessage = "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title)"
+            if item.isProjectRoot {
+                statusMessage = "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title). Updating docs overview…"
+                projectDocumentImportFeedback = ProjectDocumentImportFeedback(
+                    projectPath: item.path,
+                    title: "Updating docs overview",
+                    message: "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title). Building a working summary for the imported material now.",
+                    style: .progress,
+                    showsOpenDocsOverviewAction: item.hasDocsOverview
+                )
+                Task {
+                    await finalizeAttachedDocuments(for: item, importedPaths: importedPaths)
+                }
+            } else {
+                statusMessage = "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title)"
+            }
         } catch {
             statusMessage = error.localizedDescription
             activeAlert = AppAlert(title: "Could not attach documents", message: error.localizedDescription)
+        }
+    }
+
+    func finalizeAttachedDocuments(for item: WorkspaceItem, importedPaths: [String]) async {
+        guard item.isProjectRoot else { return }
+
+        do {
+            try await summarizeImportedDocsOverview(
+                projectRoot: item.path,
+                importedPaths: importedPaths
+            )
+            reloadWorkspace()
+
+            if let itemID = workspaceItemID(forPath: item.path) {
+                select(.workspace(itemID))
+            }
+
+            let count = importedPaths.count
+            statusMessage = "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title) and updated docs overview"
+            projectDocumentImportFeedback = ProjectDocumentImportFeedback(
+                projectPath: item.path,
+                title: "Docs attached",
+                message: "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title) and updated the docs overview. Review the imported summary before treating it as settled reporting material.",
+                style: .success,
+                showsOpenDocsOverviewAction: true
+            )
+        } catch {
+            let count = importedPaths.count
+            statusMessage = "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title), but docs overview update failed"
+            projectDocumentImportFeedback = ProjectDocumentImportFeedback(
+                projectPath: item.path,
+                title: "Docs attached, summary needs review",
+                message: "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title), but the docs overview could not be refreshed. Open the docs overview and source files directly before relying on them.",
+                style: .warning,
+                showsOpenDocsOverviewAction: item.hasDocsOverview
+            )
+            activeAlert = AppAlert(
+                title: "Could not summarize docs overview",
+                message: error.localizedDescription
+            )
         }
     }
 
@@ -1421,7 +1527,7 @@ final class AppStore: ObservableObject {
                     importedStoragePath: existing.importedStoragePath,
                     capturedAt: existing.capturedAt,
                     captureType: existing.captureType,
-                    state: .failed,
+                    state: .needsReview,
                     failureDescription: error.localizedDescription,
                     userNote: normalizedNote.isEmpty ? nil : normalizedNote,
                     assignedTargetPath: existing.assignedTargetPath,
@@ -1430,13 +1536,17 @@ final class AppStore: ObservableObject {
                 )
             }
             statusMessage = "Could not assign \(current.displayTitle)"
+            activeAlert = AppAlert(
+                title: "Could not assign capture item",
+                message: error.localizedDescription
+            )
         }
     }
 
     private func isCaptureAssignmentTarget(_ item: WorkspaceItem) -> Bool {
         switch item.section {
         case .projects:
-            return item.isProjectRoot
+            return item.isProjectRoot && item.inactiveReason != .discarded
         case .areas:
             return isTopLevelArea(item)
         case .resources, .archives:
@@ -2027,7 +2137,7 @@ final class AppStore: ObservableObject {
         }.value
     }
 
-    private func summarizeScaffoldDocsOverview(for state: ScaffoldPostCreateState) async throws {
+    private func summarizeImportedDocsOverview(projectRoot: String, importedPaths: [String]) async throws {
         guard let scriptPath = bundledKnowledgeOpsScriptPath("summarize_scaffold_docs.py") else {
             throw NSError(
                 domain: "JournalismWorkflowHub.ScaffoldSummary",
@@ -2039,8 +2149,7 @@ final class AppStore: ObservableObject {
         let environment = ProcessInfo.processInfo.environment
         let pythonExecutable = try CommandRunner.resolveExecutableURL(for: "python3", environment: environment)
         let workspaceRoot = self.workspaceRoot
-        let importedPaths = state.importedPaths.sorted()
-        let projectRoot = state.projectRoot
+        let importedPaths = importedPaths.sorted()
 
         try await Task.detached(priority: .userInitiated) {
             let process = Process()
@@ -2360,16 +2469,11 @@ final class AppStore: ObservableObject {
         }
 
         let currentText = try String(contentsOf: readmeURL, encoding: .utf8)
-        var finalProjectState = ProjectState(
-            activityState: .inactive,
-            workflowStage: outcome == .published ? .published : state.currentProjectState.workflowStage,
-            inactiveReason: .finished
-        )
-        if outcome != .published, state.currentProjectState.workflowStage == .published {
-            finalProjectState = ProjectState(
-                activityState: .inactive,
-                workflowStage: .activeInvestigation,
-                inactiveReason: .finished
+        guard let finalProjectState = outcome.resultingProjectState(from: state.currentProjectState) else {
+            throw NSError(
+                domain: "JournalismWorkflowHub.ProjectOffboarding",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Choose an explicit offboarding outcome before saving closeout."]
             )
         }
         let managedSection = buildProjectCloseoutSection(
