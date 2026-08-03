@@ -2495,7 +2495,7 @@ struct ProjectTrustInlineEditor: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 10) {
             EditableMetadataRow(label: "Project") {
                 TextField("Project title", text: $projectTitle)
                     .textFieldStyle(.roundedBorder)
