@@ -68,9 +68,12 @@ Never hand raw subagent output back to the user as the final result.
 
 For non-trivial work, require the chief to check the planning lifecycle:
 
-1. If the request is only a new idea or product question, capture or recommend capturing it in `Projects/2026/journalism_workflow_hub_plan/docs/backlog.md`.
-2. If the work is a realistic near-term candidate, check whether it belongs in `Projects/2026/journalism_workflow_hub_plan/docs/current_priorities.md`.
-3. Before implementation, check whether it touches data models, persistence, workflow execution, preflight behavior, permissions, privacy posture, document export safety, filesystem assumptions, sync/cloud/collaboration, or cross-cutting app boundaries. If yes, update or request an update to `Projects/2026/journalism_workflow_hub_plan/docs/architecture.md` before coding.
+Use the workspace-level planning project at `/Users/jandaalder/My Drive/coding_projects/Projects/2026/journalism_workflow_hub_plan`.
+Do not treat the repo-local `Projects/2026/journalism_workflow_hub_plan/` pointer copy inside the app repo as the live planning source.
+
+1. If the request is only a new idea or product question, capture or recommend capturing it in `/Users/jandaalder/My Drive/coding_projects/Projects/2026/journalism_workflow_hub_plan/docs/backlog.md`.
+2. If the work is a realistic near-term candidate, check whether it belongs in `/Users/jandaalder/My Drive/coding_projects/Projects/2026/journalism_workflow_hub_plan/docs/current_priorities.md`.
+3. Before implementation, check whether it touches data models, persistence, workflow execution, preflight behavior, permissions, privacy posture, document export safety, filesystem assumptions, sync/cloud/collaboration, or cross-cutting app boundaries. If yes, update or request an update to `/Users/jandaalder/My Drive/coding_projects/Projects/2026/journalism_workflow_hub_plan/docs/architecture.md` before coding.
 4. After implementation or review, verify appropriately with tests, focused review, or a clear statement of what could not be run.
 5. Before closing, ensure planning docs still match reality or explicitly say no planning update was needed.
 6. Before calling feature work finished, ensure git closeout is explicit: committed state, push status, and whether merge to `main` is done now or intentionally deferred.

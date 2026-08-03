@@ -9,6 +9,13 @@ This file applies to the `journalism_workflow_hub` app repository.
 - Prefer one `chief_of_staff` and a small number of specialists.
 - Keep changes minimal, auditable, and scoped to the task.
 
+## Planning Source Of Truth
+
+- The canonical planning project for this app is `/Users/jandaalder/My Drive/coding_projects/Projects/2026/journalism_workflow_hub_plan`.
+- Use that workspace-level project for live updates to `docs/current_priorities.md`, `docs/backlog.md`, `docs/roadmap.md`, `docs/architecture.md`, and related planning docs.
+- Treat the repo-local `Projects/2026/journalism_workflow_hub_plan/` folder inside this app repo as a non-canonical pointer copy only.
+- If a repo-local planning file and the workspace-level planning project appear to disagree, follow the workspace-level planning project and fix the pointer copy only if needed to keep the distinction explicit.
+
 ## Design And Engineering Split
 
 - Separate abstract UX decisions from UI construction.
