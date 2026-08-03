@@ -310,6 +310,35 @@ final class WorkspaceScannerTests: XCTestCase {
         XCTAssertEqual(research.freshness(referenceDate: fixedDate("2026-07-08")), .localFile)
     }
 
+    func testParsesRootSpreadsheetDocuments() throws {
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let project = tmp.appendingPathComponent("Projects/2026/data_story")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true, attributes: nil)
+
+        try """
+        ---
+        type: project
+        project: Data Story
+        status: active
+        project_type: journalism
+        ---
+
+        # Data Story
+
+        Spreadsheet-backed reporting project.
+        """.write(to: project.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
+        FileManager.default.createFile(atPath: project.appendingPathComponent("Data workbook.xlsx").path, contents: Data("spreadsheet".utf8))
+
+        let item = try XCTUnwrap(WorkspaceScanner(workspaceRoot: tmp).scan().items.first)
+        let spreadsheet = try XCTUnwrap(item.documents.first(where: { $0.fileExtension == "xlsx" }))
+
+        XCTAssertEqual(spreadsheet.title, "Data workbook")
+        XCTAssertEqual(spreadsheet.provider, .localFile)
+        XCTAssertEqual(spreadsheet.role, .data)
+        XCTAssertEqual(item.xlsxFiles, 1)
+    }
+
     func testDocumentFreshnessFlagsNeedsFetchAndStaleCache() {
         let stale = WorkspaceDocument(
             id: "stale",

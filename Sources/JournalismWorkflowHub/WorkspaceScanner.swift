@@ -18,7 +18,7 @@ struct WorkspaceScanner {
     ]
 
     private let documentExtensions: Set<String> = [
-        "md", "txt", "pdf", "srt", "rtf", "docx", "html", "ics", "gdoc"
+        "md", "txt", "pdf", "srt", "rtf", "docx", "html", "ics", "gdoc", "csv", "xls", "xlsx"
     ]
 
     func scan() -> WorkspaceSnapshot {

@@ -1183,7 +1183,13 @@ struct WorkspaceDetailView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     SectionCard(title: "Project trust") {
                         if let editState, editState.projectID == item.id {
-                            EmptyView()
+                            Button("Cancel") {
+                                store.dismissProjectDetailsEdit()
+                            }
+                            .buttonStyle(.borderless)
+                            .controlSize(.small)
+                            .keyboardShortcut(.cancelAction)
+                            .tint(AppPalette.title)
                         } else {
                             Button {
                                 store.beginProjectDetailsEditing(for: item)
@@ -2082,6 +2088,8 @@ struct MetadataGrid: View {
     }
 }
 
+private let trustedInlineMetadataRowMinHeight: CGFloat = 28
+
 struct KeyValueRow: View {
     let key: String
     let value: String
@@ -2099,7 +2107,7 @@ struct KeyValueRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             Spacer()
         }
-        .frame(minHeight: 28, alignment: .topLeading)
+        .frame(minHeight: trustedInlineMetadataRowMinHeight, alignment: .topLeading)
     }
 
     private var displayValue: String {
@@ -2605,11 +2613,6 @@ struct ProjectTrustInlineEditor: View {
             }
 
             HStack(spacing: 12) {
-                Button("Cancel") {
-                    store.dismissProjectDetailsEdit()
-                }
-                .keyboardShortcut(.cancelAction)
-
                 Button("Save details") {
                     store.saveProjectDetailsEdit(
                         state,
@@ -2675,7 +2678,7 @@ struct EditableMetadataRow<Content: View>: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             Spacer()
         }
-        .frame(minHeight: 28, alignment: .topLeading)
+        .frame(minHeight: trustedInlineMetadataRowMinHeight, alignment: .topLeading)
     }
 }
 
@@ -3004,14 +3007,27 @@ struct WorkspaceDocumentRow: View {
     let isLikelySnapshot: Bool
     let openDocument: () -> Void
     let openCache: () -> Void
+    @State private var isHoveringDocumentTitle = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(document.title)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(AppPalette.title)
-                    .textSelection(.enabled)
+                Button(action: openDocument) {
+                    HStack(spacing: 6) {
+                        Text(document.title)
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(isHoveringDocumentTitle ? Color.accentColor : AppPalette.title)
+                            .underline(true, color: isHoveringDocumentTitle ? Color.accentColor.opacity(0.6) : AppPalette.border)
+                        Image(systemName: document.provider == .localFile ? "arrow.up.right.square" : "safari")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(isHoveringDocumentTitle ? Color.accentColor : AppPalette.subtle)
+                    }
+                }
+                .buttonStyle(.plain)
+                .help(document.provider == .localFile ? "Open local file" : "Open in browser")
+                .onHover { hovering in
+                    isHoveringDocumentTitle = hovering
+                }
 
                 Text(documentDetailText)
                     .font(.caption)
@@ -3020,15 +3036,19 @@ struct WorkspaceDocumentRow: View {
 
                 HStack(spacing: 8) {
                     if isPreferredDraft {
-                        WorkspaceBadge(text: "Preferred draft")
+                        WorkspaceBadge(text: "Canonical draft")
                     }
                     if isLikelySnapshot {
                         WorkspaceBadge(text: "Snapshot copy")
                     }
-                    WorkspaceBadge(text: document.role.label)
-                    WorkspaceBadge(text: document.provider.label)
-                    DocumentCacheBadge(state: document.cacheState)
-                    DocumentFreshnessBadge(freshness: document.freshness())
+                    if shouldShowRoleBadge {
+                        WorkspaceBadge(text: document.role.label)
+                    }
+                    if document.provider == .googleDocPointer {
+                        WorkspaceBadge(text: document.provider.label)
+                        DocumentCacheBadge(state: document.cacheState)
+                        DocumentFreshnessBadge(freshness: document.freshness())
+                    }
                 }
 
                 if let cachedOn = document.cachedOn, !cachedOn.isEmpty {
@@ -3041,11 +3061,8 @@ struct WorkspaceDocumentRow: View {
 
             Spacer()
 
-            HStack(spacing: 8) {
-                Button(document.provider == .localFile ? "Open local file" : "Open in browser", action: openDocument)
-                if document.cachePath != nil {
-                    Button("Open local cache", action: openCache)
-                }
+            if document.cachePath != nil {
+                Button("Open cache", action: openCache)
             }
         }
         .padding(.vertical, 4)
@@ -3058,10 +3075,22 @@ struct WorkspaceDocumentRow: View {
 
         switch document.provider {
         case .localFile:
-            return "\(document.role.label) stored locally and ready to open."
+            return "\(documentTypeLabel) stored locally and ready to open."
         case .googleDocPointer:
             return "Google Doc pointer with \(document.cacheState.label.lowercased()) local cache and \(document.freshness().label.lowercased()) freshness."
         }
+    }
+
+    private var shouldShowRoleBadge: Bool {
+        if isPreferredDraft && document.role == .draft {
+            return false
+        }
+        return document.role != .general
+    }
+
+    private var documentTypeLabel: String {
+        let ext = document.fileExtension.uppercased()
+        return ext.isEmpty ? document.role.label : "\(ext) file"
     }
 }
 
