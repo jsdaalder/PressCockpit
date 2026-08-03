@@ -307,6 +307,21 @@ enum SidebarSelection: Hashable {
     case run(String)
 }
 
+enum ProjectDocumentImportFeedbackStyle: Hashable {
+    case progress
+    case success
+    case warning
+}
+
+struct ProjectDocumentImportFeedback: Identifiable, Hashable {
+    let id = UUID()
+    let projectPath: String
+    let title: String
+    let message: String
+    let style: ProjectDocumentImportFeedbackStyle
+    let showsOpenDocsOverviewAction: Bool
+}
+
 enum ProjectActivityState: String, Codable, Hashable, CaseIterable {
     case active
     case inactive
@@ -558,6 +573,25 @@ enum ProjectOffboardingOutcome: String, Codable, Hashable, CaseIterable {
         case .superseded:
             return "Superseded"
         }
+    }
+
+    func resultingProjectState(from currentState: ProjectState) -> ProjectState? {
+        guard self != .unknown else { return nil }
+
+        let workflowStage: ProjectWorkflowStage
+        if self == .published {
+            workflowStage = .published
+        } else if currentState.workflowStage == .published {
+            workflowStage = .activeInvestigation
+        } else {
+            workflowStage = currentState.workflowStage
+        }
+
+        return ProjectState(
+            activityState: .inactive,
+            workflowStage: workflowStage,
+            inactiveReason: self == .superseded ? .discarded : .finished
+        )
     }
 }
 

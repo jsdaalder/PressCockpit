@@ -577,7 +577,7 @@ struct CaptureView: View {
                         Picker("Project", selection: $selectedProjectPath) {
                             Text("Choose destination").tag("")
                             ForEach(store.captureAssignmentTargets, id: \.path) { project in
-                                Text(project.title).tag(project.path)
+                                Text(store.captureAssignmentLabel(for: project)).tag(project.path)
                             }
                         }
                         .labelsHidden()
@@ -1229,6 +1229,14 @@ struct WorkspaceDetailView: View {
         Group {
             if let item {
                 VStack(alignment: .leading, spacing: 16) {
+                    if item.isProjectRoot, let feedback = store.projectDocumentImportFeedback(for: item) {
+                        ProjectDocumentImportFeedbackBanner(
+                            feedback: feedback,
+                            openDocsOverview: { store.openDocsOverview(for: item) },
+                            dismiss: { store.dismissProjectDocumentImportFeedback(for: item) }
+                        )
+                    }
+
                     SectionCard(title: "Project trust") {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("This is the main place to check the project's current state, dossier link, and main draft target before you do anything else.")
@@ -1478,6 +1486,9 @@ struct WorkspaceDetailView: View {
                 }
                 Button("Put on hold") {
                     store.beginProjectStatusChange(for: item, targetStatus: .onHold)
+                }
+                Button("Mark discarded…") {
+                    store.beginDiscardingProject(item)
                 }
                 Button("Mark finished…") {
                     store.beginProjectStatusChange(for: item, targetStatus: .done)
@@ -2144,6 +2155,92 @@ struct SectionCard<Content: View>: View {
     }
 }
 
+private struct ProjectDocumentImportFeedbackBanner: View {
+    let feedback: ProjectDocumentImportFeedback
+    let openDocsOverview: () -> Void
+    let dismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: symbolName)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(accentColor)
+                    .frame(width: 24, height: 24)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(feedback.title)
+                        .font(.headline)
+                        .foregroundStyle(AppPalette.title)
+                    Text(feedback.message)
+                        .font(.subheadline)
+                        .foregroundStyle(AppPalette.subtle)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+            }
+
+            HStack(spacing: 10) {
+                if feedback.showsOpenDocsOverviewAction {
+                    Button("Open docs overview") {
+                        openDocsOverview()
+                    }
+                }
+                Button("Dismiss") {
+                    dismiss()
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .tint(AppPalette.title)
+        }
+        .padding(18)
+        .background(backgroundColor, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(borderColor, lineWidth: 1)
+        )
+    }
+
+    private var symbolName: String {
+        switch feedback.style {
+        case .progress:
+            return "arrow.trianglehead.2.clockwise"
+        case .success:
+            return "checkmark.circle.fill"
+        case .warning:
+            return "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var accentColor: Color {
+        switch feedback.style {
+        case .progress:
+            return Color(red: 0.20, green: 0.42, blue: 0.65)
+        case .success:
+            return Color(red: 0.20, green: 0.45, blue: 0.30)
+        case .warning:
+            return Color(red: 0.67, green: 0.42, blue: 0.14)
+        }
+    }
+
+    private var backgroundColor: Color {
+        switch feedback.style {
+        case .progress:
+            return Color(red: 0.93, green: 0.96, blue: 0.99)
+        case .success:
+            return Color(red: 0.93, green: 0.97, blue: 0.94)
+        case .warning:
+            return Color(red: 0.99, green: 0.95, blue: 0.90)
+        }
+    }
+
+    private var borderColor: Color {
+        accentColor.opacity(0.25)
+    }
+}
+
 struct StatCard: Identifiable {
     let id = UUID()
     let title: String
@@ -2500,6 +2597,10 @@ struct OverviewProjectRow: View {
                 store.beginProjectStatusChange(for: summary.item, targetStatus: .onHold)
             }
 
+            Button("Mark discarded…") {
+                store.beginDiscardingProject(summary.item)
+            }
+
             Divider()
 
             Button("Mark finished…") {
@@ -2756,7 +2857,7 @@ struct ProjectOffboardingSheet: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 statusRow("Current project state", value: state.currentProjectState.detailLabel)
-                statusRow("Resulting project state", value: resultingProjectState.detailLabel)
+                statusRow("Resulting project state", value: resultingProjectStateLabel)
                 statusRow("Workspace action", value: workspaceActionLabel)
                 statusRow("Compatibility status", value: state.targetCompatibilityStatus.label)
 
@@ -2769,6 +2870,12 @@ struct ProjectOffboardingSheet: View {
                         }
                     }
                     .pickerStyle(.menu)
+
+                    if outcome == .unknown {
+                        Text("Choose an explicit outcome before saving so finished and archived work keep clear semantics.")
+                            .font(.caption)
+                            .foregroundStyle(AppPalette.subtle)
+                    }
                 }
             }
 
@@ -2843,7 +2950,7 @@ struct ProjectOffboardingSheet: View {
                     }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(isSaving)
+                .disabled(isSaving || outcome == .unknown)
             }
         }
         .padding(24)
@@ -2858,20 +2965,12 @@ struct ProjectOffboardingSheet: View {
         state.targetCompatibilityStatus == .archived ? "Archive project" : "Save closeout"
     }
 
-    private var resultingProjectState: ProjectState {
-        if outcome != .published, state.currentProjectState.workflowStage == .published {
-            return ProjectState(
-                activityState: .inactive,
-                workflowStage: .activeInvestigation,
-                inactiveReason: .finished
-            )
-        }
+    private var resultingProjectState: ProjectState? {
+        outcome.resultingProjectState(from: state.currentProjectState)
+    }
 
-        return ProjectState(
-            activityState: .inactive,
-            workflowStage: outcome == .published ? .published : state.currentProjectState.workflowStage,
-            inactiveReason: .finished
-        )
+    private var resultingProjectStateLabel: String {
+        resultingProjectState?.detailLabel ?? "Choose outcome first"
     }
 
     private var workspaceActionLabel: String {

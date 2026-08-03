@@ -401,4 +401,57 @@ final class ScaffoldProjectScriptTests: XCTestCase {
         XCTAssertTrue(stdout.contains("\\n"))
         XCTAssertTrue(stdout.contains("\\t"))
     }
+
+    func testScaffoldSummaryScriptSanitizesAnsiSequencesBeforeWritingOverview() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let scriptURL = root
+            .appendingPathComponent("Sources/JournalismWorkflowHub/Resources/knowledge_ops/scripts/summarize_scaffold_docs.py")
+
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let projectRoot = tmp.appendingPathComponent("Projects/2026/demo_story")
+        let docsRoot = projectRoot.appendingPathComponent("docs")
+        try FileManager.default.createDirectory(at: docsRoot, withIntermediateDirectories: true, attributes: nil)
+
+        try """
+        # Demo Story
+
+        This README explains the project direction.
+        """.write(to: projectRoot.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
+        let importedURL = docsRoot.appendingPathComponent("research_notes.md")
+        let pollutedLead = "Tata Steel levert ruim een tiende\u{001B}[4D\u{001B}[K aan de Verenigde Staten."
+        try """
+        \(pollutedLead)
+
+        Supporting detail with a form-feed character \u{000C} that should not leak through.
+        """.write(to: importedURL, atomically: true, encoding: .utf8)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["python3", scriptURL.path, "--project-root", projectRoot.path, "--imported-path", importedURL.path]
+
+        var environment = ProcessInfo.processInfo.environment
+        environment["JWH_SCAFFOLD_SUMMARY_FAKE"] = "1"
+        process.environment = environment
+
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        try process.run()
+        process.waitUntilExit()
+
+        let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        XCTAssertEqual(process.terminationStatus, 0, stderr)
+
+        let overview = try String(contentsOf: docsRoot.appendingPathComponent("docs_overview.md"), encoding: .utf8)
+        XCTAssertTrue(overview.contains("Working summary from research_notes.md: Tata Steel levert ruim een tiende aan de Verenigde Staten."))
+        XCTAssertFalse(overview.contains("\u{001B}"))
+        XCTAssertFalse(overview.contains("[4D"))
+        XCTAssertFalse(overview.contains("\u{000C}"))
+    }
 }
