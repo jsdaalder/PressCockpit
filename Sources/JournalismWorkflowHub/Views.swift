@@ -1223,7 +1223,6 @@ struct OverviewView: View {
 struct WorkspaceDetailView: View {
     @EnvironmentObject private var store: AppStore
     let itemID: String
-    @State private var showsAdvancedMetadata = false
 
     var body: some View {
         Group {
@@ -1243,6 +1242,9 @@ struct WorkspaceDetailView: View {
                                         store.openPreferredDraft(for: item)
                                     }
                                 }
+                                Button("Open docs folder") {
+                                    store.openPath(item.docsDirectoryURL.path)
+                                }
                                 Button("Edit project details…") {
                                     store.beginProjectDetailsEditing(for: item)
                                 }
@@ -1254,66 +1256,15 @@ struct WorkspaceDetailView: View {
                         }
                     }
 
-                    SectionCard(title: "Working context") {
-                        VStack(alignment: .leading, spacing: 14) {
-                            if !item.subtitle.isEmpty {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("Current summary")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(AppPalette.title)
-                                    Text(item.subtitle)
-                                        .font(.body)
-                                        .foregroundStyle(AppPalette.title)
-                                        .textSelection(.enabled)
-                                }
-                            } else {
-                                Text("This project still needs a clearer working summary in its README.")
-                                    .font(.body)
-                                    .foregroundStyle(AppPalette.subtle)
-                            }
-
-                            if !item.agentsSummary.isEmpty {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("Local rules")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(AppPalette.title)
-                                    Text(item.agentsSummary)
-                                        .font(.body)
-                                        .foregroundStyle(AppPalette.title)
-                                        .textSelection(.enabled)
-                                }
-                            } else {
-                                Text("No local rules are captured in `AGENTS.md` yet.")
-                                    .font(.caption)
-                                    .foregroundStyle(AppPalette.subtle)
-                            }
-
-                            HStack {
-                                Button("Open README") { store.openReadme(for: item) }
-                                if let agentsURL = item.agentsURL {
-                                    Button("Open local rules") {
-                                        store.openURL(agentsURL)
-                                    }
-                                }
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .tint(AppPalette.title)
-                        }
-                    }
-
                     SectionCard(title: "Supporting documents") {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("These are the root-level drafts, notes, pointers, and local copies the scanner found. The main draft target is decided above; this section is the supporting file list.")
+                            Text("These are the root-level drafts, notes, pointers, and local copies the scanner found.")
                                 .font(.subheadline)
                                 .foregroundStyle(AppPalette.subtle)
 
                             HStack(spacing: 12) {
                                 Button("Attach docs…") {
                                     store.addDocuments(to: item)
-                                }
-                                Button("Open docs folder") {
-                                    store.openPath(item.docsDirectoryURL.path)
                                 }
                                 if let googleDriveURL = item.googleDriveURL {
                                     Button("Open Drive folder") {
@@ -1340,42 +1291,6 @@ struct WorkspaceDetailView: View {
                                     )
                                 }
                             }
-                        }
-                    }
-
-                    SectionCard(title: "Secondary tools") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Keep these secondary tools available without letting them crowd the main project surface.")
-                                .font(.subheadline)
-                                .foregroundStyle(AppPalette.subtle)
-
-                            DisclosureGroup("Show secondary tools") {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Text("These actions update derived project state or prepare local Google Doc cache placeholders. Write actions still route through workflow detail first so you can review them before execution.")
-                                        .font(.caption)
-                                        .foregroundStyle(AppPalette.subtle)
-
-                                    HStack {
-                                        Button("Open folder") { store.openFolder(for: item) }
-                                        if item.hasGoogleDocPointers {
-                                            Button("Open Google Doc prep workflow") {
-                                                store.select(.workspace(item.id))
-                                                store.select(.workflow("refresh-project-google-doc-prep"))
-                                            }
-                                        }
-                                        if item.isProjectRoot {
-                                            Button("Open README rebuild workflow") {
-                                                store.select(.workspace(item.id))
-                                                store.select(.workflow("build-project-readme"))
-                                            }
-                                        }
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.small)
-                                    .tint(AppPalette.title)
-                                }
-                            }
-                            .tint(AppPalette.title)
                         }
                     }
 
@@ -1409,33 +1324,6 @@ struct WorkspaceDetailView: View {
                                     PublicationStoryRow(story: story)
                                 }
                             }
-                        }
-                    }
-
-                    SectionCard(title: "Advanced metadata") {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Raw trusted README frontmatter for troubleshooting or audit checks. The project trust section above is the main user-facing summary.")
-                                .font(.subheadline)
-                                .foregroundStyle(AppPalette.subtle)
-
-                            DisclosureGroup(
-                                showsAdvancedMetadata ? "Hide raw README metadata" : "Show raw README metadata",
-                                isExpanded: $showsAdvancedMetadata
-                            ) {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    if item.frontmatter.isEmpty {
-                                        Text("No trusted README frontmatter was detected.")
-                                            .font(.body)
-                                            .foregroundStyle(AppPalette.subtle)
-                                    } else {
-                                        ForEach(item.frontmatter.keys.sorted(), id: \.self) { key in
-                                            KeyValueRow(key: key, value: item.frontmatter[key] ?? "")
-                                        }
-                                    }
-                                }
-                                .padding(.top, 8)
-                            }
-                            .tint(AppPalette.title)
                         }
                     }
                 }
