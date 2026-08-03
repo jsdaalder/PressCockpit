@@ -229,11 +229,13 @@ Examples in helper copy:
 
 Purpose:
 
-- captures timing preference without forcing upload into the middle of the intake flow
+- captures timing preference and decides whether the wizard should continue straight into document intake
 
 Behavior:
 
-- if `Yes`, the wizard should finish project creation first, then move into a post-create import step
+- if `Yes`, choosing that path should lead directly into document selection as the next step in the wizard experience
+- do not defer document intake to a later popup after the wizard has otherwise finished
+- create the project just in time for the import target, then open the document picker immediately in the same flow
 - do not open a file picker before the project exists
 
 ### Screen 6. Priority
@@ -324,6 +326,7 @@ Implication:
 
 - the guided flow can ship before the Python scaffold script changes
 - the first implementation can remain a frontend orchestration layer over the existing workflow
+- if the user chose `Yes, add documents now`, that orchestration should create the project as soon as the wizard has enough information, then continue directly into import without a separate post-wizard interruption
 
 ## Post-Create Next Steps
 
@@ -331,7 +334,8 @@ After successful creation, route to one next action instead of dropping the user
 
 If source material choice was `Yes`:
 
-- open a document import step targeted at the new project
+- continue immediately into a document import step targeted at the new project as part of the same guided flow
+- once import finishes or is skipped, then show the normal created-project next actions
 
 If source material choice was `Not now`:
 
@@ -376,6 +380,7 @@ The wizard is failing if:
 
 - it becomes another long settings form
 - it asks for metadata that is not needed to create the project
+- document intake is deferred into a later popup after the user explicitly chose `Yes, add documents now`
 - file upload interrupts the intake before the project exists
 - advanced fields dominate the main path
 
