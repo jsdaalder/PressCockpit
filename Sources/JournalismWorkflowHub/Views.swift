@@ -2649,16 +2649,12 @@ struct ProjectDetailsEditorSheet: View {
                     .font(.system(.title2, design: .serif).weight(.semibold))
                     .foregroundStyle(AppPalette.title)
 
-                Text("Keep the trusted project title, project kind, activity state, workflow stage, and daily focus accurate here. Safety stays separate.")
+                Text("Update the small set of trusted project fields here. Safety stays separate.")
                     .font(.subheadline)
                     .foregroundStyle(AppPalette.subtle)
             }
 
             VStack(alignment: .leading, spacing: 12) {
-                statusRow("Project", value: state.currentDisplayTitle)
-                statusRow("Project kind", value: state.currentProjectType.label)
-                statusRow("Current", value: state.currentState.detailLabel)
-
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Project title")
                         .font(.subheadline.weight(.semibold))
@@ -2699,8 +2695,28 @@ struct ProjectDetailsEditorSheet: View {
                     .pickerStyle(.menu)
                 }
 
-                Toggle("Show in daily focus", isOn: $isInDailyFocus)
-                    .toggleStyle(.switch)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Daily focus")
+                        .font(.subheadline.weight(.semibold))
+
+                    Button {
+                        isInDailyFocus.toggle()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: isInDailyFocus ? "star.fill" : "star")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(isInDailyFocus ? Color.accentColor : AppPalette.subtle)
+                                .frame(width: 28, height: 28)
+                                .background(AppPalette.card.opacity(0.98), in: Circle())
+                                .overlay(Circle().stroke(AppPalette.border))
+
+                            Text(isInDailyFocus ? "In daily focus" : "Not in daily focus")
+                                .foregroundStyle(AppPalette.title)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .help(isInDailyFocus ? "Remove from daily focus" : "Add to daily focus")
+                }
 
                 if activityState == .inactive {
                     VStack(alignment: .leading, spacing: 8) {
@@ -2754,16 +2770,6 @@ struct ProjectDetailsEditorSheet: View {
             get: { inactiveReason },
             set: { inactiveReason = $0 }
         )
-    }
-
-    private func statusRow(_ title: String, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-            Text(value)
-                .foregroundStyle(AppPalette.subtle)
-                .textSelection(.enabled)
-        }
     }
 }
 
