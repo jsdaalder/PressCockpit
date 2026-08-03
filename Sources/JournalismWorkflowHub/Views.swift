@@ -6,7 +6,9 @@ func shouldShowHeaderActionMenu(
     workspaceItem: WorkspaceItem?
 ) -> Bool {
     switch selection {
-    case .overview, .capture:
+    case .overview:
+        return true
+    case .capture:
         return false
     case .workspace:
         return !(workspaceItem?.isProjectRoot ?? false)
@@ -975,8 +977,6 @@ struct OverviewView: View {
                     Text("Keep daily-focus stories on top, then handle the next actions and follow-up work that should not surprise you later.")
                         .font(.body)
                         .foregroundStyle(AppPalette.subtle)
-
-                    overviewActionMenu
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -985,49 +985,6 @@ struct OverviewView: View {
                 Text("Keep daily-focus stories on top, then handle the next actions and follow-up work that should not surprise you later.")
                     .font(.body)
                     .foregroundStyle(AppPalette.subtle)
-
-                overviewActionMenu
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var overviewActionMenu: some View {
-        if store.isStandaloneMode {
-            Menu {
-                Button("Open workspace root") {
-                    store.select(.workflow("open-workspace-root"))
-                }
-
-                Button("Inspect sample project") {
-                    if let firstItem = store.firstWorkspaceItem {
-                        store.select(.workspace(firstItem.id))
-                    }
-                }
-                .disabled(store.firstWorkspaceItem == nil)
-            } label: {
-                HeaderActionMenuLabel(
-                    title: "Audit actions",
-                    systemImage: "plus",
-                    prominence: .secondary
-                )
-            }
-        } else {
-            Menu {
-                Button("New project") {
-                    store.select(.workflow("scaffold-project"))
-                }
-
-                Button("Brainstorm from archive") {
-                    store.select(.workflow("article-brain-brief"))
-                }
-                .disabled(!store.workflows.contains(where: { $0.id == "article-brain-brief" }))
-            } label: {
-                HeaderActionMenuLabel(
-                    title: "New work",
-                    systemImage: "plus",
-                    prominence: .primary
-                )
             }
         }
     }

@@ -2,8 +2,8 @@ import XCTest
 @testable import JournalismWorkflowHub
 
 final class DetailViewHeaderActionTests: XCTestCase {
-    func testHeaderActionMenuIsHiddenOnOverviewAndCapture() {
-        XCTAssertFalse(shouldShowHeaderActionMenu(for: .overview, workspaceItem: nil))
+    func testHeaderActionMenuStaysVisibleOnOverviewButIsHiddenOnCapture() {
+        XCTAssertTrue(shouldShowHeaderActionMenu(for: .overview, workspaceItem: nil))
         XCTAssertFalse(shouldShowHeaderActionMenu(for: .capture, workspaceItem: nil))
     }
 
