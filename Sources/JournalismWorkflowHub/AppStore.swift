@@ -32,7 +32,7 @@ final class AppStore: ObservableObject {
     @Published var scaffoldProjectWizardStep: ScaffoldProjectWizardStep = .workingTitle
     @Published var scaffoldPostCreateState: ScaffoldPostCreateState?
     @Published var projectStatusChangeState: ProjectStatusChangeState?
-    @Published var projectStateEditState: ProjectStateEditState?
+    @Published var projectDetailsEditState: ProjectDetailsEditState?
     @Published private(set) var isFinishingScaffoldPostCreate: Bool = false
     @Published private(set) var hiddenWorkflowCount: Int = 0
     @Published private(set) var workflowPreflightReports: [String: WorkflowPreflightReport] = [:]
@@ -324,14 +324,14 @@ final class AppStore: ObservableObject {
         }
 
         let updatedState = quickProjectState(for: targetStatus, basedOn: currentProjectState)
-        beginProjectStateEditing(for: item, initialState: updatedState, readmePathOverride: readmePath)
+        beginProjectDetailsEditing(for: item, initialState: updatedState, readmePathOverride: readmePath)
     }
 
     func dismissProjectStatusChange() {
         projectStatusChangeState = nil
     }
 
-    func beginProjectStateEditing(
+    func beginProjectDetailsEditing(
         for item: WorkspaceItem,
         initialState: ProjectState? = nil,
         readmePathOverride: String? = nil
@@ -351,11 +351,17 @@ final class AppStore: ObservableObject {
             inactiveReason: nil
         )
 
-        projectStateEditState = ProjectStateEditState(
+        let displayTitle = item.frontmatter["project"]?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? item.title
+
+        projectDetailsEditState = ProjectDetailsEditState(
             projectID: item.id,
             projectPath: item.path,
             readmePath: readmePath,
             projectTitle: item.title,
+            currentDisplayTitle: displayTitle,
+            initialDisplayTitle: displayTitle,
+            currentProjectType: item.projectType,
+            initialProjectType: item.projectType,
             currentState: currentState,
             initialState: initialState ?? currentState,
             currentIsInDailyFocus: item.isInDailyFocus,
@@ -364,16 +370,18 @@ final class AppStore: ObservableObject {
         )
     }
 
-    func dismissProjectStateEdit() {
-        projectStateEditState = nil
+    func dismissProjectDetailsEdit() {
+        projectDetailsEditState = nil
     }
 
     func toggleDailyFocus(for item: WorkspaceItem) {
         updateProjectDailyFocus(!item.isInDailyFocus, for: item)
     }
 
-    func saveProjectStateEdit(
-        _ state: ProjectStateEditState,
+    func saveProjectDetailsEdit(
+        _ state: ProjectDetailsEditState,
+        projectTitle: String,
+        projectType: WorkspaceProjectType,
         activityState: ProjectActivityState,
         workflowStage: ProjectWorkflowStage,
         inactiveReason: ProjectInactiveReason?,
@@ -382,7 +390,7 @@ final class AppStore: ObservableObject {
         guard let item = snapshot.items.first(where: { $0.id == state.projectID }) else {
             activeAlert = AppAlert(
                 title: "Project not found",
-                message: "Reload the workspace and try editing the project state again."
+                message: "Reload the workspace and try editing the project details again."
             )
             return
         }
@@ -395,6 +403,15 @@ final class AppStore: ObservableObject {
             return
         }
 
+        let normalizedTitle = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalizedTitle.isEmpty {
+            activeAlert = AppAlert(
+                title: "Project title required",
+                message: "Give the project a real title so the detail page and workspace lists stay trustworthy."
+            )
+            return
+        }
+
         let normalizedState = ProjectState(
             activityState: activityState,
             workflowStage: workflowStage,
@@ -402,12 +419,14 @@ final class AppStore: ObservableObject {
         )
 
         updateProjectMetadata(
+            title: normalizedTitle,
+            projectType: projectType,
             normalizedState,
             isInDailyFocus: isInDailyFocus,
             for: item,
             compatibilityStatusOverride: normalizedState.legacyLifecycleStatus(isArchivedStorage: state.isArchivedStorage)
         )
-        projectStateEditState = nil
+        projectDetailsEditState = nil
     }
 
     func choosePublishedPDF() -> URL? {
@@ -2142,6 +2161,8 @@ final class AppStore: ObservableObject {
         compatibilityStatusOverride: ProjectLifecycleStatus? = nil
     ) {
         updateProjectMetadata(
+            title: item.frontmatter["project"]?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? item.title,
+            projectType: item.projectType,
             projectState,
             isInDailyFocus: item.isInDailyFocus,
             for: item,
@@ -2158,6 +2179,8 @@ final class AppStore: ObservableObject {
         let compatibilityStatus = item.compatibilityStatus
             ?? projectState.legacyLifecycleStatus(isArchivedStorage: item.section == .archives)
         updateProjectMetadata(
+            title: item.frontmatter["project"]?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? item.title,
+            projectType: item.projectType,
             projectState,
             isInDailyFocus: isInDailyFocus,
             for: item,
@@ -2166,6 +2189,8 @@ final class AppStore: ObservableObject {
     }
 
     private func updateProjectMetadata(
+        title: String,
+        projectType: WorkspaceProjectType,
         _ projectState: ProjectState,
         isInDailyFocus: Bool,
         for item: WorkspaceItem,
@@ -2183,6 +2208,12 @@ final class AppStore: ObservableObject {
             let readmeURL = URL(fileURLWithPath: readmePath)
             let currentText = try String(contentsOf: readmeURL, encoding: .utf8)
             let updatedText = updateFrontmatter(in: currentText) { frontmatter, orderedKeys in
+                applyProjectIdentityFrontmatter(
+                    title: title,
+                    projectType: projectType,
+                    to: &frontmatter,
+                    orderedKeys: &orderedKeys
+                )
                 let compatibilityStatus = compatibilityStatusOverride
                     ?? projectState.legacyLifecycleStatus(isArchivedStorage: item.section == .archives)
                 applyProjectStateFrontmatter(
@@ -2200,10 +2231,10 @@ final class AppStore: ObservableObject {
             try updatedText.write(to: readmeURL, atomically: true, encoding: .utf8)
             reloadWorkspace()
             let focusSummary = isInDailyFocus ? "in daily focus" : "out of daily focus"
-            statusMessage = "\(item.title) updated to \(projectState.detailLabel.lowercased()) and \(focusSummary)"
+            statusMessage = "\(title) updated to \(projectState.detailLabel.lowercased()) and \(focusSummary)"
         } catch {
             activeAlert = AppAlert(
-                title: "Could not update project state",
+                title: "Could not update project details",
                 message: error.localizedDescription
             )
             statusMessage = error.localizedDescription
@@ -2595,6 +2626,20 @@ private func workspaceActionSummary(for status: ProjectLifecycleStatus) -> Strin
     }
 }
 
+private func applyProjectIdentityFrontmatter(
+    title: String,
+    projectType: WorkspaceProjectType,
+    to frontmatter: inout [String: String],
+    orderedKeys: inout [String]
+) {
+    frontmatter["project"] = title
+    frontmatter["project_type"] = projectType.rawValue
+
+    for key in ["project", "project_type"] where !orderedKeys.contains(key) {
+        orderedKeys.append(key)
+    }
+}
+
 private func applyProjectStateFrontmatter(
     _ projectState: ProjectState,
     compatibilityStatus: ProjectLifecycleStatus,
@@ -2646,6 +2691,12 @@ private func relativePath(_ path: String, from rootPath: String) -> String {
         return normalizedPath
     }
     return String(normalizedPath.dropFirst(normalizedRoot.count + 1))
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
 }
 
 private func copyDocuments(_ urls: [URL], into docsURL: URL) throws -> [String] {

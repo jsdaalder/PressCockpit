@@ -164,8 +164,8 @@ struct DetailView: View {
             ProjectOffboardingSheet(state: state)
                 .environmentObject(store)
         }
-        .sheet(item: $store.projectStateEditState) { state in
-            ProjectStateEditorSheet(state: state)
+        .sheet(item: $store.projectDetailsEditState) { state in
+            ProjectDetailsEditorSheet(state: state)
                 .environmentObject(store)
         }
         .alert(item: $store.activeAlert) { alert in
@@ -1231,7 +1231,7 @@ struct WorkspaceDetailView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     SectionCard(title: "Project trust") {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("This is the main place to check the project's current state, dossier link, and main draft target before you do anything else.")
+                            Text("This is the trusted project surface: keep the title, project kind, newsroom state, draft ownership, and dossier context accurate here before you do anything else.")
                                 .font(.subheadline)
                                 .foregroundStyle(AppPalette.subtle)
 
@@ -1243,25 +1243,10 @@ struct WorkspaceDetailView: View {
                                         store.openPreferredDraft(for: item)
                                     }
                                 }
-                                Button("Edit project state…") {
-                                    store.beginProjectStateEditing(for: item)
+                                Button("Edit project details…") {
+                                    store.beginProjectDetailsEditing(for: item)
                                 }
-                                if item.dossierSlug != nil {
-                                    Button("Open dossier") {
-                                        store.openLinkedDossier(for: item)
-                                    }
-                                }
-                                if item.hasDocsOverview {
-                                    Button("Open docs overview") {
-                                        store.openDocsOverview(for: item)
-                                    }
-                                }
-                                if store.shouldOfferGoogleDraftPromotion(for: item) {
-                                    Button("Promote Google draft…") {
-                                        store.promoteGoogleDraft(for: item)
-                                    }
-                                }
-                                projectStatusMenu
+                                projectActionMenu
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
@@ -1269,7 +1254,7 @@ struct WorkspaceDetailView: View {
                         }
                     }
 
-                    SectionCard(title: "How to work with this project") {
+                    SectionCard(title: "Working context") {
                         VStack(alignment: .leading, spacing: 14) {
                             if !item.subtitle.isEmpty {
                                 VStack(alignment: .leading, spacing: 6) {
@@ -1358,29 +1343,38 @@ struct WorkspaceDetailView: View {
                         }
                     }
 
-                    SectionCard(title: "Project maintenance") {
+                    SectionCard(title: "Secondary tools") {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("These actions update derived project state or prepare local Google Doc cache placeholders. Write actions now route through workflow detail first so you can review them before execution.")
+                            Text("Keep these secondary tools available without letting them crowd the main project surface.")
                                 .font(.subheadline)
                                 .foregroundStyle(AppPalette.subtle)
 
-                            HStack {
-                                Button("Open folder") { store.openFolder(for: item) }
-                                if item.hasGoogleDocPointers {
-                                    Button("Open Google Doc prep workflow") {
-                                        store.select(.workspace(item.id))
-                                        store.select(.workflow("refresh-project-google-doc-prep"))
+                            DisclosureGroup("Show secondary tools") {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text("These actions update derived project state or prepare local Google Doc cache placeholders. Write actions still route through workflow detail first so you can review them before execution.")
+                                        .font(.caption)
+                                        .foregroundStyle(AppPalette.subtle)
+
+                                    HStack {
+                                        Button("Open folder") { store.openFolder(for: item) }
+                                        if item.hasGoogleDocPointers {
+                                            Button("Open Google Doc prep workflow") {
+                                                store.select(.workspace(item.id))
+                                                store.select(.workflow("refresh-project-google-doc-prep"))
+                                            }
+                                        }
+                                        if item.isProjectRoot {
+                                            Button("Open README rebuild workflow") {
+                                                store.select(.workspace(item.id))
+                                                store.select(.workflow("build-project-readme"))
+                                            }
+                                        }
                                     }
-                                }
-                                if item.isProjectRoot {
-                                    Button("Open README rebuild workflow") {
-                                        store.select(.workspace(item.id))
-                                        store.select(.workflow("build-project-readme"))
-                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                    .tint(AppPalette.title)
                                 }
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
                             .tint(AppPalette.title)
                         }
                     }
@@ -1470,9 +1464,27 @@ struct WorkspaceDetailView: View {
         store.maintenanceItems(for: item)
     }
 
-    private var projectStatusMenu: some View {
+    private var projectActionMenu: some View {
         Menu {
             if let item {
+                if item.dossierSlug != nil {
+                    Button("Open dossier") {
+                        store.openLinkedDossier(for: item)
+                    }
+                }
+                if item.hasDocsOverview {
+                    Button("Open docs overview") {
+                        store.openDocsOverview(for: item)
+                    }
+                }
+                if store.shouldOfferGoogleDraftPromotion(for: item) {
+                    Button("Promote Google draft…") {
+                        store.promoteGoogleDraft(for: item)
+                    }
+                }
+
+                Divider()
+
                 Button("Mark active") {
                     store.beginProjectStatusChange(for: item, targetStatus: .active)
                 }
@@ -1487,7 +1499,7 @@ struct WorkspaceDetailView: View {
                 }
             }
         } label: {
-            Label("Quick state change", systemImage: "arrow.triangle.2.circlepath")
+            Label("Project actions", systemImage: "ellipsis.circle")
         }
         .controlSize(.small)
     }
@@ -2480,8 +2492,8 @@ struct OverviewProjectRow: View {
 
     private var stateMenu: some View {
         Menu {
-            Button("Edit project state…") {
-                store.beginProjectStateEditing(for: summary.item)
+            Button("Edit project details…") {
+                store.beginProjectDetailsEditing(for: summary.item)
             }
 
             Divider()
@@ -2609,17 +2621,21 @@ private struct OverviewProjectActionLabel: View {
     }
 }
 
-struct ProjectStateEditorSheet: View {
+struct ProjectDetailsEditorSheet: View {
     @EnvironmentObject private var store: AppStore
-    let state: ProjectStateEditState
+    let state: ProjectDetailsEditState
 
+    @State private var projectTitle: String
+    @State private var projectType: WorkspaceProjectType
     @State private var activityState: ProjectActivityState
     @State private var workflowStage: ProjectWorkflowStage
     @State private var inactiveReason: ProjectInactiveReason?
     @State private var isInDailyFocus: Bool
 
-    init(state: ProjectStateEditState) {
+    init(state: ProjectDetailsEditState) {
         self.state = state
+        _projectTitle = State(initialValue: state.initialDisplayTitle)
+        _projectType = State(initialValue: state.initialProjectType)
         _activityState = State(initialValue: state.initialState.activityState)
         _workflowStage = State(initialValue: state.initialState.workflowStage)
         _inactiveReason = State(initialValue: state.initialState.inactiveReason)
@@ -2629,18 +2645,37 @@ struct ProjectStateEditorSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Edit Project State")
+                Text("Edit Project Details")
                     .font(.system(.title2, design: .serif).weight(.semibold))
                     .foregroundStyle(AppPalette.title)
 
-                Text("Use activity, workflow stage, inactive reason, and daily focus to describe the project accurately. Safety stays separate.")
+                Text("Keep the trusted project title, project kind, activity state, workflow stage, and daily focus accurate here. Safety stays separate.")
                     .font(.subheadline)
                     .foregroundStyle(AppPalette.subtle)
             }
 
             VStack(alignment: .leading, spacing: 12) {
-                statusRow("Project", value: state.projectTitle)
+                statusRow("Project", value: state.currentDisplayTitle)
+                statusRow("Project kind", value: state.currentProjectType.label)
                 statusRow("Current", value: state.currentState.detailLabel)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Project title")
+                        .font(.subheadline.weight(.semibold))
+                    TextField("Project title", text: $projectTitle)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Project kind")
+                        .font(.subheadline.weight(.semibold))
+                    Picker("Project kind", selection: $projectType) {
+                        ForEach(WorkspaceProjectType.editableProjectKinds, id: \.self) { option in
+                            Text(option.label).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Activity state")
@@ -2685,13 +2720,15 @@ struct ProjectStateEditorSheet: View {
             HStack {
                 Spacer()
                 Button("Cancel") {
-                    store.dismissProjectStateEdit()
+                    store.dismissProjectDetailsEdit()
                 }
                 .keyboardShortcut(.cancelAction)
 
-                Button("Save state") {
-                    store.saveProjectStateEdit(
+                Button("Save details") {
+                    store.saveProjectDetailsEdit(
                         state,
+                        projectTitle: projectTitle,
+                        projectType: projectType,
                         activityState: activityState,
                         workflowStage: workflowStage,
                         inactiveReason: inactiveReason,

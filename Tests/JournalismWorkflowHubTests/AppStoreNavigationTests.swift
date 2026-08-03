@@ -1089,8 +1089,10 @@ final class AppStoreNavigationTests: XCTestCase {
         let project = try XCTUnwrap(store.snapshot.items.first(where: { $0.section == .projects }))
         store.beginProjectStatusChange(for: project, targetStatus: .onHold)
 
-        let state = try XCTUnwrap(store.projectStateEditState)
+        let state = try XCTUnwrap(store.projectDetailsEditState)
         XCTAssertNil(store.projectStatusChangeState)
+        XCTAssertEqual(state.currentDisplayTitle, "Demo Story")
+        XCTAssertEqual(state.currentProjectType, .journalism)
         XCTAssertEqual(state.currentState.activityState, .active)
         XCTAssertEqual(state.currentState.workflowStage, .activeInvestigation)
         XCTAssertNil(state.currentState.inactiveReason)
@@ -1104,8 +1106,10 @@ final class AppStoreNavigationTests: XCTestCase {
         let unchangedReadmeText = try String(contentsOf: readmePath, encoding: .utf8)
         XCTAssertTrue(unchangedReadmeText.contains("status: active"))
 
-        store.saveProjectStateEdit(
+        store.saveProjectDetailsEdit(
             state,
+            projectTitle: state.initialDisplayTitle,
+            projectType: state.initialProjectType,
             activityState: state.initialState.activityState,
             workflowStage: state.initialState.workflowStage,
             inactiveReason: state.initialState.inactiveReason,
@@ -1114,7 +1118,7 @@ final class AppStoreNavigationTests: XCTestCase {
 
         let readmeText = try String(contentsOf: readmePath, encoding: .utf8)
 
-        XCTAssertNil(store.projectStateEditState)
+        XCTAssertNil(store.projectDetailsEditState)
         XCTAssertNil(store.projectStatusChangeState)
         XCTAssertTrue(readmeText.contains("activity_state: inactive"))
         XCTAssertTrue(readmeText.contains("workflow_stage: active_investigation"))
@@ -1122,7 +1126,7 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertTrue(readmeText.contains("status: on_hold"))
     }
 
-    func testEditingProjectStateWritesNewFrontmatterFields() throws {
+    func testEditingProjectDetailsWritesTrustedFrontmatterFields() throws {
         let workspaceRoot = try makeWorkspaceRoot()
         let store = AppStore(configuration: AppConfiguration(
             profile: .standalone,
@@ -1131,11 +1135,13 @@ final class AppStoreNavigationTests: XCTestCase {
         ))
 
         let project = try XCTUnwrap(store.snapshot.items.first(where: { $0.section == .projects }))
-        store.beginProjectStateEditing(for: project)
+        store.beginProjectDetailsEditing(for: project)
 
-        let state = try XCTUnwrap(store.projectStateEditState)
-        store.saveProjectStateEdit(
+        let state = try XCTUnwrap(store.projectDetailsEditState)
+        store.saveProjectDetailsEdit(
             state,
+            projectTitle: "Retitled Story",
+            projectType: .dataJournalism,
             activityState: .inactive,
             workflowStage: .feasibilityStudy,
             inactiveReason: .discarded,
@@ -1145,7 +1151,9 @@ final class AppStoreNavigationTests: XCTestCase {
         let readmePath = workspaceRoot.appendingPathComponent("Projects/2026/demo_story/README.md")
         let readmeText = try String(contentsOf: readmePath, encoding: .utf8)
 
-        XCTAssertNil(store.projectStateEditState)
+        XCTAssertNil(store.projectDetailsEditState)
+        XCTAssertTrue(readmeText.contains("project: Retitled Story"))
+        XCTAssertTrue(readmeText.contains("project_type: data_journalism"))
         XCTAssertTrue(readmeText.contains("activity_state: inactive"))
         XCTAssertTrue(readmeText.contains("workflow_stage: feasibility_study"))
         XCTAssertTrue(readmeText.contains("inactive_reason: discarded"))

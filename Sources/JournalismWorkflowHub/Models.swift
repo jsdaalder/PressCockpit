@@ -78,6 +78,10 @@ enum WorkspaceProjectType: String, Codable, Hashable {
         case .general: return "General"
         }
     }
+
+    static var editableProjectKinds: [WorkspaceProjectType] {
+        [.journalism, .dataJournalism, .tooling, .general]
+    }
 }
 
 enum WorkspaceSafetyPosture: String, Codable, Hashable {
@@ -575,12 +579,16 @@ struct ProjectStatusChangeState: Identifiable, Hashable {
     let archiveYear: String
 }
 
-struct ProjectStateEditState: Identifiable, Hashable {
+struct ProjectDetailsEditState: Identifiable, Hashable {
     let id = UUID()
     let projectID: String
     let projectPath: String
     let readmePath: String
     let projectTitle: String
+    let currentDisplayTitle: String
+    let initialDisplayTitle: String
+    let currentProjectType: WorkspaceProjectType
+    let initialProjectType: WorkspaceProjectType
     let currentState: ProjectState
     let initialState: ProjectState
     let currentIsInDailyFocus: Bool
@@ -1000,21 +1008,14 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
 
     var projectTrustRows: [(String, String)] {
         var rows: [(String, String)] = [
+            ("Project", title),
+            ("Project kind", projectType.label),
             ("Activity state", activityState?.label ?? "Not set"),
             ("Workflow stage", workflowStage?.label ?? "Not set")
         ]
 
         if activityState == .inactive {
             rows.append(("Inactive reason", inactiveReason?.label ?? "Not set"))
-        }
-
-        if projectState != nil {
-            rows.append((
-                "State source",
-                hasExplicitProjectStateFrontmatter
-                    ? "Explicit frontmatter"
-                    : "Compatibility fallback from `status`"
-            ))
         }
 
         rows.append(("Daily focus", isInDailyFocus ? "Yes" : "No"))
