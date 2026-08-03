@@ -8,11 +8,27 @@ struct JournalismWorkflowHubApp: App {
         WindowGroup {
             AppRootView()
                 .environmentObject(store)
+                .preferredColorScheme(store.preferredColorScheme)
                 .frame(minWidth: 980, minHeight: 720)
         }
         .windowStyle(.titleBar)
         .commands {
             CommandGroup(replacing: .newItem) { }
+            CommandGroup(after: .toolbar) {
+                Divider()
+
+                Toggle(isOn: Binding(
+                    get: { store.isDarkModeMenuEnabled },
+                    set: { store.setDarkModeEnabled($0) }
+                )) {
+                    Text("Dark mode")
+                }
+
+                Button("Follow system appearance") {
+                    store.followSystemAppearance()
+                }
+                .disabled(store.appAppearancePreference == .system)
+            }
 
             CommandMenu("Workspace") {
                 Button("Refresh workspace") {

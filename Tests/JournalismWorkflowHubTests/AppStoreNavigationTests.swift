@@ -445,6 +445,56 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertFalse(OnboardingPreferences.diagnosticsLoggingEnabled(defaults: defaults))
     }
 
+    func testAppStoreStartsFollowingSystemAppearanceByDefault() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = AppStore(
+            configuration: AppConfiguration(
+                profile: .standalone,
+                workspaceRoot: workspaceRoot,
+                demoWorkspaceRoot: nil
+            ),
+            defaults: defaults
+        )
+
+        XCTAssertEqual(store.appAppearancePreference, .system)
+        XCTAssertNil(store.preferredColorScheme)
+    }
+
+    func testSettingDarkModePersistsAppearancePreference() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = AppStore(
+            configuration: AppConfiguration(
+                profile: .standalone,
+                workspaceRoot: workspaceRoot,
+                demoWorkspaceRoot: nil
+            ),
+            defaults: defaults
+        )
+
+        store.setDarkModeEnabled(true)
+        XCTAssertEqual(store.appAppearancePreference, .dark)
+        XCTAssertEqual(store.preferredColorScheme, .dark)
+        XCTAssertEqual(OnboardingPreferences.appAppearancePreference(defaults: defaults), .dark)
+
+        store.setDarkModeEnabled(false)
+        XCTAssertEqual(store.appAppearancePreference, .light)
+        XCTAssertEqual(store.preferredColorScheme, .light)
+        XCTAssertEqual(OnboardingPreferences.appAppearancePreference(defaults: defaults), .light)
+
+        store.followSystemAppearance()
+        XCTAssertEqual(store.appAppearancePreference, .system)
+        XCTAssertNil(store.preferredColorScheme)
+        XCTAssertEqual(OnboardingPreferences.appAppearancePreference(defaults: defaults), .system)
+    }
+
     func testReopenOnboardingResetsCompletionState() throws {
         OnboardingPreferences.reset()
         defer { OnboardingPreferences.reset() }

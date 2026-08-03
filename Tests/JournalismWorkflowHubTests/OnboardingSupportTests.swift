@@ -113,4 +113,22 @@ final class OnboardingSupportTests: XCTestCase {
 
         XCTAssertTrue(OnboardingPreferences.diagnosticsLoggingEnabled(defaults: defaults))
     }
+
+    func testOnboardingPreferencesDefaultToSystemAppearance() {
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        XCTAssertEqual(OnboardingPreferences.appAppearancePreference(defaults: defaults), .system)
+    }
+
+    func testOnboardingPreferencesPersistAndReadAppearancePreference() {
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        OnboardingPreferences.setAppAppearancePreference(.dark, defaults: defaults)
+
+        XCTAssertEqual(OnboardingPreferences.appAppearancePreference(defaults: defaults), .dark)
+    }
 }

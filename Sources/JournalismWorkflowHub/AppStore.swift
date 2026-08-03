@@ -24,6 +24,7 @@ final class AppStore: ObservableObject {
     @Published var selectedRunOutput: String = ""
     @Published private(set) var documentMode: OnboardingDocumentMode
     @Published private(set) var isDiagnosticsLoggingEnabled: Bool
+    @Published private(set) var appAppearancePreference: AppAppearancePreference
     @Published var hasCompletedOnboarding: Bool
     @Published private(set) var onboardingLaunchMode: OnboardingLaunchMode?
     @Published private(set) var captureRecords: [CaptureRecord] = []
@@ -67,6 +68,7 @@ final class AppStore: ObservableObject {
         self.appSupportDirectory = appSupportDirectory
         self.documentMode = OnboardingPreferences.documentMode(defaults: defaults)
         self.isDiagnosticsLoggingEnabled = OnboardingPreferences.diagnosticsLoggingEnabled(defaults: defaults)
+        self.appAppearancePreference = OnboardingPreferences.appAppearancePreference(defaults: defaults)
         self.hasCompletedOnboarding = hasCompletedOnboarding
         self.onboardingLaunchMode = hasCompletedOnboarding ? nil : .firstRun
         self.scanner = WorkspaceScanner(workspaceRoot: configuration.workspaceRoot)
@@ -660,6 +662,55 @@ final class AppStore: ObservableObject {
 
         if enabled {
             logDiagnostics("diagnostics enabled from menu")
+        }
+    }
+
+    func setDarkModeEnabled(_ enabled: Bool) {
+        setAppAppearancePreference(enabled ? .dark : .light)
+    }
+
+    func followSystemAppearance() {
+        setAppAppearancePreference(.system)
+    }
+
+    var preferredColorScheme: ColorScheme? {
+        switch appAppearancePreference {
+        case .system:
+            return nil
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
+    }
+
+    var isDarkModeMenuEnabled: Bool {
+        switch appAppearancePreference {
+        case .dark:
+            return true
+        case .light:
+            return false
+        case .system:
+            return resolvedSystemColorScheme == .dark
+        }
+    }
+
+    private var resolvedSystemColorScheme: ColorScheme {
+        let bestMatch = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
+        return bestMatch == .darkAqua ? .dark : .light
+    }
+
+    private func setAppAppearancePreference(_ preference: AppAppearancePreference) {
+        guard preference != appAppearancePreference else { return }
+        OnboardingPreferences.setAppAppearancePreference(preference, defaults: userDefaults)
+        appAppearancePreference = preference
+        switch preference {
+        case .system:
+            statusMessage = "Following system appearance"
+        case .light:
+            statusMessage = "Light mode enabled"
+        case .dark:
+            statusMessage = "Dark mode enabled"
         }
     }
 

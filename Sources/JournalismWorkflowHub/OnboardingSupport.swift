@@ -1,5 +1,11 @@
 import Foundation
 
+enum AppAppearancePreference: String, CaseIterable, Hashable {
+    case system
+    case light
+    case dark
+}
+
 enum OnboardingStep: Int, CaseIterable, Hashable {
     case welcome
     case startMode
@@ -233,6 +239,7 @@ struct OnboardingPreferences {
     static let startModeKey = "onboardingStartMode"
     static let firstActionKey = "onboardingFirstAction"
     static let diagnosticsLoggingEnabledKey = "diagnosticsLoggingEnabled"
+    static let appAppearancePreferenceKey = "appAppearancePreference"
 
     static func hasCompleted(defaults: UserDefaults = .standard) -> Bool {
         defaults.bool(forKey: completedKey)
@@ -265,11 +272,24 @@ struct OnboardingPreferences {
         defaults.set(enabled, forKey: diagnosticsLoggingEnabledKey)
     }
 
+    static func appAppearancePreference(defaults: UserDefaults = .standard) -> AppAppearancePreference {
+        guard let rawValue = defaults.string(forKey: appAppearancePreferenceKey),
+              let preference = AppAppearancePreference(rawValue: rawValue) else {
+            return .system
+        }
+        return preference
+    }
+
+    static func setAppAppearancePreference(_ preference: AppAppearancePreference, defaults: UserDefaults = .standard) {
+        defaults.set(preference.rawValue, forKey: appAppearancePreferenceKey)
+    }
+
     static func reset(defaults: UserDefaults = .standard) {
         defaults.removeObject(forKey: completedKey)
         defaults.removeObject(forKey: documentModeKey)
         defaults.removeObject(forKey: startModeKey)
         defaults.removeObject(forKey: firstActionKey)
+        defaults.removeObject(forKey: appAppearancePreferenceKey)
     }
 }
 
