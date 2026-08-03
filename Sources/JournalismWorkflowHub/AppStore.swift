@@ -368,6 +368,7 @@ final class AppStore: ObservableObject {
             initialIsInDailyFocus: item.isInDailyFocus,
             isArchivedStorage: item.section == .archives
         )
+        select(.workspace(item.id))
     }
 
     func dismissProjectDetailsEdit() {

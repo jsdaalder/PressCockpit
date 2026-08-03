@@ -1161,6 +1161,24 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertTrue(readmeText.contains("daily_focus: true"))
     }
 
+    func testBeginningProjectDetailsEditingRoutesToProjectPage() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+
+        let project = try XCTUnwrap(store.snapshot.items.first(where: { $0.section == .projects }))
+        store.select(.overview)
+
+        store.beginProjectDetailsEditing(for: project)
+
+        let state = try XCTUnwrap(store.projectDetailsEditState)
+        XCTAssertEqual(state.projectID, project.id)
+        XCTAssertEqual(store.selection, .workspace(project.id))
+    }
+
     func testTogglingDailyFocusWritesTrustedFrontmatter() throws {
         let workspaceRoot = try makeWorkspaceRoot()
         let store = AppStore(configuration: AppConfiguration(

@@ -164,10 +164,6 @@ struct DetailView: View {
             ProjectOffboardingSheet(state: state)
                 .environmentObject(store)
         }
-        .sheet(item: $store.projectDetailsEditState) { state in
-            ProjectDetailsEditorSheet(state: state)
-                .environmentObject(store)
-        }
         .alert(item: $store.activeAlert) { alert in
             Alert(
                 title: Text(alert.title),
@@ -1234,25 +1230,30 @@ struct WorkspaceDetailView: View {
                                 .font(.subheadline)
                                 .foregroundStyle(AppPalette.subtle)
 
-                            MetadataGrid(rows: item.projectTrustRows)
+                            if let editState, editState.projectID == item.id {
+                                ProjectTrustInlineEditor(item: item, state: editState)
+                                    .environmentObject(store)
+                            } else {
+                                MetadataGrid(rows: item.projectTrustRows)
 
-                            HStack(spacing: 12) {
-                                if item.canonicalDraftDocument != nil {
-                                    Button("Open draft") {
-                                        store.openPreferredDraft(for: item)
+                                HStack(spacing: 12) {
+                                    if item.canonicalDraftDocument != nil {
+                                        Button("Open draft") {
+                                            store.openPreferredDraft(for: item)
+                                        }
                                     }
+                                    Button("Open docs folder") {
+                                        store.openPath(item.docsDirectoryURL.path)
+                                    }
+                                    Button("Edit project details…") {
+                                        store.beginProjectDetailsEditing(for: item)
+                                    }
+                                    projectActionMenu
                                 }
-                                Button("Open docs folder") {
-                                    store.openPath(item.docsDirectoryURL.path)
-                                }
-                                Button("Edit project details…") {
-                                    store.beginProjectDetailsEditing(for: item)
-                                }
-                                projectActionMenu
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                .tint(AppPalette.title)
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .tint(AppPalette.title)
                         }
                     }
 
@@ -1339,6 +1340,10 @@ struct WorkspaceDetailView: View {
 
     private var item: WorkspaceItem? {
         store.workspaceItem(for: itemID)
+    }
+
+    private var editState: ProjectDetailsEditState? {
+        store.projectDetailsEditState
     }
 
     private var publicationMatches: [PublicationStory]? {
@@ -2509,8 +2514,9 @@ private struct OverviewProjectActionLabel: View {
     }
 }
 
-struct ProjectDetailsEditorSheet: View {
+struct ProjectTrustInlineEditor: View {
     @EnvironmentObject private var store: AppStore
+    let item: WorkspaceItem
     let state: ProjectDetailsEditState
 
     @State private var projectTitle: String
@@ -2520,7 +2526,8 @@ struct ProjectDetailsEditorSheet: View {
     @State private var inactiveReason: ProjectInactiveReason?
     @State private var isInDailyFocus: Bool
 
-    init(state: ProjectDetailsEditState) {
+    init(item: WorkspaceItem, state: ProjectDetailsEditState) {
+        self.item = item
         self.state = state
         _projectTitle = State(initialValue: state.initialDisplayTitle)
         _projectType = State(initialValue: state.initialProjectType)
@@ -2532,97 +2539,79 @@ struct ProjectDetailsEditorSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Edit Project Details")
-                    .font(.system(.title2, design: .serif).weight(.semibold))
-                    .foregroundStyle(AppPalette.title)
-
-                Text("Update the small set of trusted project fields here. Safety stays separate.")
-                    .font(.subheadline)
-                    .foregroundStyle(AppPalette.subtle)
+            EditableMetadataRow(label: "Project") {
+                TextField("Project title", text: $projectTitle)
+                    .textFieldStyle(.roundedBorder)
             }
 
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Project title")
-                        .font(.subheadline.weight(.semibold))
-                    TextField("Project title", text: $projectTitle)
-                        .textFieldStyle(.roundedBorder)
+            EditableMetadataRow(label: "Project kind") {
+                Picker("Project kind", selection: $projectType) {
+                    ForEach(WorkspaceProjectType.editableProjectKinds, id: \.self) { option in
+                        Text(option.label).tag(option)
+                    }
                 }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Project kind")
-                        .font(.subheadline.weight(.semibold))
-                    Picker("Project kind", selection: $projectType) {
-                        ForEach(WorkspaceProjectType.editableProjectKinds, id: \.self) { option in
-                            Text(option.label).tag(option)
+            EditableMetadataRow(label: "Activity state") {
+                Picker("Activity state", selection: $activityState) {
+                    ForEach(ProjectActivityState.allCases, id: \.self) { option in
+                        Text(option.label).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+
+            EditableMetadataRow(label: "Workflow stage") {
+                Picker("Workflow stage", selection: $workflowStage) {
+                    ForEach(ProjectWorkflowStage.allCases, id: \.self) { option in
+                        Text(option.label).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+
+            EditableMetadataRow(label: "Daily focus") {
+                Button {
+                    isInDailyFocus.toggle()
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: isInDailyFocus ? "star.fill" : "star")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(isInDailyFocus ? Color.accentColor : AppPalette.subtle)
+                            .frame(width: 28, height: 28)
+                            .background(AppPalette.card.opacity(0.98), in: Circle())
+                            .overlay(Circle().stroke(AppPalette.border))
+
+                        Text(isInDailyFocus ? "In daily focus" : "Not in daily focus")
+                            .foregroundStyle(AppPalette.title)
+                    }
+                }
+                .buttonStyle(.plain)
+                .help(isInDailyFocus ? "Remove from daily focus" : "Add to daily focus")
+            }
+
+            if activityState == .inactive {
+                EditableMetadataRow(label: "Inactive reason") {
+                    Picker("Inactive reason", selection: inactiveReasonBinding) {
+                        Text("Choose reason").tag(Optional<ProjectInactiveReason>.none)
+                        ForEach(ProjectInactiveReason.allCases, id: \.self) { option in
+                            Text(option.label).tag(Optional(option))
                         }
                     }
                     .pickerStyle(.menu)
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Activity state")
-                        .font(.subheadline.weight(.semibold))
-                    Picker("Activity state", selection: $activityState) {
-                        ForEach(ProjectActivityState.allCases, id: \.self) { option in
-                            Text(option.label).tag(option)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Workflow stage")
-                        .font(.subheadline.weight(.semibold))
-                    Picker("Workflow stage", selection: $workflowStage) {
-                        ForEach(ProjectWorkflowStage.allCases, id: \.self) { option in
-                            Text(option.label).tag(option)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Daily focus")
-                        .font(.subheadline.weight(.semibold))
-
-                    Button {
-                        isInDailyFocus.toggle()
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: isInDailyFocus ? "star.fill" : "star")
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(isInDailyFocus ? Color.accentColor : AppPalette.subtle)
-                                .frame(width: 28, height: 28)
-                                .background(AppPalette.card.opacity(0.98), in: Circle())
-                                .overlay(Circle().stroke(AppPalette.border))
-
-                            Text(isInDailyFocus ? "In daily focus" : "Not in daily focus")
-                                .foregroundStyle(AppPalette.title)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .help(isInDailyFocus ? "Remove from daily focus" : "Add to daily focus")
-                }
-
-                if activityState == .inactive {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Inactive reason")
-                            .font(.subheadline.weight(.semibold))
-                        Picker("Inactive reason", selection: inactiveReasonBinding) {
-                            Text("Choose reason").tag(Optional<ProjectInactiveReason>.none)
-                            ForEach(ProjectInactiveReason.allCases, id: \.self) { option in
-                                Text(option.label).tag(Optional(option))
-                            }
-                        }
-                        .pickerStyle(.menu)
-                    }
+                    .labelsHidden()
                 }
             }
 
-            HStack {
-                Spacer()
+            if !remainingRows.isEmpty {
+                MetadataGrid(rows: remainingRows)
+            }
+
+            HStack(spacing: 12) {
                 Button("Cancel") {
                     store.dismissProjectDetailsEdit()
                 }
@@ -2641,9 +2630,10 @@ struct ProjectDetailsEditorSheet: View {
                 }
                 .keyboardShortcut(.defaultAction)
             }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .tint(AppPalette.title)
         }
-        .padding(24)
-        .frame(width: 520)
         .onChange(of: activityState) { _, newValue in
             if newValue == .active {
                 inactiveReason = nil
@@ -2658,6 +2648,40 @@ struct ProjectDetailsEditorSheet: View {
             get: { inactiveReason },
             set: { inactiveReason = $0 }
         )
+    }
+
+    private var remainingRows: [(String, String)] {
+        let editableKeys: Set<String> = [
+            "Project",
+            "Project kind",
+            "Activity state",
+            "Workflow stage",
+            "Inactive reason",
+            "Daily focus"
+        ]
+        return item.projectTrustRows.filter { !editableKeys.contains($0.0) }
+    }
+}
+
+struct EditableMetadataRow<Content: View>: View {
+    let label: String
+    let content: Content
+
+    init(label: String, @ViewBuilder content: () -> Content) {
+        self.label = label
+        self.content = content()
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            Text(label)
+                .frame(width: 160, alignment: .leading)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppPalette.subtle)
+            content
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Spacer()
+        }
     }
 }
 
