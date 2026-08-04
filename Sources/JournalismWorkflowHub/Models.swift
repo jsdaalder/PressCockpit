@@ -1040,6 +1040,37 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
         return value.isEmpty ? nil : value
     }
 
+    var projectDetailRows: [(String, String)] {
+        var rows: [(String, String)] = [
+            ("Project", title),
+            ("Project kind", projectType.label),
+            ("Activity state", activityState?.label ?? "Not set"),
+            ("Workflow stage", workflowStage?.label ?? "Not set")
+        ]
+
+        if activityState == .inactive {
+            rows.append(("Inactive reason", inactiveReason?.label ?? "Not set"))
+        }
+
+        rows.append(("Daily focus", isInDailyFocus ? "Yes" : "No"))
+        rows.append(("Dossier", dossierSlug ?? "None linked yet"))
+        rows.append(("Handling", safetyPosture.label))
+        return rows
+    }
+
+    var workingDocumentRows: [(String, String)] {
+        var rows: [(String, String)] = []
+
+        if let draft = canonicalDraftDocument {
+            rows.append(("Canonical draft", draft.title))
+        } else {
+            rows.append(("Canonical draft", "Not decided yet"))
+        }
+
+        rows.append(("Pitch", pitchDocument?.title ?? "None linked yet"))
+        return rows
+    }
+
     var projectTrustRows: [(String, String)] {
         var rows: [(String, String)] = [
             ("Project", title),
@@ -1057,7 +1088,6 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
 
         if let draft = canonicalDraftDocument {
             rows.append(("Canonical draft", draft.title))
-            rows.append(("Draft target", draftOwnershipSummary(for: draft)))
         } else {
             rows.append(("Canonical draft", "Not decided yet"))
         }
@@ -1084,6 +1114,10 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
 
     var canonicalDraftDocument: WorkspaceDocument? {
         preferredCanonicalDocument(for: .draft)
+    }
+
+    var pitchDocument: WorkspaceDocument? {
+        preferredCanonicalDocument(for: .pitch)
     }
 
     var overviewShortcutDocuments: [WorkspaceDocument] {
@@ -1150,23 +1184,11 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
         return siblingDraftPointers.contains(normalizedTitle)
     }
 
-    func draftTargetExplanation(for document: WorkspaceDocument) -> String {
-        if document.provider == .localFile {
-            return "Open draft will use the local draft file first. Snapshot exports stay listed below, but they do not replace the main draft target."
-        }
-        return "Open draft will open the main Google Doc in the browser. Local snapshot copies stay secondary and do not replace the main draft target."
-    }
-
-    func draftOwnershipSummary(for document: WorkspaceDocument) -> String {
-        let provider = document.provider == .googleDocPointer ? "Google Doc" : "Local file"
-        let role = document.role.label
-        if isLikelyDerivedSnapshot(document) {
-            return "\(provider) • \(role) • treated as a secondary snapshot"
-        }
-        return "\(provider) • \(role) • current canonical draft target"
-    }
-
     private func preferredCanonicalDocument(for role: WorkspaceDocumentRole) -> WorkspaceDocument? {
+        if let explicitDocument = explicitCanonicalDocument(for: role) {
+            return explicitDocument
+        }
+
         let roleDocuments = documents.filter { $0.role == role }
         guard !roleDocuments.isEmpty else { return nil }
 
@@ -1194,6 +1216,45 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
         }
 
         return roleDocuments.sorted(by: Self.compareOverviewDocuments).first
+    }
+
+    private func explicitCanonicalDocument(for role: WorkspaceDocumentRole) -> WorkspaceDocument? {
+        guard let configuredPath = explicitCanonicalDocumentPath(for: role) else { return nil }
+
+        let projectURL = url.standardizedFileURL
+        let normalizedConfiguredPath = Self.normalizedConfiguredDocumentPath(configuredPath)
+
+        return documents
+            .sorted(by: Self.compareOverviewDocuments)
+            .first { document in
+                let documentURL = document.url.standardizedFileURL
+                if Self.normalizedConfiguredDocumentPath(documentURL.path) == normalizedConfiguredPath {
+                    return true
+                }
+
+                guard documentURL.path.hasPrefix(projectURL.path + "/") else {
+                    return false
+                }
+
+                let relativePath = String(documentURL.path.dropFirst(projectURL.path.count + 1))
+                return Self.normalizedConfiguredDocumentPath(relativePath) == normalizedConfiguredPath
+            }
+    }
+
+    private func explicitCanonicalDocumentPath(for role: WorkspaceDocumentRole) -> String? {
+        let key: String
+        switch role {
+        case .draft:
+            key = "canonical_draft"
+        case .pitch:
+            key = "canonical_pitch"
+        default:
+            return nil
+        }
+
+        let value = frontmatter[key]?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return value.isEmpty ? nil : value
     }
 
     private func isExplicitPromotedGoogleDraft(_ document: WorkspaceDocument) -> Bool {
@@ -1246,6 +1307,13 @@ struct WorkspaceItem: Identifiable, Hashable, Codable {
         }
 
         return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+    }
+
+    private static func normalizedConfiguredDocumentPath(_ path: String) -> String {
+        path
+            .replacingOccurrences(of: "\\", with: "/")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
     }
 
     private static func documentRolePriority(_ role: WorkspaceDocumentRole) -> Int {
@@ -1619,6 +1687,10 @@ struct ScaffoldPostCreateState: Identifiable, Hashable {
 
     var importedItemCount: Int {
         importedPaths.count
+    }
+
+    var isAwaitingImmediateDocumentImport: Bool {
+        sourceMaterialChoice == .now && importedPaths.isEmpty
     }
 
     var projectURL: URL {

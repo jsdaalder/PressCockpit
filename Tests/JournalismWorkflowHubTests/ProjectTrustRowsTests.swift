@@ -109,7 +109,68 @@ final class ProjectTrustRowsTests: XCTestCase {
         )
 
         XCTAssertEqual(value(for: "Canonical draft", in: item.projectTrustRows), "Draft")
-        XCTAssertEqual(value(for: "Draft target", in: item.projectTrustRows), "Local file • Draft • current canonical draft target")
+        XCTAssertNil(value(for: "Draft target", in: item.projectTrustRows))
+    }
+
+    func testWorkingDocumentRowsRespectExplicitCanonicalDraftSelection() {
+        let manuscript = WorkspaceDocument(
+            id: "/tmp/explicit-draft/Manuscript.md",
+            path: "/tmp/explicit-draft/Manuscript.md",
+            title: "Manuscript",
+            fileExtension: "md",
+            provider: .localFile,
+            role: .general,
+            cacheState: .localFile,
+            externalURL: nil,
+            docID: nil,
+            cachePath: nil,
+            cachedOn: nil
+        )
+
+        let item = makeProject(
+            id: "explicit-draft",
+            title: "Explicit Draft",
+            frontmatter: [
+                "activity_state": "active",
+                "workflow_stage": "active_investigation",
+                "canonical_draft": "Manuscript.md"
+            ],
+            documents: [manuscript]
+        )
+
+        XCTAssertEqual(item.canonicalDraftDocument?.title, "Manuscript")
+        XCTAssertEqual(value(for: "Canonical draft", in: item.workingDocumentRows), "Manuscript")
+        XCTAssertNil(value(for: "Draft target", in: item.workingDocumentRows))
+    }
+
+    func testWorkingDocumentRowsRespectExplicitCanonicalPitchSelection() {
+        let editorMemo = WorkspaceDocument(
+            id: "/tmp/explicit-pitch/Editor memo.md",
+            path: "/tmp/explicit-pitch/Editor memo.md",
+            title: "Editor memo",
+            fileExtension: "md",
+            provider: .localFile,
+            role: .general,
+            cacheState: .localFile,
+            externalURL: nil,
+            docID: nil,
+            cachePath: nil,
+            cachedOn: nil
+        )
+
+        let item = makeProject(
+            id: "explicit-pitch",
+            title: "Explicit Pitch",
+            frontmatter: [
+                "activity_state": "active",
+                "workflow_stage": "active_investigation",
+                "canonical_pitch": "Editor memo.md"
+            ],
+            documents: [editorMemo]
+        )
+
+        XCTAssertEqual(item.pitchDocument?.title, "Editor memo")
+        XCTAssertEqual(value(for: "Pitch", in: item.workingDocumentRows), "Editor memo")
     }
 
     func testProjectTrustRowsDescribePromotedGoogleDraft() {
@@ -151,7 +212,7 @@ final class ProjectTrustRowsTests: XCTestCase {
         )
 
         XCTAssertEqual(value(for: "Canonical draft", in: item.projectTrustRows), "Draft")
-        XCTAssertEqual(value(for: "Draft target", in: item.projectTrustRows), "Google Doc • Draft • current canonical draft target")
+        XCTAssertNil(value(for: "Draft target", in: item.projectTrustRows))
     }
 
     private func value(for label: String, in rows: [(String, String)]) -> String? {

@@ -85,7 +85,7 @@ enum ScaffoldSourceMaterialChoice: String, CaseIterable, Hashable {
     var summary: String {
         switch self {
         case .now:
-            return "Create the project first, then move into a follow-up import step."
+            return "Create the project, then immediately add the files you already have."
         case .later:
             return "Keep the intake fast and add source material after the scaffold is ready."
         }
@@ -763,7 +763,7 @@ struct ScaffoldProjectWizardView: View {
             }
 
             if draft.sourceMaterialChoice == .now {
-                Text("After creation, the app will immediately prompt you to add files or folders into this project's `docs/` folder.")
+                Text("After creation, the next step will immediately be document upload into this project's `docs/` folder.")
                     .font(.caption)
                     .foregroundStyle(AppPalette.subtle)
             }
