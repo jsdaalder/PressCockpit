@@ -1526,6 +1526,12 @@ final class AppStore: ObservableObject {
                 from: sourceURL,
                 into: URL(fileURLWithPath: projectRoot).appendingPathComponent("docs", isDirectory: true)
             )
+            let didAppendFacts = (try? appendCaptureNoteToFactsFileIfNeeded(
+                note: normalizedNote,
+                record: current,
+                assignedDestinationPath: destinationURL.path,
+                projectRoot: URL(fileURLWithPath: projectRoot)
+            )) ?? false
 
             updateCaptureRecord(recordID) { existing in
                 CaptureRecord(
@@ -1545,7 +1551,9 @@ final class AppStore: ObservableObject {
             }
 
             reloadWorkspace()
-            statusMessage = "Created placeholder project \(projectTitle)"
+            statusMessage = didAppendFacts
+                ? "Created placeholder project \(projectTitle) and saved note to facts"
+                : "Created placeholder project \(projectTitle)"
             return true
         } catch {
             updateCaptureRecord(recordID) { existing in
@@ -1605,6 +1613,14 @@ final class AppStore: ObservableObject {
                 from: URL(fileURLWithPath: importedStoragePath),
                 into: target.url.appendingPathComponent("docs", isDirectory: true)
             )
+            let didAppendFacts = target.section == .projects
+                ? ((try? appendCaptureNoteToFactsFileIfNeeded(
+                    note: normalizedNote,
+                    record: current,
+                    assignedDestinationPath: destinationURL.path,
+                    projectRoot: target.url
+                )) ?? false)
+                : false
 
             updateCaptureRecord(recordID) { existing in
                 CaptureRecord(
@@ -1624,7 +1640,9 @@ final class AppStore: ObservableObject {
             }
 
             reloadWorkspace()
-            statusMessage = "Assigned \(current.displayTitle) to \(target.title)"
+            statusMessage = didAppendFacts
+                ? "Assigned \(current.displayTitle) to \(target.title) and saved note to facts"
+                : "Assigned \(current.displayTitle) to \(target.title)"
         } catch {
             updateCaptureRecord(recordID) { existing in
                 CaptureRecord(
@@ -2373,6 +2391,39 @@ final class AppStore: ObservableObject {
         }.value
     }
 
+    private func appendCaptureNoteToFactsFileIfNeeded(
+        note: String,
+        record: CaptureRecord,
+        assignedDestinationPath: String,
+        projectRoot: URL
+    ) throws -> Bool {
+        let normalizedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedNote.isEmpty else { return false }
+
+        let docsURL = projectRoot.appendingPathComponent("docs", isDirectory: true)
+        let factsURL = docsURL.appendingPathComponent("facts.md")
+        try FileManager.default.createDirectory(at: docsURL, withIntermediateDirectories: true, attributes: nil)
+
+        let existingText = (try? String(contentsOf: factsURL, encoding: .utf8)) ?? ""
+        let header = "# Facts\n\n"
+        var updatedText = existingText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? header : existingText
+        if !updatedText.hasSuffix("\n") {
+            updatedText += "\n"
+        }
+        if !updatedText.hasSuffix("\n\n") {
+            updatedText += "\n"
+        }
+
+        updatedText += captureFactsEntry(
+            note: normalizedNote,
+            record: record,
+            assignedDestinationPath: assignedDestinationPath,
+            docsRootPath: docsURL.path
+        )
+        try updatedText.write(to: factsURL, atomically: true, encoding: .utf8)
+        return true
+    }
+
     private func moveCaptureRecord(from sourceURL: URL, into destinationRoot: URL) async throws -> URL {
         let normalizedSource = sourceURL.standardizedFileURL
         let normalizedDestinationRoot = destinationRoot.standardizedFileURL
@@ -3090,6 +3141,56 @@ private func copyDocuments(_ urls: [URL], into docsURL: URL) throws -> [String] 
     }
 
     return importedPaths
+}
+
+private func captureFactsEntry(
+    note: String,
+    record: CaptureRecord,
+    assignedDestinationPath: String,
+    docsRootPath: String
+) -> String {
+    let title = factsEntryTitle(note: note, fallback: record.displayTitle)
+    let source = captureFactsSourceDescription(
+        assignedDestinationPath: assignedDestinationPath,
+        docsRootPath: docsRootPath
+    )
+
+    return """
+    ## \(title)
+    Fact: \(note)
+    Source: \(source)
+
+    """
+}
+
+private func factsEntryTitle(note: String, fallback: String) -> String {
+    let singleLine = note
+        .components(separatedBy: .newlines)
+        .joined(separator: " ")
+        .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+
+    guard !singleLine.isEmpty else { return fallback }
+    guard singleLine.count > 72 else { return singleLine }
+
+    let prefix = String(singleLine.prefix(72))
+    if let split = prefix.lastIndex(of: " "), split > prefix.startIndex {
+        return String(prefix[..<split])
+    }
+
+    return prefix
+}
+
+private func captureFactsSourceDescription(
+    assignedDestinationPath: String,
+    docsRootPath: String
+) -> String {
+    let relative = relativePath(assignedDestinationPath, from: docsRootPath)
+    if relative != assignedDestinationPath {
+        return relative
+    }
+
+    return URL(fileURLWithPath: assignedDestinationPath).lastPathComponent
 }
 
 private func archiveDestinationURL(
