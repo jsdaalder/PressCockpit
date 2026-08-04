@@ -291,6 +291,25 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertEqual(store.statusMessage, "Using existing project")
     }
 
+    func testScaffoldPostCreateStateTracksImmediateDocumentStepUntilImportStarts() {
+        var state = ScaffoldPostCreateState(
+            id: "demo",
+            mode: .created,
+            projectTitle: "Demo Story",
+            projectRoot: "/tmp/demo_story",
+            readmePath: "/tmp/demo_story/README.md",
+            sourceMaterialChoice: .now,
+            shouldAutoPromptForDocuments: true,
+            importedPaths: []
+        )
+
+        XCTAssertTrue(state.isAwaitingImmediateDocumentImport)
+
+        state.importedPaths = ["/tmp/demo_story/docs/research.pdf"]
+
+        XCTAssertFalse(state.isAwaitingImmediateDocumentImport)
+    }
+
     func testCreateScaffoldDraftBuildsLocalDocxWithoutExternalTemplate() throws {
         let workspaceRoot = try makeWorkspaceRoot()
         let store = AppStore(configuration: AppConfiguration(
@@ -326,6 +345,71 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertTrue(text.contains("[Nieuwsbrief]"))
         XCTAssertTrue(text.contains("[Speedread]"))
         XCTAssertTrue(text.contains("[Gerelateerde artikelen]"))
+    }
+
+    func testCreateProjectDraftWritesExplicitCanonicalDraftSelection() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        var revealedURLs: [[URL]] = []
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ), revealInFinder: { urls in
+            revealedURLs.append(urls)
+        })
+
+        let project = try XCTUnwrap(store.snapshot.items.first(where: { $0.section == .projects }))
+        let expectedDraftURL = URL(fileURLWithPath: project.path)
+            .appendingPathComponent(DraftSupport.localDraftFilename(projectTitle: project.title))
+
+        store.createProjectDraft(for: project)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: expectedDraftURL.path))
+        XCTAssertEqual(store.statusMessage, "Created draft \(expectedDraftURL.lastPathComponent)")
+
+        let readmeText = try String(
+            contentsOf: URL(fileURLWithPath: project.path).appendingPathComponent("README.md"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(readmeText.contains("canonical_draft: \(expectedDraftURL.lastPathComponent)"))
+
+        let refreshedProject = try XCTUnwrap(store.snapshot.items.first(where: { $0.id == project.id }))
+        XCTAssertEqual(refreshedProject.canonicalDraftDocument?.url.standardizedFileURL, expectedDraftURL.standardizedFileURL)
+        XCTAssertTrue(revealedURLs.isEmpty)
+    }
+
+    func testCreateProjectPitchWritesExplicitCanonicalPitchSelection() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        var revealedURLs: [[URL]] = []
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ), revealInFinder: { urls in
+            revealedURLs.append(urls)
+        })
+
+        let project = try XCTUnwrap(store.snapshot.items.first(where: { $0.section == .projects }))
+        let expectedPitchURL = URL(fileURLWithPath: project.path).appendingPathComponent("Pitch.md")
+
+        store.createProjectPitch(for: project)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: expectedPitchURL.path))
+        XCTAssertEqual(store.statusMessage, "Created pitch Pitch.md")
+
+        let readmeText = try String(
+            contentsOf: URL(fileURLWithPath: project.path).appendingPathComponent("README.md"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(readmeText.contains("canonical_pitch: Pitch.md"))
+
+        let pitchBody = try String(contentsOf: expectedPitchURL, encoding: .utf8)
+        XCTAssertTrue(pitchBody.contains("## Core angle"))
+        XCTAssertTrue(pitchBody.contains("## Questions for the editor"))
+
+        let refreshedProject = try XCTUnwrap(store.snapshot.items.first(where: { $0.id == project.id }))
+        XCTAssertEqual(refreshedProject.pitchDocument?.url.standardizedFileURL, expectedPitchURL.standardizedFileURL)
+        XCTAssertTrue(revealedURLs.isEmpty)
     }
 
     func testCompleteOnboardingStartNewProjectSelectsScaffoldWorkflow() throws {
@@ -1619,6 +1703,42 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertTrue(feedback.showsOpenDocsOverviewAction)
     }
 
+    func testFinalizeAttachedDocumentsPersistsRelevanceNoteInDocsOverview() async throws {
+        setenv("JWH_SCAFFOLD_SUMMARY_FAKE", "1", 1)
+        defer { unsetenv("JWH_SCAFFOLD_SUMMARY_FAKE") }
+
+        let workspaceRoot = try makeWorkspaceRoot()
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+        let project = try XCTUnwrap(store.snapshot.items.first)
+
+        let sourceFile = workspaceRoot.appendingPathComponent("timeline.md")
+        try """
+        Timeline excerpt for the overnight incident.
+
+        Add this to the working chronology for cross-checking.
+        """.write(to: sourceFile, atomically: true, encoding: .utf8)
+
+        let importedPaths = try store.importDocumentsToProject([sourceFile], item: project)
+        await store.finalizeAttachedDocuments(
+            for: project,
+            importedPaths: importedPaths,
+            relevanceNote: "Contains the timeline details we need for the first reconstruction."
+        )
+
+        let overviewPath = workspaceRoot.appendingPathComponent("Projects/2026/demo_story/docs/docs_overview.md")
+        let overviewText = try String(contentsOf: overviewPath, encoding: .utf8)
+        let feedback = try XCTUnwrap(store.projectDocumentImportFeedback(for: project))
+
+        XCTAssertTrue(overviewText.contains("### Why these files matter now"))
+        XCTAssertTrue(overviewText.contains("Contains the timeline details we need for the first reconstruction."))
+        XCTAssertEqual(feedback.style, .success)
+        XCTAssertTrue(feedback.message.contains("saved your relevance note"))
+    }
+
     func testFinalizeAttachedDocumentsFallsBackWhenModelReturnsInvalidJSON() async throws {
         setenv("JWH_SCAFFOLD_SUMMARY_FORCE_INVALID_JSON", "1", 1)
         defer { unsetenv("JWH_SCAFFOLD_SUMMARY_FORCE_INVALID_JSON") }
@@ -1651,6 +1771,40 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertNil(store.activeAlert)
         XCTAssertEqual(feedback.title, "Docs attached")
         XCTAssertEqual(feedback.style, .success)
+    }
+
+    func testFinalizeAttachedDocumentsFallbackStillPersistsRelevanceNote() async throws {
+        setenv("JWH_SCAFFOLD_SUMMARY_FORCE_INVALID_JSON", "1", 1)
+        defer { unsetenv("JWH_SCAFFOLD_SUMMARY_FORCE_INVALID_JSON") }
+
+        let workspaceRoot = try makeWorkspaceRoot()
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+        let project = try XCTUnwrap(store.snapshot.items.first)
+
+        let sourceFile = workspaceRoot.appendingPathComponent("background_note.md")
+        try """
+        Background note for the emissions angle.
+
+        Double-check which figures survive publication review.
+        """.write(to: sourceFile, atomically: true, encoding: .utf8)
+
+        let importedPaths = try store.importDocumentsToProject([sourceFile], item: project)
+        await store.finalizeAttachedDocuments(
+            for: project,
+            importedPaths: importedPaths,
+            relevanceNote: "Use this to sanity-check the published numbers before we quote them."
+        )
+
+        let overviewPath = workspaceRoot.appendingPathComponent("Projects/2026/demo_story/docs/docs_overview.md")
+        let overviewText = try String(contentsOf: overviewPath, encoding: .utf8)
+
+        XCTAssertTrue(overviewText.contains("Fallback summary from background_note.md"))
+        XCTAssertTrue(overviewText.contains("### Why these files matter now"))
+        XCTAssertTrue(overviewText.contains("Use this to sanity-check the published numbers before we quote them."))
     }
 
     private func waitForCaptureAsyncWork(_ operation: @escaping @MainActor () async -> Void) {

@@ -62,6 +62,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--project-root", required=True)
     parser.add_argument("--imported-path", action="append", default=[])
+    parser.add_argument("--relevance-note", default="")
     parser.add_argument("--docs-overview-path", default="")
     parser.add_argument("--model", default="")
     parser.add_argument("--max-context-chars", type=int, default=4000)
@@ -87,6 +88,7 @@ def main() -> int:
         raise SystemExit("No supported imported files were provided for scaffold summarization.")
 
     context_docs = load_context_documents(project_root, max_chars=args.max_context_chars)
+    relevance_note = sanitize_multiline_text(args.relevance_note).strip()
     fake_mode = os.environ.get(FAKE_MODE_ENV) == "1"
     force_invalid_json = os.environ.get(FORCE_INVALID_JSON_ENV) == "1"
     model: str | None = None
@@ -101,6 +103,7 @@ def main() -> int:
             source_path,
             project_root=project_root,
             context_docs=context_docs,
+            relevance_note=relevance_note,
             model=model,
             model_issue=model_issue,
             max_source_chars=args.max_source_chars,
@@ -113,7 +116,13 @@ def main() -> int:
     else:
         existing = "# Docs Overview\n\n"
 
-    updated = merge_docs_overview(existing, project_root, context_docs, summaries)
+    updated = merge_docs_overview(
+        existing,
+        project_root,
+        context_docs,
+        summaries,
+        relevance_note=relevance_note,
+    )
     docs_overview_path.write_text(updated, encoding="utf-8")
     print(f"Updated {docs_overview_path} with {len(summaries)} imported document summary item(s).")
     return 0
@@ -270,6 +279,7 @@ def summarize_source(
     *,
     project_root: Path,
     context_docs: list[ContextDocument],
+    relevance_note: str,
     model: str | None,
     model_issue: str | None,
     max_source_chars: int,
@@ -320,6 +330,7 @@ def summarize_source(
         source_path,
         project_root=project_root,
         context_docs=context_docs,
+        relevance_note=relevance_note,
         source_text=source_text,
     )
     try:
@@ -387,12 +398,14 @@ def build_prompt(
     *,
     project_root: Path,
     context_docs: list[ContextDocument],
+    relevance_note: str,
     source_text: str,
 ) -> str:
     context_block = "\n\n".join(
         f"[{doc.label} | {relative_label(doc.path, project_root)}]\n{doc.text}"
         for doc in context_docs
     ) or "No extra context documents were readable."
+    user_note_block = relevance_note or "No user-entered relevance note was provided."
 
     return textwrap.dedent(
         f"""\
@@ -417,6 +430,9 @@ def build_prompt(
 
         Context:
         {context_block}
+
+        User relevance note:
+        {user_note_block}
 
         Imported source:
         [Source | {source_path.name}]
@@ -511,8 +527,14 @@ def merge_docs_overview(
     project_root: Path,
     context_docs: list[ContextDocument],
     summaries: list[SourceSummary],
+    relevance_note: str,
 ) -> str:
-    section_body = build_managed_summary_section(project_root, context_docs, summaries)
+    section_body = build_managed_summary_section(
+        project_root,
+        context_docs,
+        summaries,
+        relevance_note=relevance_note,
+    )
     managed_block = f"{MANAGED_START}\n{section_body}\n{MANAGED_END}"
 
     if MANAGED_START in existing_text and MANAGED_END in existing_text:
@@ -532,6 +554,7 @@ def build_managed_summary_section(
     project_root: Path,
     context_docs: list[ContextDocument],
     summaries: list[SourceSummary],
+    relevance_note: str,
 ) -> str:
     lines = [
         f"_Updated: {date.today().isoformat()}_",
@@ -546,6 +569,10 @@ def build_managed_summary_section(
             lines.append(f"- {doc.label}: `{relative_label(doc.path, project_root)}`")
     else:
         lines.append("- README, draft, or pitch text was not readable locally, so the summaries rely on the imported files alone.")
+
+    if relevance_note:
+        lines.extend(["", "### Why these files matter now", ""])
+        lines.extend(relevance_note.splitlines())
 
     lines.extend(["", "### Imported file summaries", ""])
 

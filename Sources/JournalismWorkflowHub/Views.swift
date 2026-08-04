@@ -578,7 +578,7 @@ struct CaptureView: View {
                                 Text(store.captureAssignmentLabel(for: project)).tag(project.path)
                             }
                         }
-                        .labelsHidden()
+                        .valueCellSelectorControlStyle()
                     }
 
                     HStack(spacing: 12) {
@@ -1220,12 +1220,16 @@ struct WorkspaceDetailView: View {
                             } else {
                                 MetadataGrid(rows: item.projectDetailRows)
 
-                                HStack(spacing: 12) {
-                                    projectActionMenu
+                                if item.dossierSlug != nil {
+                                    HStack(spacing: 12) {
+                                        Button("Open dossier") {
+                                            store.openLinkedDossier(for: item)
+                                        }
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                    .tint(AppPalette.title)
                                 }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                                .tint(AppPalette.title)
                             }
                         }
                     }
@@ -1236,7 +1240,29 @@ struct WorkspaceDetailView: View {
                                 .font(.subheadline)
                                 .foregroundStyle(AppPalette.subtle)
 
-                            MetadataGrid(rows: item.workingDocumentRows)
+                            VStack(alignment: .leading, spacing: 10) {
+                                workingDocumentSelectorRow(
+                                    label: "Canonical draft",
+                                    selectedDocument: item.canonicalDraftDocument,
+                                    emptyLabel: "Not decided yet",
+                                    role: .draft,
+                                    createActionTitle: item.canonicalDraftDocument == nil ? "Create local draft…" : nil,
+                                    createAction: {
+                                        store.createProjectDraft(for: item)
+                                    }
+                                )
+
+                                workingDocumentSelectorRow(
+                                    label: "Pitch",
+                                    selectedDocument: item.pitchDocument,
+                                    emptyLabel: "None linked yet",
+                                    role: .pitch,
+                                    createActionTitle: item.pitchDocument == nil ? "Create pitch…" : nil,
+                                    createAction: {
+                                        store.createProjectPitch(for: item)
+                                    }
+                                )
+                            }
 
                             HStack(spacing: 12) {
                                 if item.canonicalDraftDocument != nil {
@@ -1275,11 +1301,6 @@ struct WorkspaceDetailView: View {
                                 if item.hasDocsOverview {
                                     Button("Open docs overview") {
                                         store.openDocsOverview(for: item)
-                                    }
-                                }
-                                if store.shouldOfferGoogleDraftPromotion(for: item) {
-                                    Button("Promote Google draft…") {
-                                        store.promoteGoogleDraft(for: item)
                                     }
                                 }
                             }
@@ -1367,37 +1388,56 @@ struct WorkspaceDetailView: View {
         store.maintenanceItems(for: item)
     }
 
-    private var projectActionMenu: some View {
-        Menu {
+    private func workingDocumentSelectorRow(
+        label: String,
+        selectedDocument: WorkspaceDocument?,
+        emptyLabel: String,
+        role: WorkspaceDocumentRole,
+        createActionTitle: String?,
+        createAction: @escaping () -> Void
+    ) -> some View {
+        let hasExplicitSelection = item?.frontmatter[role == .draft ? "canonical_draft" : "canonical_pitch"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty == false
+
+        return SelectableMetadataRow(
+            label: label,
+            title: selectedDocument?.title ?? emptyLabel,
+            isPlaceholder: selectedDocument == nil
+        ) {
             if let item {
-                if item.dossierSlug != nil {
-                    Button("Open dossier") {
-                        store.openLinkedDossier(for: item)
+                let documents = item.documents
+                if documents.isEmpty && createActionTitle == nil {
+                    Text("No root-level project documents yet")
+                } else {
+                    ForEach(documents) { document in
+                        Button {
+                            store.setCanonicalWorkingDocument(document, role: role, for: item)
+                        } label: {
+                            if selectedDocument?.id == document.id {
+                                Label(document.title, systemImage: "checkmark")
+                            } else {
+                                Text(document.title)
+                            }
+                        }
+                    }
+
+                    if let createActionTitle {
+                        if !documents.isEmpty {
+                            Divider()
+                        }
+                        Button(createActionTitle, action: createAction)
+                    }
+
+                    if hasExplicitSelection {
+                        Divider()
+                        Button("Clear selection") {
+                            store.clearCanonicalWorkingDocument(for: item, role: role)
+                        }
                     }
                 }
-
-                Divider()
-
-                Button("Mark active") {
-                    store.beginProjectStatusChange(for: item, targetStatus: .active)
-                }
-                Button("Put on hold") {
-                    store.beginProjectStatusChange(for: item, targetStatus: .onHold)
-                }
-                Button("Mark discarded…") {
-                    store.beginDiscardingProject(item)
-                }
-                Button("Mark finished…") {
-                    store.beginProjectStatusChange(for: item, targetStatus: .done)
-                }
-                Button("Archive…") {
-                    store.beginProjectStatusChange(for: item, targetStatus: .archived)
-                }
             }
-        } label: {
-            Label("Project actions", systemImage: "ellipsis.circle")
         }
-        .controlSize(.small)
     }
 }
 
@@ -1669,16 +1709,29 @@ private struct ScaffoldPostCreateSheet: View {
             ])
 
             HStack {
-                Button(draftButtonTitle) {
-                    store.createScaffoldDraft()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(store.isFinishingScaffoldPostCreate)
+                if state.isAwaitingImmediateDocumentImport {
+                    Button(primaryButtonTitle) {
+                        store.addDocumentsToScaffoldProject()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(store.isFinishingScaffoldPostCreate)
 
-                Button(primaryButtonTitle) {
-                    store.addDocumentsToScaffoldProject()
+                    Button(draftButtonTitle) {
+                        store.createScaffoldDraft()
+                    }
+                    .disabled(store.isFinishingScaffoldPostCreate)
+                } else {
+                    Button(draftButtonTitle) {
+                        store.createScaffoldDraft()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(store.isFinishingScaffoldPostCreate)
+
+                    Button(primaryButtonTitle) {
+                        store.addDocumentsToScaffoldProject()
+                    }
+                    .disabled(store.isFinishingScaffoldPostCreate)
                 }
-                .disabled(store.isFinishingScaffoldPostCreate)
 
                 Button("Show in app") {
                     store.openScaffoldPostCreateProject()
@@ -1724,8 +1777,7 @@ private struct ScaffoldPostCreateSheet: View {
         .frame(minWidth: 620)
         .onAppear {
             guard state.shouldAutoPromptForDocuments,
-                  state.sourceMaterialChoice == .now,
-                  state.importedItemCount == 0,
+                  state.isAwaitingImmediateDocumentImport,
                   !didAutoPrompt else {
                 return
             }
@@ -1749,7 +1801,10 @@ private struct ScaffoldPostCreateSheet: View {
     }
 
     private var doneButtonTitle: String {
-        state.importedItemCount > 0 ? "Summarize and close" : "Done"
+        if state.isAwaitingImmediateDocumentImport {
+            return "Skip for now"
+        }
+        return state.importedItemCount > 0 ? "Summarize and close" : "Done"
     }
 
     private var draftStatusText: String {
@@ -1760,6 +1815,15 @@ private struct ScaffoldPostCreateSheet: View {
     }
 
     private var titleText: String {
+        if state.isAwaitingImmediateDocumentImport {
+            switch state.mode {
+            case .created:
+                return "Add documents now"
+            case .reused:
+                return "Add documents to this project"
+            }
+        }
+
         switch state.mode {
         case .created:
             return "Project created"
@@ -1772,6 +1836,15 @@ private struct ScaffoldPostCreateSheet: View {
         let draftLine = store.documentMode == .googleDocs
             ? "Create a local draft now, then promote a Google Doc later if that becomes the canonical version."
             : "Create a local draft now so the project starts with a real editable draft target."
+
+        if state.isAwaitingImmediateDocumentImport {
+            switch state.mode {
+            case .created:
+                return "You said you already have material to upload. This step opens the file picker immediately so those files can land in this project's docs folder before you move on. \(draftLine)"
+            case .reused:
+                return "You said you already have material to upload. This step opens the file picker immediately so those files can land in this project's docs folder before you move on. \(draftLine)"
+            }
+        }
 
         if state.sourceMaterialChoice == .now {
             switch state.mode {
@@ -1910,7 +1983,7 @@ struct WorkflowParameterEditor: View {
                         Text(choice).tag(choice)
                     }
                 }
-                .pickerStyle(.menu)
+                .valueCellSelectorControlStyle()
             case .multiline:
                 Text(spec.label)
                     .font(.headline)
@@ -2229,6 +2302,45 @@ struct KeyValueRow: View {
 
     private var isPlaceholder: Bool {
         value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+struct SelectableMetadataRow<MenuContent: View>: View {
+    let label: String
+    let title: String
+    let isPlaceholder: Bool
+    let menuContent: MenuContent
+
+    init(
+        label: String,
+        title: String,
+        isPlaceholder: Bool = false,
+        @ViewBuilder menuContent: () -> MenuContent
+    ) {
+        self.label = label
+        self.title = title
+        self.isPlaceholder = isPlaceholder
+        self.menuContent = menuContent()
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            Text(label)
+                .frame(width: 160, alignment: .leading)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppPalette.subtle)
+
+            Menu {
+                menuContent
+            } label: {
+                ValueCellSelectorMenuLabel(title: title, isPlaceholder: isPlaceholder)
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Spacer()
+        }
+        .frame(minHeight: trustedInlineMetadataRowMinHeight, alignment: .topLeading)
     }
 }
 
@@ -2657,37 +2769,31 @@ struct ProjectTrustInlineEditor: View {
                     .controlSize(.small)
             }
 
-            EditableMetadataRow(label: "Project kind") {
+            ValueCellSelectorRow(label: "Project kind") {
                 Picker("Project kind", selection: $projectType) {
                     ForEach(WorkspaceProjectType.editableProjectKinds, id: \.self) { option in
                         Text(option.label).tag(option)
                     }
                 }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .controlSize(.small)
+                .valueCellSelectorControlStyle()
             }
 
-            EditableMetadataRow(label: "Activity state") {
+            ValueCellSelectorRow(label: "Activity state") {
                 Picker("Activity state", selection: $activityState) {
                     ForEach(ProjectActivityState.allCases, id: \.self) { option in
                         Text(option.label).tag(option)
                     }
                 }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .controlSize(.small)
+                .valueCellSelectorControlStyle()
             }
 
-            EditableMetadataRow(label: "Workflow stage") {
+            ValueCellSelectorRow(label: "Workflow stage") {
                 Picker("Workflow stage", selection: $workflowStage) {
                     ForEach(ProjectWorkflowStage.allCases, id: \.self) { option in
                         Text(option.label).tag(option)
                     }
                 }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .controlSize(.small)
+                .valueCellSelectorControlStyle()
             }
 
             EditableMetadataRow(label: "Daily focus") {
@@ -2711,16 +2817,14 @@ struct ProjectTrustInlineEditor: View {
             }
 
             if activityState == .inactive {
-                EditableMetadataRow(label: "Inactive reason") {
+                ValueCellSelectorRow(label: "Inactive reason") {
                     Picker("Inactive reason", selection: inactiveReasonBinding) {
                         Text("Choose reason").tag(Optional<ProjectInactiveReason>.none)
                         ForEach(ProjectInactiveReason.allCases, id: \.self) { option in
                             Text(option.label).tag(Optional(option))
                         }
                     }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                    .controlSize(.small)
+                    .valueCellSelectorControlStyle()
                 }
             }
 
@@ -2741,6 +2845,31 @@ struct ProjectTrustInlineEditor: View {
                     )
                 }
                 .keyboardShortcut(.defaultAction)
+
+                if showsCloseoutActions {
+                    Menu {
+                        if closeoutMenuNeedsSaveWarning {
+                            Text("Save details first")
+                        }
+
+                        if showsFinishAction {
+                            Button("Finish…") {
+                                launchCloseout(.done)
+                            }
+                            .disabled(hasUnsavedChanges)
+                        }
+
+                        if showsArchiveAction {
+                            Button("Archive…") {
+                                launchCloseout(.archived)
+                            }
+                            .disabled(hasUnsavedChanges)
+                        }
+                    } label: {
+                        Label("Close out…", systemImage: "ellipsis.circle")
+                    }
+                    .help(closeoutMenuNeedsSaveWarning ? "Save details before finishing or archiving." : "Finish or archive this project.")
+                }
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
@@ -2771,10 +2900,44 @@ struct ProjectTrustInlineEditor: View {
             "Inactive reason",
             "Daily focus",
             "Canonical draft",
-            "Draft target",
             "Pitch"
         ]
         return item.projectTrustRows.filter { !editableKeys.contains($0.0) }
+    }
+
+    private var hasUnsavedChanges: Bool {
+        projectTitle.trimmingCharacters(in: .whitespacesAndNewlines) != state.initialDisplayTitle
+            || projectType != state.initialProjectType
+            || activityState != state.initialState.activityState
+            || workflowStage != state.initialState.workflowStage
+            || inactiveReason != state.initialState.inactiveReason
+            || isInDailyFocus != state.initialIsInDailyFocus
+    }
+
+    private var currentCompatibilityStatus: ProjectLifecycleStatus {
+        item.compatibilityStatus
+            ?? state.initialState.legacyLifecycleStatus(isArchivedStorage: state.isArchivedStorage)
+    }
+
+    private var showsCloseoutActions: Bool {
+        !state.isArchivedStorage && (showsFinishAction || showsArchiveAction)
+    }
+
+    private var showsFinishAction: Bool {
+        currentCompatibilityStatus != .done && currentCompatibilityStatus != .archived
+    }
+
+    private var showsArchiveAction: Bool {
+        currentCompatibilityStatus != .archived
+    }
+
+    private var closeoutMenuNeedsSaveWarning: Bool {
+        hasUnsavedChanges
+    }
+
+    private func launchCloseout(_ status: ProjectLifecycleStatus) {
+        store.dismissProjectDetailsEdit()
+        store.beginProjectStatusChange(for: item, targetStatus: status)
     }
 }
 
@@ -2798,6 +2961,55 @@ struct EditableMetadataRow<Content: View>: View {
             Spacer()
         }
         .frame(minHeight: trustedInlineMetadataRowMinHeight, alignment: .topLeading)
+    }
+}
+
+struct ValueCellSelectorRow<Content: View>: View {
+    let label: String
+    let content: Content
+
+    init(label: String, @ViewBuilder content: () -> Content) {
+        self.label = label
+        self.content = content()
+    }
+
+    var body: some View {
+        EditableMetadataRow(label: label) {
+            content
+        }
+    }
+}
+
+struct ValueCellSelectorMenuLabel: View {
+    let title: String
+    let isPlaceholder: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(title)
+                .font(.body)
+                .foregroundStyle(isPlaceholder ? AppPalette.subtle : AppPalette.title)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(AppPalette.subtle)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(
+            AppPalette.card.opacity(0.98),
+            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+        )
+    }
+}
+
+private extension View {
+    func valueCellSelectorControlStyle() -> some View {
+        pickerStyle(.menu)
+            .labelsHidden()
+            .controlSize(.small)
     }
 }
 
@@ -2839,7 +3051,7 @@ struct ProjectOffboardingSheet: View {
                             Text(choice.label).tag(choice)
                         }
                     }
-                    .pickerStyle(.menu)
+                    .valueCellSelectorControlStyle()
 
                     if outcome == .unknown {
                         Text("Choose an explicit outcome before saving so finished and archived work keep clear semantics.")

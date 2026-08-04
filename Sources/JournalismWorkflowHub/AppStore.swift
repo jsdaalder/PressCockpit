@@ -51,6 +51,7 @@ final class AppStore: ObservableObject {
     private var forwardHistory: [SidebarSelection] = []
     private let userDefaults: UserDefaults
     private let appSupportDirectory: URL
+    private let revealInFinder: ([URL]) -> Void
 
     init(
         configuration: AppConfiguration = AppDefaults.configuration,
@@ -58,7 +59,10 @@ final class AppStore: ObservableObject {
         captureStore: (any CapturePersisting)? = nil,
         maintenanceStore: (any MaintenancePersisting)? = nil,
         defaults: UserDefaults = .standard,
-        supportDirectory: URL? = nil
+        supportDirectory: URL? = nil,
+        revealInFinder: @escaping ([URL]) -> Void = { urls in
+            NSWorkspace.shared.activateFileViewerSelecting(urls)
+        }
     ) {
         let hasCompletedOnboarding = OnboardingPreferences.hasCompleted(defaults: defaults)
         let appSupportDirectory = supportDirectory ?? journalismWorkflowHubSupportDirectory()
@@ -67,6 +71,7 @@ final class AppStore: ObservableObject {
         self.demoWorkspaceRoot = configuration.demoWorkspaceRoot
         self.userDefaults = defaults
         self.appSupportDirectory = appSupportDirectory
+        self.revealInFinder = revealInFinder
         self.documentMode = OnboardingPreferences.documentMode(defaults: defaults)
         self.isDiagnosticsLoggingEnabled = OnboardingPreferences.diagnosticsLoggingEnabled(defaults: defaults)
         self.appAppearancePreference = OnboardingPreferences.appAppearancePreference(defaults: defaults)
@@ -685,7 +690,7 @@ final class AppStore: ObservableObject {
 
     func openFolder(for item: WorkspaceItem?) {
         guard let item else { return }
-        NSWorkspace.shared.activateFileViewerSelecting([item.url])
+        revealInFinder([item.url])
     }
 
     func openReadme(for item: WorkspaceItem?) {
@@ -694,11 +699,11 @@ final class AppStore: ObservableObject {
     }
 
     func openPath(_ path: String) {
-        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+        revealInFinder([URL(fileURLWithPath: path)])
     }
 
     func openCaptureStorage() {
-        NSWorkspace.shared.activateFileViewerSelecting([captureStorageDirectory])
+        revealInFinder([captureStorageDirectory])
     }
 
     func setDiagnosticsLoggingEnabled(_ enabled: Bool) {
@@ -766,11 +771,11 @@ final class AppStore: ObservableObject {
     func revealDiagnosticsLog() {
         let logURL = journalismWorkflowHubLogFileURL(supportDirectory: supportDirectory())
         if FileManager.default.fileExists(atPath: logURL.path) {
-            NSWorkspace.shared.activateFileViewerSelecting([logURL])
+            revealInFinder([logURL])
             return
         }
 
-        NSWorkspace.shared.activateFileViewerSelecting([
+        revealInFinder([
             journalismWorkflowHubLogsDirectory(supportDirectory: supportDirectory())
         ])
     }
@@ -831,7 +836,7 @@ final class AppStore: ObservableObject {
         }
 
         if let dossierDirectory = dossierURL(for: slug, workspaceRoot: workspaceRoot) {
-            NSWorkspace.shared.activateFileViewerSelecting([dossierDirectory])
+            revealInFinder([dossierDirectory])
         }
     }
 
@@ -846,7 +851,7 @@ final class AppStore: ObservableObject {
     }
 
     func openProjectRoot(_ path: String) {
-        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+        revealInFinder([URL(fileURLWithPath: path)])
     }
 
     func openOverviewTarget(_ target: OverviewTarget) {
@@ -970,55 +975,80 @@ final class AppStore: ObservableObject {
         }
     }
 
-    func shouldOfferGoogleDraftPromotion(for item: WorkspaceItem?) -> Bool {
-        guard let item, item.isProjectRoot else { return false }
-        if item.canonicalDraftDocument?.provider == .googleDocPointer {
-            return false
-        }
-        return documentMode == .googleDocs || item.googleDriveURL != nil
-    }
-
-    func promoteGoogleDraft(for item: WorkspaceItem?) {
+    func createProjectDraft(for item: WorkspaceItem?) {
         guard let item, item.isProjectRoot else { return }
 
-        let alert = NSAlert()
-        alert.messageText = "Promote Google draft"
-        alert.informativeText = "Paste the Google Docs URL or document ID. The app will write a root `.gdoc` pointer and use that Google Doc as the canonical draft target."
-        alert.alertStyle = .informational
-
-        let inputField = NSTextField(frame: NSRect(x: 0, y: 0, width: 360, height: 24))
-        inputField.placeholderString = "https://docs.google.com/document/d/..."
-        alert.accessoryView = inputField
-
-        alert.addButton(withTitle: "Promote")
-        alert.addButton(withTitle: "Cancel")
-
-        guard alert.runModal() == .alertFirstButtonReturn else {
-            return
-        }
-
-        guard let docID = DraftSupport.extractGoogleDocID(from: inputField.stringValue) else {
-            let message = "Paste a valid Google Docs URL or document ID."
-            statusMessage = message
-            activeAlert = AppAlert(title: "Invalid Google draft link", message: message)
+        if let existingDraft = item.canonicalDraftDocument {
+            openDocument(existingDraft)
             return
         }
 
         do {
-            let pointerURL = DraftSupport.preferredGoogleDraftPointerURL(for: item)
-            try DraftSupport.googleDraftPointerContents(docID: docID)
-                .write(to: pointerURL, atomically: true, encoding: .utf8)
-            reloadWorkspace()
-
-            if let itemID = workspaceItemID(forPath: item.path) {
-                select(.workspace(itemID))
-            }
-
-            statusMessage = "Promoted Google draft"
+            let destinationURL = try createLocalDraft(
+                in: item.url,
+                projectTitle: item.title
+            )
+            updateCanonicalWorkingDocumentPath(
+                destinationURL.lastPathComponent,
+                role: .draft,
+                for: item,
+                successMessage: "Created draft \(destinationURL.lastPathComponent)"
+            )
         } catch {
             statusMessage = error.localizedDescription
-            activeAlert = AppAlert(title: "Could not promote Google draft", message: error.localizedDescription)
+            activeAlert = AppAlert(title: "Could not create draft", message: error.localizedDescription)
         }
+    }
+
+    func createProjectPitch(for item: WorkspaceItem?) {
+        guard let item, item.isProjectRoot else { return }
+
+        if let existingPitch = item.pitchDocument {
+            openDocument(existingPitch)
+            return
+        }
+
+        do {
+            let destinationURL = try createPitchDocument(
+                in: item.url,
+                projectTitle: item.title
+            )
+            updateCanonicalWorkingDocumentPath(
+                destinationURL.lastPathComponent,
+                role: .pitch,
+                for: item,
+                successMessage: "Created pitch \(destinationURL.lastPathComponent)"
+            )
+        } catch {
+            statusMessage = error.localizedDescription
+            activeAlert = AppAlert(title: "Could not create pitch", message: error.localizedDescription)
+        }
+    }
+
+    func setCanonicalWorkingDocument(_ document: WorkspaceDocument?, role: WorkspaceDocumentRole, for item: WorkspaceItem) {
+        guard let document else {
+            clearCanonicalWorkingDocument(for: item, role: role)
+            return
+        }
+
+        let relativeDocumentPath = relativePath(document.path, from: item.path)
+        updateCanonicalWorkingDocumentPath(
+            relativeDocumentPath,
+            role: role,
+            for: item,
+            successMessage: "Updated canonical \(role.label.lowercased())"
+        )
+    }
+
+    func clearCanonicalWorkingDocument(for item: WorkspaceItem?, role: WorkspaceDocumentRole) {
+        guard let item, item.isProjectRoot else { return }
+
+        updateCanonicalWorkingDocumentPath(
+            nil,
+            role: role,
+            for: item,
+            successMessage: "Cleared explicit \(role.label.lowercased()) selection"
+        )
     }
 
     func addDocumentsToScaffoldProject() {
@@ -1069,6 +1099,16 @@ final class AppStore: ObservableObject {
 
         guard panel.runModal() == .OK else { return }
 
+        let relevanceNote: String?
+        if item.isProjectRoot {
+            relevanceNote = promptForProjectDocumentRelevanceNote(
+                projectTitle: item.title,
+                selectedURLs: panel.urls
+            )
+        } else {
+            relevanceNote = nil
+        }
+
         do {
             let importedPaths = try importDocumentsToProject(panel.urls, item: item)
             guard !importedPaths.isEmpty else { return }
@@ -1084,12 +1124,18 @@ final class AppStore: ObservableObject {
                 projectDocumentImportFeedback = ProjectDocumentImportFeedback(
                     projectPath: item.path,
                     title: "Updating docs overview",
-                    message: "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title). Building a working summary for the imported material now.",
+                    message: relevanceNote == nil
+                        ? "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title). Building a working summary for the imported material now."
+                        : "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title). Building a working summary for the imported material and your relevance note now.",
                     style: .progress,
                     showsOpenDocsOverviewAction: item.hasDocsOverview
                 )
                 Task {
-                    await finalizeAttachedDocuments(for: item, importedPaths: importedPaths)
+                    await finalizeAttachedDocuments(
+                        for: item,
+                        importedPaths: importedPaths,
+                        relevanceNote: relevanceNote
+                    )
                 }
             } else {
                 statusMessage = "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title)"
@@ -1100,13 +1146,18 @@ final class AppStore: ObservableObject {
         }
     }
 
-    func finalizeAttachedDocuments(for item: WorkspaceItem, importedPaths: [String]) async {
+    func finalizeAttachedDocuments(
+        for item: WorkspaceItem,
+        importedPaths: [String],
+        relevanceNote: String? = nil
+    ) async {
         guard item.isProjectRoot else { return }
 
         do {
             try await summarizeImportedDocsOverview(
                 projectRoot: item.path,
-                importedPaths: importedPaths
+                importedPaths: importedPaths,
+                relevanceNote: relevanceNote
             )
             reloadWorkspace()
 
@@ -1119,7 +1170,9 @@ final class AppStore: ObservableObject {
             projectDocumentImportFeedback = ProjectDocumentImportFeedback(
                 projectPath: item.path,
                 title: "Docs attached",
-                message: "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title) and updated the docs overview. Review the imported summary before treating it as settled reporting material.",
+                message: relevanceNote == nil
+                    ? "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title) and updated the docs overview. Review the imported summary before treating it as settled reporting material."
+                    : "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title), saved your relevance note, and updated the docs overview. Review the imported summary before treating it as settled reporting material.",
                 style: .success,
                 showsOpenDocsOverviewAction: true
             )
@@ -1129,7 +1182,9 @@ final class AppStore: ObservableObject {
             projectDocumentImportFeedback = ProjectDocumentImportFeedback(
                 projectPath: item.path,
                 title: "Docs attached, summary needs review",
-                message: "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title), but the docs overview could not be refreshed. Open the docs overview and source files directly before relying on them.",
+                message: relevanceNote == nil
+                    ? "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title), but the docs overview could not be refreshed. Open the docs overview and source files directly before relying on them."
+                    : "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title), but the docs overview could not be refreshed. Your relevance note was not folded into the project summary yet, so open the docs overview and source files directly before relying on them.",
                 style: .warning,
                 showsOpenDocsOverviewAction: item.hasDocsOverview
             )
@@ -1142,6 +1197,58 @@ final class AppStore: ObservableObject {
 
     func importDocumentsToProject(_ urls: [URL], item: WorkspaceItem) throws -> [String] {
         try importDocuments(from: urls, into: item.docsDirectoryURL)
+    }
+
+    private func promptForProjectDocumentRelevanceNote(projectTitle: String, selectedURLs: [URL]) -> String? {
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "Add an optional relevance note"
+        alert.informativeText = relevanceNotePromptMessage(
+            projectTitle: projectTitle,
+            selectedURLs: selectedURLs
+        )
+        alert.addButton(withTitle: "Attach files")
+        alert.addButton(withTitle: "Skip note")
+
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 420, height: 96))
+        textView.isRichText = false
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.font = .systemFont(ofSize: NSFont.systemFontSize)
+
+        let scrollView = NSScrollView(frame: textView.frame)
+        scrollView.hasVerticalScroller = true
+        scrollView.borderType = .bezelBorder
+        scrollView.documentView = textView
+
+        let helperLabel = NSTextField(labelWithString: "Why this matters (optional)")
+        helperLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize, weight: .semibold)
+
+        let stackView = NSStackView(views: [helperLabel, scrollView])
+        stackView.orientation = .vertical
+        stackView.alignment = .leading
+        stackView.spacing = 8
+        alert.accessoryView = stackView
+
+        let response = alert.runModal()
+        if response == .alertSecondButtonReturn {
+            return nil
+        }
+
+        return textView.string.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+    }
+
+    private func relevanceNotePromptMessage(projectTitle: String, selectedURLs: [URL]) -> String {
+        let selectedNames = selectedURLs.map(\.lastPathComponent)
+        let preview = selectedNames.prefix(3).joined(separator: ", ")
+        let suffix = selectedNames.count > 3 ? ", and \(selectedNames.count - 3) more" : ""
+        let selectionSummary: String
+        if selectedNames.count == 1, let name = selectedNames.first {
+            selectionSummary = "You're attaching `\(name)`."
+        } else {
+            selectionSummary = "You're attaching \(selectedNames.count) items: `\(preview)\(suffix)`."
+        }
+
+        return "\(selectionSummary) If helpful, note why these files matter for \(projectTitle). This note will be added to the working docs overview with the imported files."
     }
 
     func addCaptureFiles() {
@@ -2009,6 +2116,45 @@ final class AppStore: ObservableObject {
         return destinationURL
     }
 
+    private func createPitchDocument(in projectURL: URL, projectTitle: String) throws -> URL {
+        let fileManager = FileManager.default
+        let destinationURL = projectURL.appendingPathComponent("Pitch.md")
+
+        if fileManager.fileExists(atPath: destinationURL.path) {
+            throw NSError(
+                domain: "JournalismWorkflowHub.PitchTemplate",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "A pitch already exists at \(destinationURL.path)."]
+            )
+        }
+
+        let normalizedTitle = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let pitchBody = """
+        # Pitch
+
+        ## Working title
+
+        \(normalizedTitle.isEmpty ? "Untitled project" : normalizedTitle)
+
+        ## Core angle
+
+        -
+
+        ## Why now
+
+        -
+
+        ## Questions for the editor
+
+        - What is the sharpest publishable angle?
+        - What still needs reporting before this can move forward?
+        """
+
+        try fileManager.createDirectory(at: projectURL, withIntermediateDirectories: true, attributes: nil)
+        try pitchBody.write(to: destinationURL, atomically: true, encoding: .utf8)
+        return destinationURL
+    }
+
     private func importDocuments(from urls: [URL], into docsURL: URL) throws -> [String] {
         try FileManager.default.createDirectory(at: docsURL, withIntermediateDirectories: true, attributes: nil)
         var importedPaths: [String] = []
@@ -2137,7 +2283,11 @@ final class AppStore: ObservableObject {
         }.value
     }
 
-    private func summarizeImportedDocsOverview(projectRoot: String, importedPaths: [String]) async throws {
+    private func summarizeImportedDocsOverview(
+        projectRoot: String,
+        importedPaths: [String],
+        relevanceNote: String? = nil
+    ) async throws {
         guard let scriptPath = bundledKnowledgeOpsScriptPath("summarize_scaffold_docs.py") else {
             throw NSError(
                 domain: "JournalismWorkflowHub.ScaffoldSummary",
@@ -2156,6 +2306,7 @@ final class AppStore: ObservableObject {
             process.executableURL = pythonExecutable
             process.arguments = [scriptPath, "--project-root", projectRoot]
                 + importedPaths.flatMap { ["--imported-path", $0] }
+                + (relevanceNote?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty.map { ["--relevance-note", $0] } ?? [])
             process.currentDirectoryURL = workspaceRoot
             process.environment = environment
 
@@ -2399,6 +2550,73 @@ final class AppStore: ObservableObject {
                 message: error.localizedDescription
             )
             statusMessage = error.localizedDescription
+        }
+    }
+
+    private func updateCanonicalWorkingDocumentPath(
+        _ relativePath: String?,
+        role: WorkspaceDocumentRole,
+        for item: WorkspaceItem,
+        successMessage: String
+    ) {
+        guard let key = canonicalWorkingDocumentFrontmatterKey(for: role) else {
+            activeAlert = AppAlert(
+                title: "Unsupported document role",
+                message: "Only draft and pitch can be assigned from this screen right now."
+            )
+            return
+        }
+
+        guard let readmePath = item.readmePath else {
+            activeAlert = AppAlert(
+                title: "Missing README",
+                message: "This project does not have a root README.md to update."
+            )
+            return
+        }
+
+        let normalizedPath = relativePath?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmpty
+
+        do {
+            let readmeURL = URL(fileURLWithPath: readmePath)
+            let currentText = try String(contentsOf: readmeURL, encoding: .utf8)
+            let updatedText = updateFrontmatter(in: currentText) { frontmatter, orderedKeys in
+                if let normalizedPath {
+                    frontmatter[key] = normalizedPath
+                    if !orderedKeys.contains(key) {
+                        orderedKeys.append(key)
+                    }
+                } else {
+                    frontmatter.removeValue(forKey: key)
+                }
+            }
+            try updatedText.write(to: readmeURL, atomically: true, encoding: .utf8)
+            reloadWorkspace()
+
+            if let itemID = workspaceItemID(forPath: item.path) {
+                select(.workspace(itemID))
+            }
+
+            statusMessage = successMessage
+        } catch {
+            activeAlert = AppAlert(
+                title: "Could not update canonical \(role.label.lowercased())",
+                message: error.localizedDescription
+            )
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    private func canonicalWorkingDocumentFrontmatterKey(for role: WorkspaceDocumentRole) -> String? {
+        switch role {
+        case .draft:
+            return "canonical_draft"
+        case .pitch:
+            return "canonical_pitch"
+        default:
+            return nil
         }
     }
 
