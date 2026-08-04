@@ -907,10 +907,62 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertEqual(assigned.userNote, "Useful for the main story.")
         XCTAssertEqual(assigned.assignedTargetPath, project.path)
         let destinationPath = try XCTUnwrap(assigned.assignedDestinationPath)
+        let factsPath = URL(fileURLWithPath: project.path).appendingPathComponent("docs/facts.md")
+        let facts = try String(contentsOf: factsPath, encoding: .utf8)
         XCTAssertTrue(FileManager.default.fileExists(atPath: destinationPath))
         XCTAssertTrue(destinationPath.contains("/docs/"))
+        XCTAssertTrue(facts.contains("# Facts"))
+        XCTAssertTrue(facts.contains("Fact: Useful for the main story."))
+        XCTAssertTrue(facts.contains("Source: source_story.pdf"))
         XCTAssertEqual(store.captureQueueRecords.count, 0)
         XCTAssertEqual(store.captureAssignedRecords.count, 1)
+        XCTAssertEqual(store.statusMessage, "Assigned source_story.pdf to Demo Story and saved note to facts")
+    }
+
+    func testAssignCaptureRecordAppendsFactsWithoutOverwritingExistingEntries() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        let supportRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let captureStore = CaptureStore(workspaceRoot: workspaceRoot, supportDirectory: supportRoot)
+        let store = AppStore(
+            configuration: AppConfiguration(
+                profile: .standalone,
+                workspaceRoot: workspaceRoot,
+                demoWorkspaceRoot: nil
+            ),
+            captureStore: captureStore
+        )
+
+        let incomingRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: incomingRoot, withIntermediateDirectories: true, attributes: nil)
+        let firstFileURL = incomingRoot.appendingPathComponent("source_story.pdf")
+        let secondFileURL = incomingRoot.appendingPathComponent("market_note.pdf")
+        try Data("pdf".utf8).write(to: firstFileURL)
+        try Data("pdf".utf8).write(to: secondFileURL)
+
+        waitForCaptureAsyncWork {
+            await store.importCaptureItems(from: [firstFileURL, secondFileURL])
+        }
+
+        let project = try XCTUnwrap(store.captureAssignmentTargets.first(where: { $0.section == .projects }))
+        let firstRecord = try XCTUnwrap(store.captureRecords.first(where: { $0.displayTitle == "source_story.pdf" }))
+        let secondRecord = try XCTUnwrap(store.captureRecords.first(where: { $0.displayTitle == "market_note.pdf" }))
+
+        waitForCaptureAsyncWork {
+            await store.assignCaptureRecord(firstRecord.id, to: project, note: "India accounts for 8.9% of EU steel imports.")
+        }
+
+        waitForCaptureAsyncWork {
+            await store.assignCaptureRecord(secondRecord.id, to: project, note: "This makes India a major importer, even if it is not the biggest.")
+        }
+
+        let factsPath = URL(fileURLWithPath: project.path).appendingPathComponent("docs/facts.md")
+        let facts = try String(contentsOf: factsPath, encoding: .utf8)
+
+        XCTAssertEqual(facts.components(separatedBy: "# Facts").count - 1, 1)
+        XCTAssertTrue(facts.contains("Fact: India accounts for 8.9% of EU steel imports."))
+        XCTAssertTrue(facts.contains("Fact: This makes India a major importer, even if it is not the biggest."))
+        XCTAssertTrue(facts.contains("Source: source_story.pdf"))
+        XCTAssertTrue(facts.contains("Source: market_note.pdf"))
     }
 
     func testAssignCaptureRecordCopiesFolderIntoProjectDocs() throws {
@@ -1032,8 +1084,15 @@ final class AppStoreNavigationTests: XCTestCase {
             contentsOf: URL(fileURLWithPath: projectPath).appendingPathComponent("README.md"),
             encoding: .utf8
         )
+        let facts = try String(
+            contentsOf: URL(fileURLWithPath: projectPath).appendingPathComponent("docs/facts.md"),
+            encoding: .utf8
+        )
         XCTAssertTrue(readme.contains("project: Inspectors ignored repeated warning signs"))
         XCTAssertTrue(readme.contains("deliverable: Placeholder lead from Capture. Confirm the reporting angle later."))
+        XCTAssertTrue(facts.contains("Fact: Placeholder lead from Capture. Confirm the reporting angle later."))
+        XCTAssertTrue(facts.contains("Source: inspectors_ignored_repeated_warning_signs_"))
+        XCTAssertEqual(store.statusMessage, "Created placeholder project Inspectors ignored repeated warning signs and saved note to facts")
 
         let destinationPath = try XCTUnwrap(assigned.assignedDestinationPath)
         XCTAssertTrue(FileManager.default.fileExists(atPath: destinationPath))
@@ -1191,8 +1250,10 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertEqual(assigned.state, .assigned)
         XCTAssertEqual(assigned.assignedTargetPath, area.path)
         let destinationPath = try XCTUnwrap(assigned.assignedDestinationPath)
+        let factsPath = URL(fileURLWithPath: area.path).appendingPathComponent("docs/facts.md")
         XCTAssertTrue(destinationPath.contains("/Areas/voedselcrisis_2027/docs/"))
         XCTAssertTrue(FileManager.default.fileExists(atPath: destinationPath))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: factsPath.path))
     }
 
     func testDeleteCaptureRecordRemovesStoredCopyAndQueueRecord() throws {

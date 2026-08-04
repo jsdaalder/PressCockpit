@@ -550,7 +550,7 @@ struct CaptureView: View {
                     .font(.system(.caption, design: .rounded))
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Description or why this matters (optional)")
+                        Text("Facts, leads, or why this matters now (optional)")
                             .font(.subheadline.weight(.semibold))
 
                         TextEditor(text: $reviewNoteText)
