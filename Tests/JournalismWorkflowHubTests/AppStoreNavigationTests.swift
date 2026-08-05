@@ -1372,6 +1372,7 @@ final class AppStoreNavigationTests: XCTestCase {
             activityState: state.initialState.activityState,
             workflowStage: state.initialState.workflowStage,
             inactiveReason: state.initialState.inactiveReason,
+            dossierSlug: state.initialDossierSlug,
             isInDailyFocus: state.initialIsInDailyFocus
         )
 
@@ -1418,6 +1419,7 @@ final class AppStoreNavigationTests: XCTestCase {
             activityState: state.initialState.activityState,
             workflowStage: state.initialState.workflowStage,
             inactiveReason: state.initialState.inactiveReason,
+            dossierSlug: state.initialDossierSlug,
             isInDailyFocus: state.initialIsInDailyFocus
         )
 
@@ -1442,6 +1444,8 @@ final class AppStoreNavigationTests: XCTestCase {
         store.beginProjectDetailsEditing(for: project)
 
         let state = try XCTUnwrap(store.projectDetailsEditState)
+        XCTAssertEqual(state.currentDossierSlug, "voedselcrisis_2027")
+        XCTAssertEqual(state.initialDossierSlug, "voedselcrisis_2027")
         store.saveProjectDetailsEdit(
             state,
             projectTitle: "Retitled Story",
@@ -1449,6 +1453,7 @@ final class AppStoreNavigationTests: XCTestCase {
             activityState: .inactive,
             workflowStage: .feasibilityStudy,
             inactiveReason: .discarded,
+            dossierSlug: state.currentDossierSlug,
             isInDailyFocus: true
         )
 
@@ -1463,6 +1468,52 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertTrue(readmeText.contains("inactive_reason: discarded"))
         XCTAssertTrue(readmeText.contains("status: on_hold"))
         XCTAssertTrue(readmeText.contains("daily_focus: true"))
+    }
+
+    func testEditingProjectDetailsCanRelinkDossier() throws {
+        let workspaceRoot = try makeWorkspaceRoot(includeArea: true)
+        let alternateDossier = workspaceRoot.appendingPathComponent("Resources/straat_van_hormuz")
+        try FileManager.default.createDirectory(at: alternateDossier, withIntermediateDirectories: true, attributes: nil)
+        try """
+        ---
+        type: project
+        project: Straat van Hormuz
+        status: active
+        ---
+
+        # Straat van Hormuz
+
+        Resource dossier for energy and shipping coverage.
+        """.write(to: alternateDossier.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+
+        let project = try XCTUnwrap(store.snapshot.items.first(where: { $0.section == .projects }))
+        store.beginProjectDetailsEditing(for: project)
+
+        let state = try XCTUnwrap(store.projectDetailsEditState)
+        store.saveProjectDetailsEdit(
+            state,
+            projectTitle: state.initialDisplayTitle,
+            projectType: state.initialProjectType,
+            activityState: state.initialState.activityState,
+            workflowStage: state.initialState.workflowStage,
+            inactiveReason: state.initialState.inactiveReason,
+            dossierSlug: "straat_van_hormuz",
+            isInDailyFocus: state.initialIsInDailyFocus
+        )
+
+        let readmePath = workspaceRoot.appendingPathComponent("Projects/2026/demo_story/README.md")
+        let readmeText = try String(contentsOf: readmePath, encoding: .utf8)
+
+        XCTAssertTrue(readmeText.contains("dossier: straat_van_hormuz"))
+        XCTAssertFalse(readmeText.contains("dossier: voedselcrisis_2027"))
+        let updatedProject = try XCTUnwrap(store.snapshot.items.first(where: { $0.section == .projects }))
+        XCTAssertEqual(updatedProject.dossierSlug, "straat_van_hormuz")
     }
 
     func testBeginningProjectDetailsEditingRoutesToProjectPage() throws {

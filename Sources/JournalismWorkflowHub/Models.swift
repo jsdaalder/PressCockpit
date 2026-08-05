@@ -632,6 +632,8 @@ struct ProjectDetailsEditState: Identifiable, Hashable {
     let initialProjectType: WorkspaceProjectType
     let currentState: ProjectState
     let initialState: ProjectState
+    let currentDossierSlug: String?
+    let initialDossierSlug: String?
     let currentIsInDailyFocus: Bool
     let initialIsInDailyFocus: Bool
     let isArchivedStorage: Bool

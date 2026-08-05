@@ -232,6 +232,14 @@ final class AppStore: ObservableObject {
             .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
     }
 
+    var dossierTargets: [WorkspaceItem] {
+        workspaceQueries.items
+            .filter { $0.section == .areas || $0.section == .resources }
+            .sorted { lhs, rhs in
+                lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+            }
+    }
+
     func captureAssignmentLabel(for item: WorkspaceItem) -> String {
         switch item.section {
         case .projects:
@@ -242,6 +250,17 @@ final class AppStore: ObservableObject {
             return "\(item.title) • Resource"
         case .archives:
             return "\(item.title) • Archive"
+        }
+    }
+
+    func dossierTargetLabel(for item: WorkspaceItem) -> String {
+        switch item.section {
+        case .areas:
+            return "\(item.title) • Area"
+        case .resources:
+            return "\(item.title) • Resource"
+        case .projects, .archives:
+            return item.title
         }
     }
 
@@ -411,6 +430,8 @@ final class AppStore: ObservableObject {
             initialProjectType: item.projectType,
             currentState: currentState,
             initialState: initialState ?? currentState,
+            currentDossierSlug: item.dossierSlug,
+            initialDossierSlug: item.dossierSlug,
             currentIsInDailyFocus: item.isInDailyFocus,
             initialIsInDailyFocus: item.isInDailyFocus,
             isArchivedStorage: item.section == .archives
@@ -433,6 +454,7 @@ final class AppStore: ObservableObject {
         activityState: ProjectActivityState,
         workflowStage: ProjectWorkflowStage,
         inactiveReason: ProjectInactiveReason?,
+        dossierSlug: String?,
         isInDailyFocus: Bool
     ) {
         guard let item = snapshot.items.first(where: { $0.id == state.projectID }) else {
@@ -470,6 +492,7 @@ final class AppStore: ObservableObject {
             title: normalizedTitle,
             projectType: projectType,
             normalizedState,
+            dossierSlug: dossierSlug,
             isInDailyFocus: isInDailyFocus,
             for: item,
             compatibilityStatusOverride: normalizedState.legacyLifecycleStatus(isArchivedStorage: state.isArchivedStorage)
@@ -2542,6 +2565,7 @@ final class AppStore: ObservableObject {
             title: item.frontmatter["project"]?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? item.title,
             projectType: item.projectType,
             projectState,
+            dossierSlug: item.dossierSlug,
             isInDailyFocus: item.isInDailyFocus,
             for: item,
             compatibilityStatusOverride: compatibilityStatusOverride
@@ -2560,6 +2584,7 @@ final class AppStore: ObservableObject {
             title: item.frontmatter["project"]?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? item.title,
             projectType: item.projectType,
             projectState,
+            dossierSlug: item.dossierSlug,
             isInDailyFocus: isInDailyFocus,
             for: item,
             compatibilityStatusOverride: compatibilityStatus
@@ -2570,6 +2595,7 @@ final class AppStore: ObservableObject {
         title: String,
         projectType: WorkspaceProjectType,
         _ projectState: ProjectState,
+        dossierSlug: String?,
         isInDailyFocus: Bool,
         for item: WorkspaceItem,
         compatibilityStatusOverride: ProjectLifecycleStatus? = nil
@@ -2585,6 +2611,9 @@ final class AppStore: ObservableObject {
         do {
             let readmeURL = URL(fileURLWithPath: readmePath)
             let currentText = try String(contentsOf: readmeURL, encoding: .utf8)
+            let normalizedDossierSlug = dossierSlug?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .nilIfEmpty
             let updatedText = updateFrontmatter(in: currentText) { frontmatter, orderedKeys in
                 applyProjectIdentityFrontmatter(
                     title: title,
@@ -2605,6 +2634,14 @@ final class AppStore: ObservableObject {
                     to: &frontmatter,
                     orderedKeys: &orderedKeys
                 )
+                if let normalizedDossierSlug {
+                    frontmatter["dossier"] = normalizedDossierSlug
+                    if !orderedKeys.contains("dossier") {
+                        orderedKeys.append("dossier")
+                    }
+                } else {
+                    frontmatter.removeValue(forKey: "dossier")
+                }
             }
             try updatedText.write(to: readmeURL, atomically: true, encoding: .utf8)
             reloadWorkspace()

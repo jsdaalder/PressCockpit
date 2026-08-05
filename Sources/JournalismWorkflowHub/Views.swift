@@ -1400,43 +1400,59 @@ struct WorkspaceDetailView: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .isEmpty == false
 
-        return SelectableMetadataRow(
-            label: label,
-            title: selectedDocument?.title ?? emptyLabel,
-            isPlaceholder: selectedDocument == nil
-        ) {
-            if let item {
-                let documents = item.documents
-                if documents.isEmpty && createActionTitle == nil {
-                    Text("No root-level project documents yet")
-                } else {
+        let noneToken = "__working_document_none__"
+        let createToken = "__working_document_create__"
+        let clearToken = "__working_document_clear__"
+
+        return ValueCellSelectorRow(label: label) {
+            Picker(label, selection: Binding(get: {
+                selectedDocument?.id ?? noneToken
+            }, set: { newValue in
+                guard let item else { return }
+
+                switch newValue {
+                case createToken:
+                    createAction()
+                case clearToken:
+                    store.clearCanonicalWorkingDocument(for: item, role: role)
+                case noneToken:
+                    break
+                default:
+                    guard let document = item.documents.first(where: { $0.id == newValue }) else { return }
+                    store.setCanonicalWorkingDocument(document, role: role, for: item)
+                }
+            })) {
+                if selectedDocument == nil {
+                    Text(emptyLabel).tag(noneToken)
+                }
+
+                if let item {
+                    let documents = item.documents
+
+                    if !documents.isEmpty {
+                        Divider()
+                    }
+
                     ForEach(documents) { document in
-                        Button {
-                            store.setCanonicalWorkingDocument(document, role: role, for: item)
-                        } label: {
-                            if selectedDocument?.id == document.id {
-                                Label(document.title, systemImage: "checkmark")
-                            } else {
-                                Text(document.title)
-                            }
-                        }
+                        Text(document.title).tag(document.id)
                     }
 
                     if let createActionTitle {
                         if !documents.isEmpty {
                             Divider()
                         }
-                        Button(createActionTitle, action: createAction)
+                        Text(createActionTitle).tag(createToken)
                     }
 
                     if hasExplicitSelection {
                         Divider()
-                        Button("Clear selection") {
-                            store.clearCanonicalWorkingDocument(for: item, role: role)
-                        }
+                        Text("Clear selection").tag(clearToken)
                     }
+                } else {
+                    Text("No root-level project documents yet").tag(noneToken)
                 }
             }
+            .valueCellSelectorControlStyle()
         }
     }
 }
@@ -2748,6 +2764,7 @@ struct ProjectTrustInlineEditor: View {
     @State private var activityState: ProjectActivityState
     @State private var workflowStage: ProjectWorkflowStage
     @State private var inactiveReason: ProjectInactiveReason?
+    @State private var dossierSlug: String?
     @State private var isInDailyFocus: Bool
 
     init(item: WorkspaceItem, state: ProjectDetailsEditState) {
@@ -2758,6 +2775,7 @@ struct ProjectTrustInlineEditor: View {
         _activityState = State(initialValue: state.initialState.activityState)
         _workflowStage = State(initialValue: state.initialState.workflowStage)
         _inactiveReason = State(initialValue: state.initialState.inactiveReason)
+        _dossierSlug = State(initialValue: state.initialDossierSlug)
         _isInDailyFocus = State(initialValue: state.initialIsInDailyFocus)
     }
 
@@ -2828,6 +2846,22 @@ struct ProjectTrustInlineEditor: View {
                 }
             }
 
+            ValueCellSelectorRow(label: "Dossier") {
+                Picker("Dossier", selection: $dossierSlug) {
+                    Text("None linked yet").tag(Optional<String>.none)
+
+                    if let dossierSlug, !self.availableDossierSlugs.contains(dossierSlug) {
+                        Text("Missing dossier: \(dossierSlug)").tag(Optional(dossierSlug))
+                    }
+
+                    ForEach(store.dossierTargets) { dossier in
+                        Text(store.dossierTargetLabel(for: dossier))
+                            .tag(Optional(URL(fileURLWithPath: dossier.path).lastPathComponent))
+                    }
+                }
+                .valueCellSelectorControlStyle()
+            }
+
             if !remainingRows.isEmpty {
                 MetadataGrid(rows: remainingRows)
             }
@@ -2841,6 +2875,7 @@ struct ProjectTrustInlineEditor: View {
                         activityState: activityState,
                         workflowStage: workflowStage,
                         inactiveReason: inactiveReason,
+                        dossierSlug: dossierSlug,
                         isInDailyFocus: isInDailyFocus
                     )
                 }
@@ -2899,6 +2934,7 @@ struct ProjectTrustInlineEditor: View {
             "Workflow stage",
             "Inactive reason",
             "Daily focus",
+            "Dossier",
             "Canonical draft",
             "Pitch"
         ]
@@ -2911,7 +2947,12 @@ struct ProjectTrustInlineEditor: View {
             || activityState != state.initialState.activityState
             || workflowStage != state.initialState.workflowStage
             || inactiveReason != state.initialState.inactiveReason
+            || dossierSlug != state.initialDossierSlug
             || isInDailyFocus != state.initialIsInDailyFocus
+    }
+
+    private var availableDossierSlugs: Set<String> {
+        Set(store.dossierTargets.map { URL(fileURLWithPath: $0.path).lastPathComponent })
     }
 
     private var currentCompatibilityStatus: ProjectLifecycleStatus {
