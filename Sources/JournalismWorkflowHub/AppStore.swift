@@ -504,15 +504,28 @@ final class AppStore: ObservableObject {
         guard outcome != .unknown else {
             activeAlert = AppAlert(
                 title: "Outcome required",
-                message: "Choose whether this project ended published, unpublished, or superseded before saving closeout."
+                message: "Choose whether this project ended published, unpublished, superseded, or should be deleted before saving closeout."
             )
             statusMessage = "Choose an explicit offboarding outcome first."
             return
         }
 
-        statusMessage = state.targetCompatibilityStatus == .archived
-            ? "Archiving \(state.projectTitle)…"
-            : "Finishing \(state.projectTitle)…"
+        guard !(outcome.deletesProject && state.targetCompatibilityStatus != .archived) else {
+            activeAlert = AppAlert(
+                title: "Delete only applies to archived projects",
+                message: "Use Delete only when removing a project instead of moving it into Archives."
+            )
+            statusMessage = "Delete is only available while archiving a project."
+            return
+        }
+
+        if outcome.deletesProject {
+            statusMessage = "Deleting \(state.projectTitle)…"
+        } else {
+            statusMessage = state.targetCompatibilityStatus == .archived
+                ? "Archiving \(state.projectTitle)…"
+                : "Finishing \(state.projectTitle)…"
+        }
 
         do {
             let closeout = try await applyProjectOffboarding(
@@ -535,7 +548,9 @@ final class AppStore: ObservableObject {
                 select(.overview)
             }
 
-            if let closeout, let importedPDFPath = closeout.importedPDFPath {
+            if closeout?.deletedProject == true {
+                statusMessage = "\(state.projectTitle) deleted"
+            } else if let closeout, let importedPDFPath = closeout.importedPDFPath {
                 statusMessage = "\(state.targetCompatibilityStatus.label) — copied \(URL(fileURLWithPath: importedPDFPath).lastPathComponent)"
             } else if let closeout, closeout.maintenanceItemCount > 0 {
                 statusMessage = "\(state.projectTitle) marked \(state.targetCompatibilityStatus.label.lowercased()) with \(closeout.maintenanceItemCount) follow-up \(closeout.maintenanceItemCount == 1 ? "item" : "items")"
@@ -2745,6 +2760,24 @@ final class AppStore: ObservableObject {
                 userInfo: [NSLocalizedDescriptionKey: "Choose an explicit offboarding outcome before saving closeout."]
             )
         }
+
+        var updatedMaintenanceItems = maintenanceStore.load()
+        updatedMaintenanceItems.removeAll {
+            $0.source == "project_offboarding"
+                && $0.projectPath == state.projectPath
+        }
+
+        if outcome.deletesProject {
+            try deleteProjectDirectory(at: projectURL)
+            maintenanceStore.replace(with: updatedMaintenanceItems)
+            return ProjectOffboardingResult(
+                importedPDFPath: nil,
+                finalProjectPath: nil,
+                maintenanceItemCount: 0,
+                deletedProject: true
+            )
+        }
+
         let managedSection = buildProjectCloseoutSection(
             compatibilityStatus: state.targetCompatibilityStatus,
             projectState: finalProjectState,
@@ -2792,10 +2825,9 @@ final class AppStore: ObservableObject {
             }
         }
 
-        var updatedMaintenanceItems = maintenanceStore.load()
         updatedMaintenanceItems.removeAll {
             $0.source == "project_offboarding"
-                && ($0.projectPath == state.projectPath || $0.projectPath == finalProjectURL.path)
+                && $0.projectPath == finalProjectURL.path
         }
 
         if routeToDossier, let dossierURL = dossierURL(for: state.dossierSlug, workspaceRoot: workspaceRoot) {
@@ -2839,7 +2871,8 @@ final class AppStore: ObservableObject {
             finalProjectPath: finalProjectURL.path,
             maintenanceItemCount: updatedMaintenanceItems.filter {
                 $0.source == "project_offboarding" && $0.projectPath == finalProjectURL.path
-            }.count
+            }.count,
+            deletedProject: false
         )
     }
 }
@@ -2917,8 +2950,9 @@ private struct ParsedReadmeDocument {
 
 private struct ProjectOffboardingResult {
     let importedPDFPath: String?
-    let finalProjectPath: String
+    let finalProjectPath: String?
     let maintenanceItemCount: Int
+    let deletedProject: Bool
 }
 
 private let projectCloseoutSectionStart = "<!-- project_closeout:start -->"
@@ -3049,6 +3083,10 @@ private func workspaceActionSummary(for status: ProjectLifecycleStatus) -> Strin
     case .onHold:
         return "Keep project inactive in Projects"
     }
+}
+
+private func deleteProjectDirectory(at projectURL: URL) throws {
+    try FileManager.default.removeItem(at: projectURL)
 }
 
 private func applyProjectIdentityFrontmatter(

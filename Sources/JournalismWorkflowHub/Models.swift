@@ -565,6 +565,7 @@ enum ProjectOffboardingOutcome: String, Codable, Hashable, CaseIterable {
     case published
     case unpublished
     case superseded
+    case deleted
 
     var label: String {
         switch self {
@@ -576,7 +577,13 @@ enum ProjectOffboardingOutcome: String, Codable, Hashable, CaseIterable {
             return "Useful but unpublished"
         case .superseded:
             return "Superseded"
+        case .deleted:
+            return "Delete"
         }
+    }
+
+    var deletesProject: Bool {
+        self == .deleted
     }
 
     func resultingProjectState(from currentState: ProjectState) -> ProjectState? {
@@ -594,7 +601,7 @@ enum ProjectOffboardingOutcome: String, Codable, Hashable, CaseIterable {
         return ProjectState(
             activityState: .inactive,
             workflowStage: workflowStage,
-            inactiveReason: self == .superseded ? .discarded : .finished
+            inactiveReason: self == .superseded || self == .deleted ? .discarded : .finished
         )
     }
 }

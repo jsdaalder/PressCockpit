@@ -1711,6 +1711,43 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertTrue(archivedReadme.contains("- Inactive reason: `discarded`"))
     }
 
+    func testDeletingArchivedProjectRemovesFolderInsteadOfMovingIt() throws {
+        let workspaceRoot = try makeWorkspaceRoot(includeArea: true)
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+
+        let project = try XCTUnwrap(store.snapshot.items.first(where: { $0.section == .projects }))
+        store.beginProjectStatusChange(for: project, targetStatus: .archived)
+        let state = try XCTUnwrap(store.projectStatusChangeState)
+        let originalProjectPath = workspaceRoot.appendingPathComponent("Projects/2026/demo_story")
+        let archivedProjectPath = workspaceRoot.appendingPathComponent("Archives/2026/demo_story")
+        let unpublishedArchivedProjectPath = workspaceRoot.appendingPathComponent("Archives/2026/unpublished/demo_story")
+        let dossierHandoff = workspaceRoot.appendingPathComponent("Areas/voedselcrisis_2027/docs/project_closeouts/demo_story_closeout.md")
+
+        waitForCaptureAsyncWork {
+            await store.completeProjectOffboarding(
+                state,
+                outcome: .deleted,
+                publishedPDFURL: nil,
+                routeToDossier: true,
+                producedSummary: "Throwaway test project.",
+                remainingOpenSummary: "",
+                impactSummary: ""
+            )
+        }
+
+        XCTAssertNil(store.projectStatusChangeState)
+        XCTAssertEqual(store.statusMessage, "Demo Story deleted")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: originalProjectPath.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: archivedProjectPath.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: unpublishedArchivedProjectPath.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dossierHandoff.path))
+        XCTAssertTrue(store.maintenanceItems.isEmpty)
+    }
+
     func testImportDocumentsToProjectCopiesIntoDocsFolder() throws {
         let workspaceRoot = try makeWorkspaceRoot()
         let store = AppStore(configuration: AppConfiguration(

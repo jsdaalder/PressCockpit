@@ -3047,66 +3047,79 @@ struct ProjectOffboardingSheet: View {
                     Text("Outcome")
                         .font(.subheadline.weight(.semibold))
                     Picker("Outcome", selection: $outcome) {
-                        ForEach(ProjectOffboardingOutcome.allCases, id: \.self) { choice in
+                        ForEach(availableOutcomes, id: \.self) { choice in
                             Text(choice.label).tag(choice)
                         }
                     }
                     .valueCellSelectorControlStyle()
 
                     if outcome == .unknown {
-                        Text("Choose an explicit outcome before saving so finished and archived work keep clear semantics.")
+                        Text(outcomeHelpText)
                             .font(.caption)
                             .foregroundStyle(AppPalette.subtle)
                     }
                 }
             }
 
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .center) {
-                    Text("Published PDF")
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Button(publishedPDFURL == nil ? "Choose PDF" : "Choose different PDF") {
-                        publishedPDFURL = store.choosePublishedPDF()
-                    }
-                    .controlSize(.small)
-                }
-
-                if let publishedPDFURL {
-                    Text(publishedPDFURL.path)
-                        .font(.caption)
-                        .foregroundStyle(AppPalette.subtle)
-                        .textSelection(.enabled)
-                } else {
-                    Text("Add the finished publication PDF here when it exists. You can skip it for now.")
-                        .font(.caption)
-                        .foregroundStyle(AppPalette.subtle)
-                }
-            }
-
-            if let dossierSlug = state.dossierSlug {
+            if isDeleteOutcome {
                 VStack(alignment: .leading, spacing: 8) {
-                    Toggle("Add a closeout handoff to dossier `\(dossierSlug)`", isOn: $routeToDossier)
-                    Text("This writes a durable dossier-facing closeout note without trying to reorganize the whole project automatically.")
+                    Text("Delete action")
+                        .font(.subheadline.weight(.semibold))
+                    Text("This removes the project folder instead of moving it into `Archives`. Closeout notes, PDF import, and dossier handoff are skipped for deleted test or throwaway projects.")
+                        .font(.caption)
+                        .foregroundStyle(AppPalette.subtle)
+                    Text("Use this only when the project has no value to keep in the workspace history.")
                         .font(.caption)
                         .foregroundStyle(AppPalette.subtle)
                 }
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .center) {
+                        Text("Published PDF")
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Button(publishedPDFURL == nil ? "Choose PDF" : "Choose different PDF") {
+                            publishedPDFURL = store.choosePublishedPDF()
+                        }
+                        .controlSize(.small)
+                    }
+
+                    if let publishedPDFURL {
+                        Text(publishedPDFURL.path)
+                            .font(.caption)
+                            .foregroundStyle(AppPalette.subtle)
+                            .textSelection(.enabled)
+                    } else {
+                        Text("Add the finished publication PDF here when it exists. You can skip it for now.")
+                            .font(.caption)
+                            .foregroundStyle(AppPalette.subtle)
+                    }
+                }
+
+                if let dossierSlug = state.dossierSlug {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Add a closeout handoff to dossier `\(dossierSlug)`", isOn: $routeToDossier)
+                        Text("This writes a durable dossier-facing closeout note without trying to reorganize the whole project automatically.")
+                            .font(.caption)
+                            .foregroundStyle(AppPalette.subtle)
+                    }
+                }
+
+                offboardingTextEditor(
+                    title: "What it produced (optional)",
+                    text: $producedSummary
+                )
+
+                offboardingTextEditor(
+                    title: "What remains open (optional)",
+                    text: $remainingOpenSummary
+                )
+
+                offboardingTextEditor(
+                    title: "Impact / follow-up (optional)",
+                    text: $impactSummary
+                )
             }
-
-            offboardingTextEditor(
-                title: "What it produced (optional)",
-                text: $producedSummary
-            )
-
-            offboardingTextEditor(
-                title: "What remains open (optional)",
-                text: $remainingOpenSummary
-            )
-
-            offboardingTextEditor(
-                title: "Impact / follow-up (optional)",
-                text: $impactSummary
-            )
 
             HStack {
                 Spacer()
@@ -3122,8 +3135,8 @@ struct ProjectOffboardingSheet: View {
                         await store.completeProjectOffboarding(
                             state,
                             outcome: outcome,
-                            publishedPDFURL: publishedPDFURL,
-                            routeToDossier: routeToDossier,
+                            publishedPDFURL: isDeleteOutcome ? nil : publishedPDFURL,
+                            routeToDossier: isDeleteOutcome ? false : routeToDossier,
                             producedSummary: producedSummary,
                             remainingOpenSummary: remainingOpenSummary,
                             impactSummary: impactSummary
@@ -3144,7 +3157,10 @@ struct ProjectOffboardingSheet: View {
     }
 
     private var confirmButtonTitle: String {
-        state.targetCompatibilityStatus == .archived ? "Archive project" : "Save closeout"
+        if isDeleteOutcome {
+            return "Delete project"
+        }
+        return state.targetCompatibilityStatus == .archived ? "Archive project" : "Save closeout"
     }
 
     private var resultingProjectState: ProjectState? {
@@ -3156,6 +3172,10 @@ struct ProjectOffboardingSheet: View {
     }
 
     private var workspaceActionLabel: String {
+        if isDeleteOutcome {
+            return "Delete project folder"
+        }
+
         switch state.targetCompatibilityStatus {
         case .archived:
             return "Move project folder into Archives"
@@ -3166,6 +3186,24 @@ struct ProjectOffboardingSheet: View {
         case .onHold:
             return "Keep project inactive in Projects"
         }
+    }
+
+    private var availableOutcomes: [ProjectOffboardingOutcome] {
+        if state.targetCompatibilityStatus == .archived {
+            return ProjectOffboardingOutcome.allCases
+        }
+        return ProjectOffboardingOutcome.allCases.filter { $0 != .deleted }
+    }
+
+    private var outcomeHelpText: String {
+        if state.targetCompatibilityStatus == .archived {
+            return "Choose an explicit outcome before saving so archived, discarded, and deleted work keep clear semantics."
+        }
+        return "Choose an explicit outcome before saving so finished work keeps clear semantics."
+    }
+
+    private var isDeleteOutcome: Bool {
+        outcome.deletesProject
     }
 
     private func statusRow(_ title: String, value: String) -> some View {
