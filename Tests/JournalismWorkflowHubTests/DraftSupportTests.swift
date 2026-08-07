@@ -71,4 +71,45 @@ final class DraftSupportTests: XCTestCase {
         XCTAssertTrue(text.contains("[Tags]"))
         XCTAssertTrue(text.contains("[Gerelateerde artikelen]"))
     }
+
+    func testScaffoldDraftDataUsesGoogleDocsLikeTypographyTokens() throws {
+        let data = try DraftSupport.scaffoldDraftData(projectTitle: "Climate Story")
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".docx")
+        try data.write(to: tmp)
+
+        let xml = try unzipDocumentXML(from: tmp)
+
+        XCTAssertTrue(xml.contains(#"w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial""#))
+        XCTAssertTrue(xml.contains(#"<w:t xml:space="preserve">Climate Story</w:t>"#))
+        XCTAssertTrue(xml.contains(#"<w:sz w:val="52"/>"#))
+        XCTAssertTrue(xml.contains(#"<w:spacing w:after="60"/>"#))
+        XCTAssertTrue(xml.contains(#"<w:t xml:space="preserve">[Nieuwsbrief]</w:t>"#))
+        XCTAssertTrue(xml.contains(#"<w:sz w:val="40"/>"#))
+        XCTAssertTrue(xml.contains(#"<w:spacing w:before="400" w:after="120"/>"#))
+        XCTAssertTrue(xml.contains(#"<w:t xml:space="preserve">Schrijf hier een korte nieuwsbriefsamenvatting.</w:t>"#))
+        XCTAssertFalse(xml.contains("Helvetica Neue"))
+    }
+
+    private func unzipDocumentXML(from url: URL) throws -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        process.arguments = ["-p", url.path, "word/document.xml"]
+
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = Pipe()
+
+        try process.run()
+        process.waitUntilExit()
+
+        XCTAssertEqual(process.terminationStatus, 0)
+
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        guard let xml = String(data: data, encoding: .utf8) else {
+            XCTFail("Expected UTF-8 XML output")
+            return ""
+        }
+
+        return xml
+    }
 }

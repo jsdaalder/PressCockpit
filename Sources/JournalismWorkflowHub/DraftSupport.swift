@@ -4,6 +4,10 @@ import Foundation
 enum DraftSupport {
     static let defaultGoogleDraftPointerFilename = "Draft.gdoc"
     private static let maxDraftTitleLength = 72
+    private static let baseFontName = "Arial"
+    private static let bodyFontSize: CGFloat = 11
+    private static let titleFontSize: CGFloat = 26
+    private static let sectionHeadingFontSize: CGFloat = 20
 
     static func localDraftFilename(projectTitle: String) -> String {
         let cleanedTitle = truncatedDraftTitle(cleanedProjectTitle(projectTitle))
@@ -51,9 +55,9 @@ enum DraftSupport {
             appendParagraph(
                 projectTitle,
                 to: document,
-                font: NSFont.systemFont(ofSize: 18, weight: .semibold),
+                font: font(size: titleFontSize),
                 spacingBefore: 0,
-                spacingAfter: 18
+                spacingAfter: 3
             )
         }
 
@@ -161,25 +165,25 @@ enum DraftSupport {
         appendParagraph(
             heading,
             to: document,
-            font: NSFont.systemFont(ofSize: 14, weight: .bold),
-            spacingBefore: document.length == 0 ? 0 : 14,
-            spacingAfter: 8
+            font: font(size: sectionHeadingFontSize),
+            spacingBefore: document.length == 0 ? 0 : 20,
+            spacingAfter: 6
         )
 
         for (index, paragraph) in body.enumerated() {
             appendParagraph(
                 paragraph,
                 to: document,
-                font: NSFont.systemFont(ofSize: 11),
+                font: font(size: bodyFontSize),
                 spacingBefore: 0,
-                spacingAfter: (index == body.count - 1 && bullets.isEmpty && bulletGroups.isEmpty) ? 12 : 6
+                spacingAfter: (index == body.count - 1 && bullets.isEmpty && bulletGroups.isEmpty) ? 8 : 4
             )
 
             if index < bulletGroups.count {
                 for bullet in bulletGroups[index] {
                     appendBullet(bullet, to: document)
                 }
-                appendSpacer(to: document, spacingAfter: 8)
+                appendSpacer(to: document, spacingAfter: 6)
             }
         }
 
@@ -188,7 +192,7 @@ enum DraftSupport {
                 for bullet in group {
                     appendBullet(bullet, to: document)
                 }
-                appendSpacer(to: document, spacingAfter: 8)
+                appendSpacer(to: document, spacingAfter: 6)
             }
         }
 
@@ -197,9 +201,9 @@ enum DraftSupport {
         }
 
         if !bullets.isEmpty {
-            appendSpacer(to: document, spacingAfter: 12)
+            appendSpacer(to: document, spacingAfter: 8)
         } else if body.isEmpty && bulletGroups.isEmpty {
-            appendSpacer(to: document, spacingAfter: 12)
+            appendSpacer(to: document, spacingAfter: 8)
         }
 
         if addDivider {
@@ -217,7 +221,6 @@ enum DraftSupport {
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.paragraphSpacingBefore = spacingBefore
         paragraphStyle.paragraphSpacing = spacingAfter
-        paragraphStyle.lineSpacing = 2
 
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
@@ -228,35 +231,38 @@ enum DraftSupport {
 
     private static func appendBullet(_ text: String, to document: NSMutableAttributedString) {
         let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.headIndent = 18
-        paragraphStyle.firstLineHeadIndent = 0
-        paragraphStyle.paragraphSpacing = 6
-        paragraphStyle.lineSpacing = 2
+        paragraphStyle.firstLineHeadIndent = 18
+        paragraphStyle.headIndent = 36
+        paragraphStyle.defaultTabInterval = 36
+        paragraphStyle.tabStops = [NSTextTab(textAlignment: .left, location: 36)]
+        paragraphStyle.paragraphSpacing = 4
 
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 11),
+            .font: font(size: bodyFontSize),
             .paragraphStyle: paragraphStyle
         ]
-        document.append(NSAttributedString(string: "•\t\(text)\n", attributes: attributes))
+        document.append(NSAttributedString(string: "●\t\(text)\n", attributes: attributes))
     }
 
     private static func appendSpacer(to document: NSMutableAttributedString, spacingAfter: CGFloat) {
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.paragraphSpacing = spacingAfter
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 11),
+            .font: font(size: bodyFontSize),
             .paragraphStyle: paragraphStyle
         ]
         document.append(NSAttributedString(string: "\n", attributes: attributes))
     }
 
     private static func appendDivider(to document: NSMutableAttributedString) {
-        appendParagraph(
-            String(repeating: "_", count: 48),
-            to: document,
-            font: NSFont.systemFont(ofSize: 11),
-            spacingBefore: 0,
-            spacingAfter: 12
-        )
+        appendSpacer(to: document, spacingAfter: 8)
+    }
+
+    private static func font(size: CGFloat) -> NSFont {
+        if let font = NSFont(name: baseFontName, size: size) {
+            return font
+        }
+
+        return NSFont.systemFont(ofSize: size)
     }
 }
