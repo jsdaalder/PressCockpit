@@ -8,6 +8,8 @@ This file applies to the `journalism_workflow_hub` app repository.
 - The user should not have to manage subordinate agents directly.
 - Prefer one `chief_of_staff` and a small number of specialists.
 - Keep changes minimal, auditable, and scoped to the task.
+- Default to `main` plus small, coherent commits.
+- Only introduce a separate git branch when the user explicitly asks for it or when unusual risk makes isolation materially safer than staying on `main`.
 
 ## Planning Source Of Truth
 
