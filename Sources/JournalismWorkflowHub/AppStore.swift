@@ -987,10 +987,40 @@ final class AppStore: ObservableObject {
                 importedPaths: state.importedPaths
             )
             reloadWorkspace()
-            statusMessage = "Updated docs overview from imported materials"
+            if let itemID = workspaceItemID(forPath: state.projectRoot) {
+                select(.workspace(itemID))
+            }
+
+            let count = state.importedItemCount
+            statusMessage = "Attached \(count) \(count == 1 ? "item" : "items") to \(state.projectTitle) and updated docs overview"
+            projectDocumentImportFeedback = ProjectDocumentImportFeedback(
+                projectPath: state.projectRoot,
+                title: "Docs attached",
+                message: projectDocumentImportSuccessMessage(
+                    count: count,
+                    projectTitle: state.projectTitle,
+                    relevanceNote: nil,
+                    reviewNotesByPath: [:]
+                ),
+                style: .success,
+                showsOpenDocsOverviewAction: docsOverviewExists(projectRoot: state.projectRoot)
+            )
             scaffoldPostCreateState = nil
         } catch {
-            statusMessage = error.localizedDescription
+            let count = state.importedItemCount
+            statusMessage = "Attached \(count) \(count == 1 ? "item" : "items") to \(state.projectTitle), but docs overview update failed"
+            projectDocumentImportFeedback = ProjectDocumentImportFeedback(
+                projectPath: state.projectRoot,
+                title: "Docs attached, summary needs review",
+                message: projectDocumentImportFailureMessage(
+                    count: count,
+                    projectTitle: state.projectTitle,
+                    relevanceNote: nil,
+                    reviewNotesByPath: [:]
+                ),
+                style: .warning,
+                showsOpenDocsOverviewAction: docsOverviewExists(projectRoot: state.projectRoot)
+            )
             activeAlert = AppAlert(title: "Could not summarize docs overview", message: error.localizedDescription)
         }
 
@@ -1036,6 +1066,11 @@ final class AppStore: ObservableObject {
     func openScaffoldPostCreateDocsFolder() {
         guard let state = scaffoldPostCreateState else { return }
         openPath(state.docsURL.path)
+    }
+
+    func openScaffoldPostCreateDocsOverview() {
+        guard let state = scaffoldPostCreateState else { return }
+        openURL(state.docsURL.appendingPathComponent("docs_overview.md"))
     }
 
     func scaffoldPostCreateDraftDocument() -> WorkspaceDocument? {
@@ -1388,6 +1423,14 @@ final class AppStore: ObservableObject {
         }
 
         return "Attached \(count) \(count == 1 ? "item" : "items") to \(projectTitle), but the docs overview could not be refreshed. Open the docs overview and source files directly before relying on them."
+    }
+
+    private func docsOverviewExists(projectRoot: String) -> Bool {
+        let overviewPath = URL(fileURLWithPath: projectRoot)
+            .appendingPathComponent("docs", isDirectory: true)
+            .appendingPathComponent("docs_overview.md")
+            .path
+        return FileManager.default.fileExists(atPath: overviewPath)
     }
 
     func addCaptureFiles() {

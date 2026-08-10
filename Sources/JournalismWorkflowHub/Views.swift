@@ -1775,6 +1775,18 @@ private struct ScaffoldPostCreateSheet: View {
                 ("Imported", state.importedItemCount == 0 ? "Nothing added yet" : "\(state.importedItemCount) item(s)")
             ])
 
+            if let feedback {
+                ProjectDocumentImportFeedbackBanner(
+                    feedback: feedback,
+                    openDocsOverview: { store.openScaffoldPostCreateDocsOverview() },
+                    dismiss: {
+                        if store.projectDocumentImportFeedback?.projectPath == state.projectRoot {
+                            store.projectDocumentImportFeedback = nil
+                        }
+                    }
+                )
+            }
+
             HStack {
                 if state.isAwaitingImmediateDocumentImport {
                     Button(primaryButtonTitle) {
@@ -1871,7 +1883,18 @@ private struct ScaffoldPostCreateSheet: View {
         if state.isAwaitingImmediateDocumentImport {
             return "Skip for now"
         }
+        if feedback?.style == .warning {
+            return "Retry summary and close"
+        }
         return state.importedItemCount > 0 ? "Summarize and close" : "Done"
+    }
+
+    private var feedback: ProjectDocumentImportFeedback? {
+        guard let feedback = store.projectDocumentImportFeedback,
+              feedback.projectPath == state.projectRoot else {
+            return nil
+        }
+        return feedback
     }
 
     private var draftStatusText: String {

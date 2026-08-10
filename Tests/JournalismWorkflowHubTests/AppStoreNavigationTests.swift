@@ -310,6 +310,99 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertFalse(state.isAwaitingImmediateDocumentImport)
     }
 
+    func testCompleteScaffoldPostCreateDismissesSheetAndPublishesSuccessFeedback() async throws {
+        setenv("JWH_SCAFFOLD_SUMMARY_FAKE", "1", 1)
+        defer { unsetenv("JWH_SCAFFOLD_SUMMARY_FAKE") }
+
+        let workspaceRoot = try makeWorkspaceRoot()
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+        let project = try XCTUnwrap(store.snapshot.items.first(where: { $0.section == .projects }))
+
+        store.reuseExistingScaffoldProject(
+            projectTitle: project.title,
+            projectRoot: project.path,
+            sourceMaterialChoice: .later
+        )
+
+        let sourceFile = workspaceRoot.appendingPathComponent("source_note.md")
+        try """
+        Lead finding from the imported note.
+
+        Supporting detail that should appear in the synthesized overview.
+        """.write(to: sourceFile, atomically: true, encoding: .utf8)
+
+        let importedPaths = try store.importDocumentsToProject([sourceFile], item: project)
+        var state = try XCTUnwrap(store.scaffoldPostCreateState)
+        state.importedPaths = importedPaths
+        store.scaffoldPostCreateState = state
+
+        await store.completeScaffoldPostCreate()
+
+        let feedback = try XCTUnwrap(store.projectDocumentImportFeedback(for: project))
+        let overviewPath = URL(fileURLWithPath: project.path).appendingPathComponent("docs/docs_overview.md")
+        let overviewText = try String(contentsOf: overviewPath, encoding: .utf8)
+
+        XCTAssertNil(store.scaffoldPostCreateState)
+        XCTAssertFalse(store.isFinishingScaffoldPostCreate)
+        XCTAssertEqual(store.statusMessage, "Attached 1 item to Demo Story and updated docs overview")
+        XCTAssertEqual(feedback.title, "Docs attached")
+        XCTAssertEqual(feedback.style, .success)
+        XCTAssertTrue(feedback.showsOpenDocsOverviewAction)
+        XCTAssertTrue(overviewText.contains("Working summary from source_note.md"))
+    }
+
+    func testCompleteScaffoldPostCreateKeepsSheetOpenAndPublishesWarningFeedbackOnFailure() async throws {
+        setenv("JWH_SCAFFOLD_SUMMARY_FAKE", "1", 1)
+        defer { unsetenv("JWH_SCAFFOLD_SUMMARY_FAKE") }
+
+        let workspaceRoot = try makeWorkspaceRoot()
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+        let project = try XCTUnwrap(store.snapshot.items.first(where: { $0.section == .projects }))
+
+        store.reuseExistingScaffoldProject(
+            projectTitle: project.title,
+            projectRoot: project.path,
+            sourceMaterialChoice: .later
+        )
+
+        let sourceFile = workspaceRoot.appendingPathComponent("source_note.md")
+        try """
+        Lead finding from the imported note.
+
+        Supporting detail that should stay reachable after a summary failure.
+        """.write(to: sourceFile, atomically: true, encoding: .utf8)
+
+        let importedPaths = try store.importDocumentsToProject([sourceFile], item: project)
+        let blockedOverviewURL = URL(fileURLWithPath: project.path).appendingPathComponent("docs/docs_overview.md", isDirectory: true)
+        try FileManager.default.createDirectory(at: blockedOverviewURL, withIntermediateDirectories: true, attributes: nil)
+
+        var state = try XCTUnwrap(store.scaffoldPostCreateState)
+        state.importedPaths = importedPaths
+        store.scaffoldPostCreateState = state
+
+        await store.completeScaffoldPostCreate()
+
+        let feedback = try XCTUnwrap(store.projectDocumentImportFeedback(for: project))
+        let alert = try XCTUnwrap(store.activeAlert)
+        let preservedState = try XCTUnwrap(store.scaffoldPostCreateState)
+
+        XCTAssertEqual(preservedState.importedPaths, importedPaths)
+        XCTAssertFalse(store.isFinishingScaffoldPostCreate)
+        XCTAssertEqual(store.statusMessage, "Attached 1 item to Demo Story, but docs overview update failed")
+        XCTAssertEqual(feedback.title, "Docs attached, summary needs review")
+        XCTAssertEqual(feedback.style, .warning)
+        XCTAssertTrue(feedback.showsOpenDocsOverviewAction)
+        XCTAssertEqual(alert.title, "Could not summarize docs overview")
+    }
+
     func testCreateScaffoldDraftBuildsLocalDocxWithoutExternalTemplate() throws {
         let workspaceRoot = try makeWorkspaceRoot()
         let store = AppStore(configuration: AppConfiguration(
