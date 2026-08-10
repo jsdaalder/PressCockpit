@@ -9,7 +9,7 @@ PRODUCT_NAME="JournalismWorkflowHub"
 RESOURCE_BUNDLE_NAME="JournalismWorkflowHub_JournalismWorkflowHub.bundle"
 APP_NAME="PressCockpit"
 BUNDLE_ID="com.jsdaalder.presscockpit"
-VERSION="0.1.2"
+VERSION="0.2.0"
 BUILD_NUMBER="1"
 DEFAULT_PROFILE="standalone"
 OUTPUT_DIR="$ROOT_DIR/dist"
@@ -24,7 +24,7 @@ Usage: scripts/build-macos-release.sh [options]
 Options:
   --app-name NAME        App bundle name. Default: PressCockpit
   --bundle-id ID         macOS bundle identifier. Default: com.jsdaalder.presscockpit
-  --version VERSION      Human-readable version. Default: 0.1.2
+  --version VERSION      Human-readable version. Default: 0.2.0
   --build-number NUMBER  Bundle build number. Default: 1
   --profile PROFILE      Default app profile at launch: standalone or standard. Default: standalone
   --output-dir PATH      Output directory for packaged artifacts. Default: dist
