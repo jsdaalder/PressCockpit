@@ -455,6 +455,69 @@ final class ScaffoldProjectScriptTests: XCTestCase {
         XCTAssertFalse(overview.contains("\u{000C}"))
     }
 
+    func testScaffoldSummaryScriptHandlesMissingPdftotextWithoutCrashing() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let scriptURL = root
+            .appendingPathComponent("Sources/JournalismWorkflowHub/Resources/knowledge_ops/scripts/summarize_scaffold_docs.py")
+
+        let snippet = #"""
+        import importlib.util
+        import json
+        import pathlib
+        import sys
+
+        script_path = pathlib.Path(sys.argv[1])
+        spec = importlib.util.spec_from_file_location("summarize_scaffold_docs", script_path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+
+        def fake_run(*args, **kwargs):
+            raise FileNotFoundError("pdftotext not installed")
+
+        module.subprocess.run = fake_run
+        pdf_path = pathlib.Path("/tmp/missing-tool.pdf")
+        extracted = module.extract_text(pdf_path)
+        assert extracted == ""
+
+        summary = module.summarize_source(
+            pdf_path,
+            project_root=pathlib.Path("/tmp/project"),
+            context_docs=[],
+            relevance_note="",
+            review_note="",
+            model=None,
+            model_issue=None,
+            max_source_chars=4000,
+        )
+
+        assert "could not be converted into readable local text yet" in summary.summary
+        print(json.dumps({"summary": summary.summary, "cautions": summary.cautions}))
+        """#
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["python3", "-c", snippet, scriptURL.path]
+
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        try process.run()
+        process.waitUntilExit()
+
+        let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        XCTAssertEqual(process.terminationStatus, 0, stderr)
+
+        let stdout = String(data: stdoutPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        XCTAssertTrue(stdout.contains("could not be converted into readable local text yet"))
+        XCTAssertTrue(stdout.contains("No local text could be extracted for the model"))
+    }
+
     func testScaffoldSummaryScriptWritesPerFileNotesFromJSON() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

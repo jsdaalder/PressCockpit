@@ -237,12 +237,15 @@ def run_textutil(path: Path) -> str:
 
 
 def run_pdftotext(path: Path) -> str:
-    completed = subprocess.run(
-        ["pdftotext", "-layout", "-nopgbrk", str(path), "-"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            ["pdftotext", "-layout", "-nopgbrk", str(path), "-"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return ""
     return completed.stdout if completed.returncode == 0 else ""
 
 
