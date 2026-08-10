@@ -454,4 +454,64 @@ final class ScaffoldProjectScriptTests: XCTestCase {
         XCTAssertFalse(overview.contains("[4D"))
         XCTAssertFalse(overview.contains("\u{000C}"))
     }
+
+    func testScaffoldSummaryScriptWritesPerFileNotesFromJSON() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let scriptURL = root
+            .appendingPathComponent("Sources/JournalismWorkflowHub/Resources/knowledge_ops/scripts/summarize_scaffold_docs.py")
+
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let projectRoot = tmp.appendingPathComponent("Projects/2026/review_notes_story")
+        let docsRoot = projectRoot.appendingPathComponent("docs")
+        try FileManager.default.createDirectory(at: docsRoot, withIntermediateDirectories: true, attributes: nil)
+
+        try """
+        # Review Notes Story
+
+        This README explains the project direction.
+        """.write(to: projectRoot.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
+        let importedURL = docsRoot.appendingPathComponent("research_notes.md")
+        try """
+        Lead finding from the imported note.
+        """.write(to: importedURL, atomically: true, encoding: .utf8)
+
+        let reviewNotesURL = tmp.appendingPathComponent("review_notes.json")
+        let payload = [
+            importedURL.path: "Pull this figure into facts after manual verification."
+        ]
+        let reviewNotesData = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+        try reviewNotesData.write(to: reviewNotesURL)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = [
+            "python3",
+            scriptURL.path,
+            "--project-root", projectRoot.path,
+            "--imported-path", importedURL.path,
+            "--review-notes-file", reviewNotesURL.path
+        ]
+
+        var environment = ProcessInfo.processInfo.environment
+        environment["JWH_SCAFFOLD_SUMMARY_FAKE"] = "1"
+        process.environment = environment
+
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        try process.run()
+        process.waitUntilExit()
+
+        let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        XCTAssertEqual(process.terminationStatus, 0, stderr)
+
+        let overview = try String(contentsOf: docsRoot.appendingPathComponent("docs_overview.md"), encoding: .utf8)
+        XCTAssertTrue(overview.contains("- Note: Pull this figure into facts after manual verification."))
+    }
 }

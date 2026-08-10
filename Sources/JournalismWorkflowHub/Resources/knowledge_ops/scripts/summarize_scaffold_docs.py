@@ -54,6 +54,7 @@ class SourceSummary:
     research_questions: tuple[str, ...]
     follow_up: tuple[str, ...]
     cautions: str
+    user_note: str = ""
 
 
 def parse_args() -> argparse.Namespace:
@@ -63,6 +64,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--project-root", required=True)
     parser.add_argument("--imported-path", action="append", default=[])
     parser.add_argument("--relevance-note", default="")
+    parser.add_argument("--review-notes-file", default="")
     parser.add_argument("--docs-overview-path", default="")
     parser.add_argument("--model", default="")
     parser.add_argument("--max-context-chars", type=int, default=4000)
@@ -89,6 +91,7 @@ def main() -> int:
 
     context_docs = load_context_documents(project_root, max_chars=args.max_context_chars)
     relevance_note = sanitize_multiline_text(args.relevance_note).strip()
+    review_notes_by_path = load_review_notes(args.review_notes_file)
     fake_mode = os.environ.get(FAKE_MODE_ENV) == "1"
     force_invalid_json = os.environ.get(FORCE_INVALID_JSON_ENV) == "1"
     model: str | None = None
@@ -104,6 +107,7 @@ def main() -> int:
             project_root=project_root,
             context_docs=context_docs,
             relevance_note=relevance_note,
+            review_note=review_notes_by_path.get(str(source_path.resolve()), ""),
             model=model,
             model_issue=model_issue,
             max_source_chars=args.max_source_chars,
@@ -280,6 +284,7 @@ def summarize_source(
     project_root: Path,
     context_docs: list[ContextDocument],
     relevance_note: str,
+    review_note: str,
     model: str | None,
     model_issue: str | None,
     max_source_chars: int,
@@ -294,10 +299,11 @@ def summarize_source(
             research_questions=("Can this file be converted or replaced with a readable local format?",),
             follow_up=("Open the original file manually and capture the key takeaways in a note.",),
             cautions="No local text could be extracted for the model.",
+            user_note=review_note,
         )
 
     if os.environ.get(FAKE_MODE_ENV) == "1":
-        return fake_summary(source_path, project_root=project_root, source_text=source_text)
+        return fake_summary(source_path, project_root=project_root, source_text=source_text, review_note=review_note)
 
     if os.environ.get(FORCE_INVALID_JSON_ENV) == "1":
         try:
@@ -308,6 +314,7 @@ def summarize_source(
                 project_root=project_root,
                 source_text=source_text,
                 reason=str(exc),
+                review_note=review_note,
             )
 
     if model_issue:
@@ -316,6 +323,7 @@ def summarize_source(
             project_root=project_root,
             source_text=source_text,
             reason=model_issue,
+            review_note=review_note,
         )
 
     if not model:
@@ -324,6 +332,7 @@ def summarize_source(
             project_root=project_root,
             source_text=source_text,
             reason="No local model was available for structured summarization.",
+            review_note=review_note,
         )
 
     prompt = build_prompt(
@@ -331,6 +340,7 @@ def summarize_source(
         project_root=project_root,
         context_docs=context_docs,
         relevance_note=relevance_note,
+        review_note=review_note,
         source_text=source_text,
     )
     try:
@@ -342,6 +352,7 @@ def summarize_source(
             project_root=project_root,
             source_text=source_text,
             reason=str(exc),
+            review_note=review_note,
         )
 
     return SourceSummary(
@@ -352,10 +363,11 @@ def summarize_source(
         research_questions=tuple(clean_list(payload.get("research_questions"))[:3]) or ("What does this file change about the current reporting direction?",),
         follow_up=tuple(clean_list(payload.get("follow_up"))[:3]),
         cautions=compact_text(payload.get("cautions")) or "Model-generated working note. Review against the source before reusing it.",
+        user_note=review_note,
     )
 
 
-def fake_summary(source_path: Path, *, project_root: Path, source_text: str) -> SourceSummary:
+def fake_summary(source_path: Path, *, project_root: Path, source_text: str, review_note: str) -> SourceSummary:
     lead = compact_text(source_text.splitlines()[0] if source_text.splitlines() else source_text) or "No readable lead."
     return SourceSummary(
         relative_path=relative_label(source_path, project_root),
@@ -368,6 +380,7 @@ def fake_summary(source_path: Path, *, project_root: Path, source_text: str) -> 
         ),
         follow_up=("Check the source against the README assumptions.",),
         cautions="Fake summary mode was used for verification only.",
+        user_note=review_note,
     )
 
 
@@ -377,6 +390,7 @@ def fallback_summary(
     project_root: Path,
     source_text: str,
     reason: str,
+    review_note: str,
 ) -> SourceSummary:
     lead = compact_text(source_text.splitlines()[0] if source_text.splitlines() else source_text) or "No readable lead."
     return SourceSummary(
@@ -390,6 +404,7 @@ def fallback_summary(
         ),
         follow_up=("Open the file and capture the key takeaways in a note or README update.",),
         cautions=f"{compact_text(reason) or 'The local summary step failed.'} A text-based fallback summary was written instead.",
+        user_note=review_note,
     )
 
 
@@ -399,13 +414,15 @@ def build_prompt(
     project_root: Path,
     context_docs: list[ContextDocument],
     relevance_note: str,
+    review_note: str,
     source_text: str,
 ) -> str:
     context_block = "\n\n".join(
         f"[{doc.label} | {relative_label(doc.path, project_root)}]\n{doc.text}"
         for doc in context_docs
     ) or "No extra context documents were readable."
-    user_note_block = relevance_note or "No user-entered relevance note was provided."
+    note_parts = [note for note in (review_note, relevance_note) if note]
+    user_note_block = "\n\n".join(note_parts) if note_parts else "No user-entered relevance note was provided."
 
     return textwrap.dedent(
         f"""\
@@ -586,6 +603,8 @@ def build_managed_summary_section(
                 f"- Research questions: {join_inline(summary.research_questions)}",
             ]
         )
+        if summary.user_note:
+            lines.append(f"- Note: {summary.user_note}")
         if summary.follow_up:
             lines.append(f"- Follow-up: {join_inline(summary.follow_up)}")
         lines.append(f"- Cautions: {summary.cautions}")
@@ -597,6 +616,28 @@ def build_managed_summary_section(
 def join_inline(items: tuple[str, ...]) -> str:
     cleaned = [item for item in items if item]
     return "; ".join(cleaned) if cleaned else "None captured yet."
+
+
+def load_review_notes(raw_path: str) -> dict[str, str]:
+    if not raw_path:
+        return {}
+
+    path = Path(raw_path).expanduser().resolve()
+    if not path.exists():
+        raise SystemExit(f"Review notes file does not exist: {path}")
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise SystemExit("Review notes file must contain a JSON object keyed by imported path.")
+
+    normalized: dict[str, str] = {}
+    for raw_key, raw_value in payload.items():
+        if not isinstance(raw_key, str) or not isinstance(raw_value, str):
+            continue
+        note = sanitize_multiline_text(raw_value).strip()
+        if note:
+            normalized[str(Path(raw_key).expanduser().resolve())] = note
+    return normalized
 
 
 def relative_label(path: Path, project_root: Path) -> str:

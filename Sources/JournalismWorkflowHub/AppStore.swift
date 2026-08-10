@@ -21,6 +21,7 @@ final class AppStore: ObservableObject {
     @Published var statusMessage: String = "Ready"
     @Published var activeAlert: AppAlert?
     @Published var projectDocumentImportFeedback: ProjectDocumentImportFeedback?
+    @Published var projectDocumentReviewSession: ProjectDocumentReviewSession?
     @Published var isRunning: Bool = false
     @Published var selectedRunOutput: String = ""
     @Published private(set) var documentMode: OnboardingDocumentMode
@@ -155,6 +156,65 @@ final class AppStore: ObservableObject {
         guard let item else { return }
         guard projectDocumentImportFeedback?.projectPath == item.path else { return }
         projectDocumentImportFeedback = nil
+    }
+
+    func activeProjectDocumentReviewSession(for item: WorkspaceItem?) -> ProjectDocumentReviewSession? {
+        guard let item else { return nil }
+        guard projectDocumentReviewSession?.projectPath == item.path else { return nil }
+        return projectDocumentReviewSession
+    }
+
+    func updateProjectDocumentReviewNote(_ text: String, for importedPath: String) {
+        guard var session = projectDocumentReviewSession else { return }
+        guard let index = session.items.firstIndex(where: { $0.importedPath == importedPath }) else { return }
+        let normalized = text.isEmpty ? nil : text
+        var items = session.items
+        items[index] = ProjectDocumentReviewItem(
+            sourcePath: items[index].sourcePath,
+            importedPath: importedPath,
+            note: normalized
+        )
+        session = ProjectDocumentReviewSession(
+            projectPath: session.projectPath,
+            projectTitle: session.projectTitle,
+            items: items,
+            currentIndex: session.currentIndex
+        )
+        projectDocumentReviewSession = session
+    }
+
+    func moveToPreviousProjectDocumentReviewItem() {
+        guard let session = projectDocumentReviewSession, session.currentIndex > 0 else { return }
+        projectDocumentReviewSession = ProjectDocumentReviewSession(
+            projectPath: session.projectPath,
+            projectTitle: session.projectTitle,
+            items: session.items,
+            currentIndex: session.currentIndex - 1
+        )
+    }
+
+    func moveToNextProjectDocumentReviewItem() {
+        guard let session = projectDocumentReviewSession else { return }
+        guard session.currentIndex + 1 < session.items.count else { return }
+        projectDocumentReviewSession = ProjectDocumentReviewSession(
+            projectPath: session.projectPath,
+            projectTitle: session.projectTitle,
+            items: session.items,
+            currentIndex: session.currentIndex + 1
+        )
+    }
+
+    func dismissProjectDocumentReviewSession(for item: WorkspaceItem?) {
+        guard let item else { return }
+        guard projectDocumentReviewSession?.projectPath == item.path else { return }
+        projectDocumentReviewSession = nil
+    }
+
+    func pauseProjectDocumentReview(for item: WorkspaceItem?) {
+        guard let item else { return }
+        guard let session = activeProjectDocumentReviewSession(for: item) else { return }
+        let count = session.items.count
+        statusMessage = "Attached \(count) \(count == 1 ? "item" : "items") to \(session.projectTitle). Review can be finished later from the project page."
     }
 
     var selectedWorkflow: WorkflowDefinition? {
@@ -1137,47 +1197,8 @@ final class AppStore: ObservableObject {
 
         guard panel.runModal() == .OK else { return }
 
-        let relevanceNote: String?
-        if item.isProjectRoot {
-            relevanceNote = promptForProjectDocumentRelevanceNote(
-                projectTitle: item.title,
-                selectedURLs: panel.urls
-            )
-        } else {
-            relevanceNote = nil
-        }
-
         do {
-            let importedPaths = try importDocumentsToProject(panel.urls, item: item)
-            guard !importedPaths.isEmpty else { return }
-            reloadWorkspace()
-
-            if let itemID = workspaceItemID(forPath: item.path) {
-                select(.workspace(itemID))
-            }
-
-            let count = importedPaths.count
-            if item.isProjectRoot {
-                statusMessage = "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title). Updating docs overview…"
-                projectDocumentImportFeedback = ProjectDocumentImportFeedback(
-                    projectPath: item.path,
-                    title: "Updating docs overview",
-                    message: relevanceNote == nil
-                        ? "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title). Building a working summary for the imported material now."
-                        : "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title). Building a working summary for the imported material and your relevance note now.",
-                    style: .progress,
-                    showsOpenDocsOverviewAction: item.hasDocsOverview
-                )
-                Task {
-                    await finalizeAttachedDocuments(
-                        for: item,
-                        importedPaths: importedPaths,
-                        relevanceNote: relevanceNote
-                    )
-                }
-            } else {
-                statusMessage = "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title)"
-            }
+            _ = try attachDocumentsToProject(panel.urls, item: item)
         } catch {
             statusMessage = error.localizedDescription
             activeAlert = AppAlert(title: "Could not attach documents", message: error.localizedDescription)
@@ -1187,7 +1208,8 @@ final class AppStore: ObservableObject {
     func finalizeAttachedDocuments(
         for item: WorkspaceItem,
         importedPaths: [String],
-        relevanceNote: String? = nil
+        relevanceNote: String? = nil,
+        reviewNotesByPath: [String: String] = [:]
     ) async {
         guard item.isProjectRoot else { return }
 
@@ -1195,7 +1217,8 @@ final class AppStore: ObservableObject {
             try await summarizeImportedDocsOverview(
                 projectRoot: item.path,
                 importedPaths: importedPaths,
-                relevanceNote: relevanceNote
+                relevanceNote: relevanceNote,
+                reviewNotesByPath: reviewNotesByPath
             )
             reloadWorkspace()
 
@@ -1208,9 +1231,12 @@ final class AppStore: ObservableObject {
             projectDocumentImportFeedback = ProjectDocumentImportFeedback(
                 projectPath: item.path,
                 title: "Docs attached",
-                message: relevanceNote == nil
-                    ? "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title) and updated the docs overview. Review the imported summary before treating it as settled reporting material."
-                    : "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title), saved your relevance note, and updated the docs overview. Review the imported summary before treating it as settled reporting material.",
+                message: projectDocumentImportSuccessMessage(
+                    count: count,
+                    projectTitle: item.title,
+                    relevanceNote: relevanceNote,
+                    reviewNotesByPath: reviewNotesByPath
+                ),
                 style: .success,
                 showsOpenDocsOverviewAction: true
             )
@@ -1220,9 +1246,12 @@ final class AppStore: ObservableObject {
             projectDocumentImportFeedback = ProjectDocumentImportFeedback(
                 projectPath: item.path,
                 title: "Docs attached, summary needs review",
-                message: relevanceNote == nil
-                    ? "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title), but the docs overview could not be refreshed. Open the docs overview and source files directly before relying on them."
-                    : "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title), but the docs overview could not be refreshed. Your relevance note was not folded into the project summary yet, so open the docs overview and source files directly before relying on them.",
+                message: projectDocumentImportFailureMessage(
+                    count: count,
+                    projectTitle: item.title,
+                    relevanceNote: relevanceNote,
+                    reviewNotesByPath: reviewNotesByPath
+                ),
                 style: .warning,
                 showsOpenDocsOverviewAction: item.hasDocsOverview
             )
@@ -1237,56 +1266,128 @@ final class AppStore: ObservableObject {
         try importDocuments(from: urls, into: item.docsDirectoryURL)
     }
 
-    private func promptForProjectDocumentRelevanceNote(projectTitle: String, selectedURLs: [URL]) -> String? {
-        let alert = NSAlert()
-        alert.alertStyle = .informational
-        alert.messageText = "Add an optional relevance note"
-        alert.informativeText = relevanceNotePromptMessage(
-            projectTitle: projectTitle,
-            selectedURLs: selectedURLs
-        )
-        alert.addButton(withTitle: "Attach files")
-        alert.addButton(withTitle: "Skip note")
+    @discardableResult
+    func attachDocumentsToProject(_ urls: [URL], item: WorkspaceItem) throws -> [String] {
+        let importedPaths = try importDocumentsToProject(urls, item: item)
+        guard !importedPaths.isEmpty else { return [] }
+        reloadWorkspace()
 
-        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 420, height: 96))
-        textView.isRichText = false
-        textView.isAutomaticQuoteSubstitutionEnabled = false
-        textView.font = .systemFont(ofSize: NSFont.systemFontSize)
-
-        let scrollView = NSScrollView(frame: textView.frame)
-        scrollView.hasVerticalScroller = true
-        scrollView.borderType = .bezelBorder
-        scrollView.documentView = textView
-
-        let helperLabel = NSTextField(labelWithString: "Why this matters (optional)")
-        helperLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize, weight: .semibold)
-
-        let stackView = NSStackView(views: [helperLabel, scrollView])
-        stackView.orientation = .vertical
-        stackView.alignment = .leading
-        stackView.spacing = 8
-        alert.accessoryView = stackView
-
-        let response = alert.runModal()
-        if response == .alertSecondButtonReturn {
-            return nil
+        if let itemID = workspaceItemID(forPath: item.path) {
+            select(.workspace(itemID))
         }
 
-        return textView.string.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let count = importedPaths.count
+        if item.isProjectRoot {
+            projectDocumentImportFeedback = nil
+            startProjectDocumentReview(for: item, sourceURLs: urls, importedPaths: importedPaths)
+            statusMessage = "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title). Review the imported files before updating docs overview."
+        } else {
+            statusMessage = "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title)"
+        }
+        return importedPaths
     }
 
-    private func relevanceNotePromptMessage(projectTitle: String, selectedURLs: [URL]) -> String {
-        let selectedNames = selectedURLs.map(\.lastPathComponent)
-        let preview = selectedNames.prefix(3).joined(separator: ", ")
-        let suffix = selectedNames.count > 3 ? ", and \(selectedNames.count - 3) more" : ""
-        let selectionSummary: String
-        if selectedNames.count == 1, let name = selectedNames.first {
-            selectionSummary = "You're attaching `\(name)`."
-        } else {
-            selectionSummary = "You're attaching \(selectedNames.count) items: `\(preview)\(suffix)`."
+    func completeProjectDocumentReview(for item: WorkspaceItem) async {
+        guard let session = activeProjectDocumentReviewSession(for: item) else { return }
+        let reviewNotesByPath: [String: String] = Dictionary(
+            uniqueKeysWithValues: session.items.compactMap { reviewItem in
+                guard let note = reviewItem.note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else { return nil }
+                return (reviewItem.importedPath, note)
+            }
+        )
+        let count = session.items.count
+        let savedFactCount = appendProjectDocumentReviewNotesToFacts(
+            session.items,
+            projectRoot: item.url
+        )
+
+        projectDocumentImportFeedback = ProjectDocumentImportFeedback(
+            projectPath: item.path,
+            title: "Updating docs overview",
+            message: savedFactCount > 0
+                ? "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title), saved \(savedFactCount) review \(savedFactCount == 1 ? "note" : "notes") to facts, and are now building the docs overview."
+                : "Attached \(count) \(count == 1 ? "item" : "items") to \(item.title). Building the docs overview from the imported material now.",
+            style: .progress,
+            showsOpenDocsOverviewAction: item.hasDocsOverview
+        )
+        projectDocumentReviewSession = nil
+
+        await finalizeAttachedDocuments(
+            for: item,
+            importedPaths: session.items.map(\.importedPath),
+            reviewNotesByPath: reviewNotesByPath
+        )
+    }
+
+    private func startProjectDocumentReview(for item: WorkspaceItem, sourceURLs: [URL], importedPaths: [String]) {
+        let pairs = zip(sourceURLs, importedPaths)
+        let items = pairs.map { sourceURL, importedPath in
+            ProjectDocumentReviewItem(
+                sourcePath: sourceURL.standardizedFileURL.path,
+                importedPath: importedPath,
+                note: nil
+            )
+        }
+        projectDocumentReviewSession = ProjectDocumentReviewSession(
+            projectPath: item.path,
+            projectTitle: item.title,
+            items: items,
+            currentIndex: 0
+        )
+    }
+
+    private func appendProjectDocumentReviewNotesToFacts(
+        _ items: [ProjectDocumentReviewItem],
+        projectRoot: URL
+    ) -> Int {
+        items.reduce(into: 0) { count, item in
+            guard let note = item.note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else { return }
+            let didAppend = (try? appendReviewNoteToFactsFileIfNeeded(
+                note: note,
+                sourceDisplayName: item.displayTitle,
+                assignedDestinationPath: item.importedPath,
+                projectRoot: projectRoot
+            )) ?? false
+            if didAppend {
+                count += 1
+            }
+        }
+    }
+
+    private func projectDocumentImportSuccessMessage(
+        count: Int,
+        projectTitle: String,
+        relevanceNote: String?,
+        reviewNotesByPath: [String: String]
+    ) -> String {
+        if relevanceNote != nil {
+            return "Attached \(count) \(count == 1 ? "item" : "items") to \(projectTitle), saved your relevance note, and updated the docs overview. Review the imported summary before treating it as settled reporting material."
         }
 
-        return "\(selectionSummary) If helpful, note why these files matter for \(projectTitle). This note will be added to the working docs overview with the imported files."
+        let savedNoteCount = reviewNotesByPath.count
+        if savedNoteCount > 0 {
+            return "Attached \(count) \(count == 1 ? "item" : "items") to \(projectTitle), saved \(savedNoteCount) review \(savedNoteCount == 1 ? "note" : "notes") to facts, and updated the docs overview. Review the imported summary before treating it as settled reporting material."
+        }
+
+        return "Attached \(count) \(count == 1 ? "item" : "items") to \(projectTitle) and updated the docs overview. Review the imported summary before treating it as settled reporting material."
+    }
+
+    private func projectDocumentImportFailureMessage(
+        count: Int,
+        projectTitle: String,
+        relevanceNote: String?,
+        reviewNotesByPath: [String: String]
+    ) -> String {
+        if relevanceNote != nil {
+            return "Attached \(count) \(count == 1 ? "item" : "items") to \(projectTitle), but the docs overview could not be refreshed. Your relevance note was not folded into the project summary yet, so open the docs overview and source files directly before relying on them."
+        }
+
+        let savedNoteCount = reviewNotesByPath.count
+        if savedNoteCount > 0 {
+            return "Attached \(count) \(count == 1 ? "item" : "items") to \(projectTitle), saved \(savedNoteCount) review \(savedNoteCount == 1 ? "note" : "notes") to facts, but the docs overview could not be refreshed. Open the source files and facts directly before relying on the summary layer."
+        }
+
+        return "Attached \(count) \(count == 1 ? "item" : "items") to \(projectTitle), but the docs overview could not be refreshed. Open the docs overview and source files directly before relying on them."
     }
 
     func addCaptureFiles() {
@@ -1564,9 +1665,9 @@ final class AppStore: ObservableObject {
                 from: sourceURL,
                 into: URL(fileURLWithPath: projectRoot).appendingPathComponent("docs", isDirectory: true)
             )
-            let didAppendFacts = (try? appendCaptureNoteToFactsFileIfNeeded(
+            let didAppendFacts = (try? appendReviewNoteToFactsFileIfNeeded(
                 note: normalizedNote,
-                record: current,
+                sourceDisplayName: current.displayTitle,
                 assignedDestinationPath: destinationURL.path,
                 projectRoot: URL(fileURLWithPath: projectRoot)
             )) ?? false
@@ -1652,9 +1753,9 @@ final class AppStore: ObservableObject {
                 into: target.url.appendingPathComponent("docs", isDirectory: true)
             )
             let didAppendFacts = target.section == .projects
-                ? ((try? appendCaptureNoteToFactsFileIfNeeded(
+                ? ((try? appendReviewNoteToFactsFileIfNeeded(
                     note: normalizedNote,
-                    record: current,
+                    sourceDisplayName: current.displayTitle,
                     assignedDestinationPath: destinationURL.path,
                     projectRoot: target.url
                 )) ?? false)
@@ -2212,41 +2313,19 @@ final class AppStore: ObservableObject {
     }
 
     private func importDocuments(from urls: [URL], into docsURL: URL) throws -> [String] {
-        try FileManager.default.createDirectory(at: docsURL, withIntermediateDirectories: true, attributes: nil)
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(at: docsURL, withIntermediateDirectories: true, attributes: nil)
         var importedPaths: [String] = []
 
         for url in urls {
-            let destination = uniqueImportDestination(for: url, in: docsURL)
+            let destination = uniqueImportDestinationURL(for: url, in: docsURL, fileManager: fileManager)
             try SecurityScopedAccess.withAccess(to: [url, docsURL]) {
-                try FileManager.default.copyItem(at: url, to: destination)
+                try fileManager.copyItem(at: url, to: destination)
             }
             importedPaths.append(destination.path)
         }
 
         return importedPaths
-    }
-
-    private func uniqueImportDestination(for sourceURL: URL, in docsURL: URL) -> URL {
-        let fileManager = FileManager.default
-        let initialDestination = docsURL.appendingPathComponent(sourceURL.lastPathComponent)
-        guard fileManager.fileExists(atPath: initialDestination.path) else {
-            return initialDestination
-        }
-
-        let baseName = sourceURL.deletingPathExtension().lastPathComponent
-        let pathExtension = sourceURL.pathExtension
-        var suffix = 2
-
-        while true {
-            let candidateName = pathExtension.isEmpty
-                ? "\(baseName)_\(suffix)"
-                : "\(baseName)_\(suffix).\(pathExtension)"
-            let candidate = docsURL.appendingPathComponent(candidateName)
-            if !fileManager.fileExists(atPath: candidate.path) {
-                return candidate
-            }
-            suffix += 1
-        }
     }
 
     private func appendCaptureRecords(_ records: [CaptureRecord]) {
@@ -2342,7 +2421,8 @@ final class AppStore: ObservableObject {
     private func summarizeImportedDocsOverview(
         projectRoot: String,
         importedPaths: [String],
-        relevanceNote: String? = nil
+        relevanceNote: String? = nil,
+        reviewNotesByPath: [String: String] = [:]
     ) async throws {
         guard let scriptPath = bundledKnowledgeOpsScriptPath("summarize_scaffold_docs.py") else {
             throw NSError(
@@ -2356,13 +2436,29 @@ final class AppStore: ObservableObject {
         let pythonExecutable = try CommandRunner.resolveExecutableURL(for: "python3", environment: environment)
         let workspaceRoot = self.workspaceRoot
         let importedPaths = importedPaths.sorted()
+        let reviewNotesByPath = reviewNotesByPath
+            .mapValues { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.value.isEmpty }
 
         try await Task.detached(priority: .userInitiated) {
             let process = Process()
             process.executableURL = pythonExecutable
-            process.arguments = [scriptPath, "--project-root", projectRoot]
+            var arguments = [scriptPath, "--project-root", projectRoot]
                 + importedPaths.flatMap { ["--imported-path", $0] }
                 + (relevanceNote?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty.map { ["--relevance-note", $0] } ?? [])
+
+            let reviewNotesURL: URL?
+            if reviewNotesByPath.isEmpty {
+                reviewNotesURL = nil
+            } else {
+                let payload = try JSONSerialization.data(withJSONObject: reviewNotesByPath, options: [.prettyPrinted, .sortedKeys])
+                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("jwh-review-notes-\(UUID().uuidString).json")
+                try payload.write(to: tempURL)
+                reviewNotesURL = tempURL
+                arguments += ["--review-notes-file", tempURL.path]
+            }
+
+            process.arguments = arguments
             process.currentDirectoryURL = workspaceRoot
             process.environment = environment
 
@@ -2376,6 +2472,9 @@ final class AppStore: ObservableObject {
 
             let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
             let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+            if let reviewNotesURL {
+                try? FileManager.default.removeItem(at: reviewNotesURL)
+            }
             let stdoutText = String(data: stdoutData, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let stderrText = String(data: stderrData, encoding: .utf8)?
@@ -2421,7 +2520,7 @@ final class AppStore: ObservableObject {
         return try await Task.detached(priority: .userInitiated) {
             let fileManager = FileManager.default
             try fileManager.createDirectory(at: normalizedDocs, withIntermediateDirectories: true, attributes: nil)
-            let destinationURL = uniqueImportDestinationForCapture(sourceURL: normalizedSource, in: normalizedDocs, fileManager: fileManager)
+            let destinationURL = uniqueImportDestinationURL(for: normalizedSource, in: normalizedDocs, fileManager: fileManager)
             try SecurityScopedAccess.withAccess(to: [normalizedSource, normalizedDocs]) {
                 try fileManager.copyItem(at: normalizedSource, to: destinationURL)
             }
@@ -2429,9 +2528,9 @@ final class AppStore: ObservableObject {
         }.value
     }
 
-    private func appendCaptureNoteToFactsFileIfNeeded(
+    private func appendReviewNoteToFactsFileIfNeeded(
         note: String,
-        record: CaptureRecord,
+        sourceDisplayName: String,
         assignedDestinationPath: String,
         projectRoot: URL
     ) throws -> Bool {
@@ -2452,9 +2551,9 @@ final class AppStore: ObservableObject {
             updatedText += "\n"
         }
 
-        updatedText += captureFactsEntry(
+        updatedText += factsEntry(
             note: normalizedNote,
-            record: record,
+            sourceDisplayName: sourceDisplayName,
             assignedDestinationPath: assignedDestinationPath,
             docsRootPath: docsURL.path
         )
@@ -2469,11 +2568,7 @@ final class AppStore: ObservableObject {
         return try await Task.detached(priority: .userInitiated) {
             let fileManager = FileManager.default
             try fileManager.createDirectory(at: normalizedDestinationRoot, withIntermediateDirectories: true, attributes: nil)
-            let destinationURL = uniqueImportDestinationForCapture(
-                sourceURL: normalizedSource,
-                in: normalizedDestinationRoot,
-                fileManager: fileManager
-            )
+            let destinationURL = uniqueImportDestinationURL(for: normalizedSource, in: normalizedDestinationRoot, fileManager: fileManager)
             try fileManager.moveItem(at: normalizedSource, to: destinationURL)
             return destinationURL
         }.value
@@ -2944,7 +3039,7 @@ private func sanitizedCaptureFilename(_ text: String) -> String {
         .description
 }
 
-private func uniqueImportDestinationForCapture(sourceURL: URL, in docsURL: URL, fileManager: FileManager) -> URL {
+private func uniqueImportDestinationURL(for sourceURL: URL, in docsURL: URL, fileManager: FileManager = .default) -> URL {
     let initialDestination = docsURL.appendingPathComponent(sourceURL.lastPathComponent)
     guard fileManager.fileExists(atPath: initialDestination.path) else {
         return initialDestination
@@ -3200,17 +3295,18 @@ private extension String {
 }
 
 private func copyDocuments(_ urls: [URL], into docsURL: URL) throws -> [String] {
-    try FileManager.default.createDirectory(at: docsURL, withIntermediateDirectories: true, attributes: nil)
+    let fileManager = FileManager.default
+    try fileManager.createDirectory(at: docsURL, withIntermediateDirectories: true, attributes: nil)
     var importedPaths: [String] = []
 
     for url in urls {
-        let destination = uniqueImportDestinationForCapture(
-            sourceURL: url.standardizedFileURL,
+        let destination = uniqueImportDestinationURL(
+            for: url.standardizedFileURL,
             in: docsURL.standardizedFileURL,
-            fileManager: FileManager.default
+            fileManager: fileManager
         )
         try SecurityScopedAccess.withAccess(to: [url, docsURL]) {
-            try FileManager.default.copyItem(at: url, to: destination)
+            try fileManager.copyItem(at: url, to: destination)
         }
         importedPaths.append(destination.path)
     }
@@ -3218,14 +3314,14 @@ private func copyDocuments(_ urls: [URL], into docsURL: URL) throws -> [String] 
     return importedPaths
 }
 
-private func captureFactsEntry(
+private func factsEntry(
     note: String,
-    record: CaptureRecord,
+    sourceDisplayName: String,
     assignedDestinationPath: String,
     docsRootPath: String
 ) -> String {
-    let title = factsEntryTitle(note: note, fallback: record.displayTitle)
-    let source = captureFactsSourceDescription(
+    let title = factsEntryTitle(note: note, fallback: sourceDisplayName)
+    let source = factsSourceDescription(
         assignedDestinationPath: assignedDestinationPath,
         docsRootPath: docsRootPath
     )
@@ -3256,7 +3352,7 @@ private func factsEntryTitle(note: String, fallback: String) -> String {
     return prefix
 }
 
-private func captureFactsSourceDescription(
+private func factsSourceDescription(
     assignedDestinationPath: String,
     docsRootPath: String
 ) -> String {

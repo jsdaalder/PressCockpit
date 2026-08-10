@@ -326,6 +326,43 @@ struct ProjectDocumentImportFeedback: Identifiable, Hashable {
     let showsOpenDocsOverviewAction: Bool
 }
 
+struct ProjectDocumentReviewItem: Identifiable, Hashable {
+    let id: String
+    let sourcePath: String
+    let importedPath: String
+    let note: String?
+
+    init(sourcePath: String, importedPath: String, note: String? = nil) {
+        self.id = importedPath
+        self.sourcePath = sourcePath
+        self.importedPath = importedPath
+        self.note = note
+    }
+
+    var displayTitle: String {
+        URL(fileURLWithPath: importedPath).lastPathComponent
+    }
+}
+
+struct ProjectDocumentReviewSession: Identifiable, Hashable {
+    let id = UUID()
+    let projectPath: String
+    let projectTitle: String
+    let items: [ProjectDocumentReviewItem]
+    let currentIndex: Int
+
+    var currentItem: ProjectDocumentReviewItem? {
+        guard items.indices.contains(currentIndex) else { return nil }
+        return items[currentIndex]
+    }
+
+    var progressLabel: String {
+        let total = items.count
+        guard total > 0 else { return "No items waiting." }
+        return "Item \(currentIndex + 1) of \(total). Work through the newly attached files one at a time and keep the rest out of sight."
+    }
+}
+
 enum ProjectActivityState: String, Codable, Hashable, CaseIterable {
     case active
     case inactive

@@ -1956,6 +1956,142 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertTrue(overviewText.contains("Use this to sanity-check the published numbers before we quote them."))
     }
 
+    func testAttachDocumentsToProjectStartsProjectReviewSession() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+        let project = try XCTUnwrap(store.snapshot.items.first)
+
+        let firstFile = workspaceRoot.appendingPathComponent("first_note.md")
+        let secondFile = workspaceRoot.appendingPathComponent("second_note.md")
+        try "First imported note.".write(to: firstFile, atomically: true, encoding: .utf8)
+        try "Second imported note.".write(to: secondFile, atomically: true, encoding: .utf8)
+
+        let importedPaths = try store.attachDocumentsToProject([firstFile, secondFile], item: project)
+        let session = try XCTUnwrap(store.activeProjectDocumentReviewSession(for: project))
+
+        XCTAssertEqual(importedPaths.count, 2)
+        XCTAssertEqual(session.items.count, 2)
+        XCTAssertEqual(session.currentIndex, 0)
+        XCTAssertEqual(session.items.first?.sourcePath, firstFile.path)
+        XCTAssertEqual(session.items.first?.importedPath, importedPaths.first)
+        XCTAssertTrue(store.statusMessage.contains("Review the imported files before updating docs overview"))
+    }
+
+    func testPauseProjectDocumentReviewKeepsSessionAvailable() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+        let project = try XCTUnwrap(store.snapshot.items.first)
+
+        let sourceFile = workspaceRoot.appendingPathComponent("hold_for_later.md")
+        try "Imported note that can wait.".write(to: sourceFile, atomically: true, encoding: .utf8)
+
+        _ = try store.attachDocumentsToProject([sourceFile], item: project)
+        store.pauseProjectDocumentReview(for: project)
+
+        XCTAssertNotNil(store.activeProjectDocumentReviewSession(for: project))
+        XCTAssertTrue(store.statusMessage.contains("finished later"))
+    }
+
+    func testProjectDocumentReviewPreservesSpacesWhileEditingButTrimsOnSave() async throws {
+        setenv("JWH_SCAFFOLD_SUMMARY_FAKE", "1", 1)
+        defer { unsetenv("JWH_SCAFFOLD_SUMMARY_FAKE") }
+
+        let workspaceRoot = try makeWorkspaceRoot()
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+        let project = try XCTUnwrap(store.snapshot.items.first)
+
+        let sourceFile = workspaceRoot.appendingPathComponent("spaced_note.md")
+        try "Imported note with spacing.".write(to: sourceFile, atomically: true, encoding: .utf8)
+
+        let importedPaths = try store.attachDocumentsToProject([sourceFile], item: project)
+        let importedPath = try XCTUnwrap(importedPaths.first)
+
+        store.updateProjectDocumentReviewNote("Leading and trailing space ", for: importedPath)
+
+        let session = try XCTUnwrap(store.activeProjectDocumentReviewSession(for: project))
+        XCTAssertEqual(session.currentItem?.note, "Leading and trailing space ")
+
+        await store.completeProjectDocumentReview(for: project)
+
+        let factsPath = URL(fileURLWithPath: project.path).appendingPathComponent("docs/facts.md")
+        let facts = try String(contentsOf: factsPath, encoding: .utf8)
+
+        XCTAssertTrue(facts.contains("Fact: Leading and trailing space"))
+        XCTAssertFalse(facts.contains("Fact: Leading and trailing space "))
+    }
+
+    func testCompleteProjectDocumentReviewWritesFactsAndPerFileNotes() async throws {
+        setenv("JWH_SCAFFOLD_SUMMARY_FAKE", "1", 1)
+        defer { unsetenv("JWH_SCAFFOLD_SUMMARY_FAKE") }
+
+        let workspaceRoot = try makeWorkspaceRoot()
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+        let project = try XCTUnwrap(store.snapshot.items.first)
+
+        let firstFile = workspaceRoot.appendingPathComponent("market_note.md")
+        let secondFile = workspaceRoot.appendingPathComponent("policy_note.md")
+        try "Market lead for the imported note.".write(to: firstFile, atomically: true, encoding: .utf8)
+        try "Policy lead for the imported note.".write(to: secondFile, atomically: true, encoding: .utf8)
+
+        let importedPaths = try store.attachDocumentsToProject([firstFile, secondFile], item: project)
+        store.updateProjectDocumentReviewNote("India accounts for 8.9% of EU steel imports.", for: importedPaths[0])
+        store.moveToNextProjectDocumentReviewItem()
+        store.updateProjectDocumentReviewNote("The CBAM workaround still depends on manual verification.", for: importedPaths[1])
+
+        await store.completeProjectDocumentReview(for: project)
+
+        let factsPath = URL(fileURLWithPath: project.path).appendingPathComponent("docs/facts.md")
+        let facts = try String(contentsOf: factsPath, encoding: .utf8)
+        let overviewPath = workspaceRoot.appendingPathComponent("Projects/2026/demo_story/docs/docs_overview.md")
+        let overview = try String(contentsOf: overviewPath, encoding: .utf8)
+        let feedback = try XCTUnwrap(store.projectDocumentImportFeedback(for: project))
+
+        XCTAssertNil(store.activeProjectDocumentReviewSession(for: project))
+        XCTAssertTrue(facts.contains("Fact: India accounts for 8.9% of EU steel imports."))
+        XCTAssertTrue(facts.contains("Fact: The CBAM workaround still depends on manual verification."))
+        XCTAssertTrue(overview.contains("- Note: India accounts for 8.9% of EU steel imports."))
+        XCTAssertTrue(overview.contains("- Note: The CBAM workaround still depends on manual verification."))
+        XCTAssertTrue(feedback.message.contains("saved 2 review notes to facts"))
+    }
+
+    func testCompleteProjectDocumentReviewSkipsEmptyFactsEntries() async throws {
+        setenv("JWH_SCAFFOLD_SUMMARY_FAKE", "1", 1)
+        defer { unsetenv("JWH_SCAFFOLD_SUMMARY_FAKE") }
+
+        let workspaceRoot = try makeWorkspaceRoot()
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+        let project = try XCTUnwrap(store.snapshot.items.first)
+
+        let sourceFile = workspaceRoot.appendingPathComponent("empty_note.md")
+        try "Imported note without extra annotation.".write(to: sourceFile, atomically: true, encoding: .utf8)
+
+        _ = try store.attachDocumentsToProject([sourceFile], item: project)
+        await store.completeProjectDocumentReview(for: project)
+
+        let factsPath = URL(fileURLWithPath: project.path).appendingPathComponent("docs/facts.md")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: factsPath.path))
+    }
+
     private func waitForCaptureAsyncWork(_ operation: @escaping @MainActor () async -> Void) {
         let expectation = expectation(description: "async capture work")
         Task {

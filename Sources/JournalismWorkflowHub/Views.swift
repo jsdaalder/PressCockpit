@@ -514,60 +514,13 @@ struct CaptureView: View {
                 .tint(AppPalette.title)
 
             if let selectedCaptureRecord {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(selectedCaptureRecord.displayTitle)
-                        .font(.headline)
-                        .foregroundStyle(AppPalette.title)
-                        .textSelection(.enabled)
-
-                    Text("Check the source, add a short note if useful, then either file this item into one active project or area or turn it into a placeholder project. Notes are kept when you move between items.")
-                        .foregroundStyle(AppPalette.subtle)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        reviewMetaRow(label: "State", value: selectedCaptureRecord.state.label)
-                        reviewMetaRow(label: "Type", value: selectedCaptureRecord.typeCue)
-                        reviewMetaRow(label: "Captured", value: selectedCaptureRecord.capturedAtLabel)
-                        reviewMetaRow(label: "Source", value: selectedCaptureRecord.sourceLabel)
-                        if let importedStoragePath = selectedCaptureRecord.importedStoragePath, !importedStoragePath.isEmpty {
-                            reviewMetaRow(label: "Stored copy", value: importedStoragePath)
-                        }
-                    }
-
-                    HStack(spacing: 12) {
-                        if let importedStoragePath = selectedCaptureRecord.importedStoragePath, !importedStoragePath.isEmpty {
-                            Button("Open stored copy") {
-                                store.openPath(importedStoragePath)
-                            }
-                        }
-
-                        if let originalSourcePath = selectedCaptureRecord.originalSourcePath, !originalSourcePath.isEmpty {
-                            Button("Reveal source") {
-                                store.openPath(originalSourcePath)
-                            }
-                        }
-                    }
-                    .buttonStyle(.link)
-                    .font(.system(.caption, design: .rounded))
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Facts, leads, or why this matters now (optional)")
-                            .font(.subheadline.weight(.semibold))
-
-                        TextEditor(text: $reviewNoteText)
-                            .font(.body)
-                            .frame(minHeight: 96)
-                            .scrollContentBackground(.hidden)
-                            .padding(6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(AppPalette.card.opacity(0.9))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(AppPalette.border)
-                            )
-                    }
-
+                GuidedReviewPanel(
+                    itemTitle: selectedCaptureRecord.displayTitle,
+                    instructions: "Check the source, add a short note if useful, then either file this item into one active project or area or turn it into a placeholder project. Notes are kept when you move between items.",
+                    metadataRows: captureReviewMetadata(for: selectedCaptureRecord),
+                    linkActions: captureReviewLinkActions(for: selectedCaptureRecord),
+                    noteText: $reviewNoteText
+                ) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Assign to existing project or area")
                             .font(.subheadline.weight(.semibold))
@@ -580,7 +533,7 @@ struct CaptureView: View {
                         }
                         .valueCellSelectorControlStyle()
                     }
-
+                } actions: {
                     HStack(spacing: 12) {
                         Button("Back") {
                             moveToPreviousTriageItem()
@@ -932,17 +885,32 @@ struct CaptureView: View {
         }
     }
 
-    @ViewBuilder
-    private func reviewMetaRow(label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(label)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(AppPalette.subtle)
-            Text(value)
-                .font(.caption)
-                .foregroundStyle(AppPalette.title)
-                .textSelection(.enabled)
+    private func captureReviewMetadata(for record: CaptureRecord) -> [(String, String)] {
+        var rows: [(String, String)] = [
+            ("State", record.state.label),
+            ("Type", record.typeCue),
+            ("Captured", record.capturedAtLabel),
+            ("Source", record.sourceLabel)
+        ]
+        if let importedStoragePath = record.importedStoragePath, !importedStoragePath.isEmpty {
+            rows.append(("Stored copy", importedStoragePath))
         }
+        return rows
+    }
+
+    private func captureReviewLinkActions(for record: CaptureRecord) -> [GuidedReviewLinkAction] {
+        var actions: [GuidedReviewLinkAction] = []
+        if let importedStoragePath = record.importedStoragePath, !importedStoragePath.isEmpty {
+            actions.append(GuidedReviewLinkAction(title: "Open stored copy") {
+                store.openPath(importedStoragePath)
+            })
+        }
+        if let originalSourcePath = record.originalSourcePath, !originalSourcePath.isEmpty {
+            actions.append(GuidedReviewLinkAction(title: "Reveal source") {
+                store.openPath(originalSourcePath)
+            })
+        }
+        return actions
     }
 }
 
@@ -1308,6 +1276,10 @@ struct WorkspaceDetailView: View {
                             .controlSize(.small)
                             .tint(AppPalette.title)
 
+                            if item.isProjectRoot, let session = store.activeProjectDocumentReviewSession(for: item) {
+                                projectDocumentReviewCard(for: item, session: session)
+                            }
+
                             if item.documents.isEmpty {
                                 Text("No root-level project documents were found yet.")
                                     .font(.body)
@@ -1388,6 +1360,86 @@ struct WorkspaceDetailView: View {
         store.maintenanceItems(for: item)
     }
 
+    @ViewBuilder
+    private func projectDocumentReviewCard(for item: WorkspaceItem, session: ProjectDocumentReviewSession) -> some View {
+        if let currentItem = session.currentItem {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Review attached files")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AppPalette.title)
+
+                        Text(session.progressLabel)
+                            .foregroundStyle(AppPalette.subtle)
+                    }
+
+                    Spacer()
+
+                    Button("Finish later") {
+                        store.pauseProjectDocumentReview(for: item)
+                    }
+                }
+
+                ProgressView(value: Double(session.currentIndex + 1), total: Double(max(session.items.count, 1)))
+                    .tint(AppPalette.title)
+
+                GuidedReviewPanel(
+                    itemTitle: currentItem.displayTitle,
+                    instructions: "Check the source, add a short note if useful, then continue. Non-empty notes will be appended to facts and used in the docs overview refresh.",
+                    metadataRows: projectReviewMetadata(for: currentItem),
+                    linkActions: projectReviewLinkActions(for: currentItem),
+                    noteText: Binding(
+                        get: { currentItem.note ?? "" },
+                        set: { store.updateProjectDocumentReviewNote($0, for: currentItem.importedPath) }
+                    )
+                ) {
+                    EmptyView()
+                } actions: {
+                    HStack(spacing: 12) {
+                        Button("Back") {
+                            store.moveToPreviousProjectDocumentReviewItem()
+                        }
+                        .disabled(session.currentIndex == 0)
+
+                        Spacer()
+
+                        if session.currentIndex + 1 < session.items.count {
+                            Button("Next") {
+                                store.moveToNextProjectDocumentReviewItem()
+                            }
+                            .buttonStyle(.borderedProminent)
+                        } else {
+                            Button("Build docs overview") {
+                                Task { await store.completeProjectDocumentReview(for: item) }
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func projectReviewMetadata(for item: ProjectDocumentReviewItem) -> [(String, String)] {
+        [
+            ("Project", self.item?.title ?? "Current project"),
+            ("Source", item.sourcePath),
+            ("Stored copy", item.importedPath)
+        ]
+    }
+
+    private func projectReviewLinkActions(for item: ProjectDocumentReviewItem) -> [GuidedReviewLinkAction] {
+        [
+            GuidedReviewLinkAction(title: "Open stored copy") {
+                store.openPath(item.importedPath)
+            },
+            GuidedReviewLinkAction(title: "Reveal source") {
+                store.openPath(item.sourcePath)
+            }
+        ]
+    }
+
     private func workingDocumentSelectorRow(
         label: String,
         selectedDocument: WorkspaceDocument?,
@@ -1399,7 +1451,6 @@ struct WorkspaceDetailView: View {
         let hasExplicitSelection = item?.frontmatter[role == .draft ? "canonical_draft" : "canonical_pitch"]?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .isEmpty == false
-
         let noneToken = "__working_document_none__"
         let createToken = "__working_document_create__"
         let clearToken = "__working_document_clear__"
@@ -2154,6 +2205,82 @@ struct SectionCard<HeaderAccessory: View, Content: View>: View {
         .padding(18)
         .background(AppPalette.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(AppPalette.border))
+    }
+}
+
+struct GuidedReviewLinkAction: Identifiable {
+    let id = UUID()
+    let title: String
+    let action: () -> Void
+}
+
+private struct GuidedReviewPanel<Supplementary: View, Actions: View>: View {
+    let itemTitle: String
+    let instructions: String
+    let metadataRows: [(String, String)]
+    let linkActions: [GuidedReviewLinkAction]
+    @Binding var noteText: String
+    @ViewBuilder let supplementary: () -> Supplementary
+    @ViewBuilder let actions: () -> Actions
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(itemTitle)
+                .font(.headline)
+                .foregroundStyle(AppPalette.title)
+                .textSelection(.enabled)
+
+            Text(instructions)
+                .foregroundStyle(AppPalette.subtle)
+
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(metadataRows.enumerated()), id: \.offset) { _, row in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(row.0)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AppPalette.subtle)
+                        Text(row.1)
+                            .font(.caption)
+                            .foregroundStyle(AppPalette.title)
+                            .textSelection(.enabled)
+                    }
+                }
+            }
+
+            if !linkActions.isEmpty {
+                HStack(spacing: 12) {
+                    ForEach(linkActions) { linkAction in
+                        Button(linkAction.title) {
+                            linkAction.action()
+                        }
+                    }
+                }
+                .buttonStyle(.link)
+                .font(.system(.caption, design: .rounded))
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Facts, leads, or why this matters now (optional)")
+                    .font(.subheadline.weight(.semibold))
+
+                TextEditor(text: $noteText)
+                    .font(.body)
+                    .frame(minHeight: 96)
+                    .scrollContentBackground(.hidden)
+                    .padding(6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(AppPalette.card.opacity(0.9))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(AppPalette.border)
+                    )
+            }
+
+            supplementary()
+            actions()
+        }
     }
 }
 
