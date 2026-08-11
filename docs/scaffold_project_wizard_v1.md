@@ -235,10 +235,28 @@ Behavior:
 
 - if `Yes`, choosing that path should lead directly into document selection as the next step in the wizard experience
 - do not defer document intake to a later popup after the wizard has otherwise finished
-- create the project just in time for the import target, then open the document picker immediately in the same flow
-- do not open a file picker before the project exists
+- let the user choose files or folders in the wizard, then carry that staged selection through creation
+- immediately after creation, copy the staged selection into the new project's `docs/` folder as part of the same flow
 
-### Screen 6. Priority
+### Screen 6. Add documents
+
+Question:
+
+- `Which documents should go into this project now?`
+
+Show:
+
+- a primary action to choose files or folders
+- a visible list of the staged items
+- remove and clear actions so the selection stays inspectable before creation
+
+Purpose:
+
+- makes the `Yes, add documents now` path concrete inside the wizard itself
+- keeps the chosen source material visible before final review
+- avoids surprising the user with a post-create prompt after the wizard appears finished
+
+### Screen 7. Priority
 
 Question:
 
@@ -261,7 +279,7 @@ Purpose:
 
 ## Final Screen
 
-### Screen 7. Review and create
+### Screen 8. Review and create
 
 Purpose:
 
@@ -275,6 +293,7 @@ Show:
 - project kind
 - pitch present or summary present
 - source material timing
+- selected documents count when source material is `Yes`
 - priority
 - derived location
 
@@ -295,6 +314,12 @@ Primary action:
 Secondary action:
 
 - `Back`
+
+Exit action:
+
+- persistent `Cancel` action in the wizard header
+- if the user has entered anything, confirm discard before leaving
+- discarding should clear any staged document selection too
 
 ## Data Mapping To Current Scaffold Workflow
 
@@ -326,7 +351,7 @@ Implication:
 
 - the guided flow can ship before the Python scaffold script changes
 - the first implementation can remain a frontend orchestration layer over the existing workflow
-- if the user chose `Yes, add documents now`, that orchestration should create the project as soon as the wizard has enough information, then continue directly into import without a separate post-wizard interruption
+- if the user chose `Yes, add documents now`, that orchestration should preserve the chosen files through creation and import them into `docs/` immediately afterward without a separate post-wizard interruption
 
 ## Post-Create Next Steps
 
@@ -334,7 +359,7 @@ After successful creation, route to one next action instead of dropping the user
 
 If source material choice was `Yes`:
 
-- continue immediately into a document import step targeted at the new project as part of the same guided flow
+- carry the staged document selection directly into the new project as part of the same guided flow
 - once import finishes or is skipped, then show the normal created-project next actions
 
 If source material choice was `Not now`:
@@ -381,7 +406,7 @@ The wizard is failing if:
 - it becomes another long settings form
 - it asks for metadata that is not needed to create the project
 - document intake is deferred into a later popup after the user explicitly chose `Yes, add documents now`
-- file upload interrupts the intake before the project exists
+- file selection is hidden until after the wizard already looks finished
 - advanced fields dominate the main path
 
 ## Implementation Notes

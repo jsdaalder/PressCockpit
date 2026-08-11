@@ -291,6 +291,81 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertEqual(store.statusMessage, "Using existing project")
     }
 
+    func testReusingExistingScaffoldProjectImportsStagedDocumentsImmediately() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+
+        let project = try XCTUnwrap(store.snapshot.items.first(where: { $0.section == .projects }))
+        let stagingRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: stagingRoot, withIntermediateDirectories: true, attributes: nil)
+
+        let sourceURL = workspaceRoot.appendingPathComponent("external_note.md")
+        try "External note".write(to: sourceURL, atomically: true, encoding: .utf8)
+
+        let stagedURL = stagingRoot.appendingPathComponent("external_note.md")
+        try "External note".write(to: stagedURL, atomically: true, encoding: .utf8)
+
+        store.scaffoldProjectWizardDraft.stagedDocumentDirectoryPath = stagingRoot.path
+        store.scaffoldProjectWizardDraft.stagedDocuments = [
+            ScaffoldStagedDocument(
+                sourcePath: sourceURL.path,
+                stagedPath: stagedURL.path,
+                isDirectory: false
+            )
+        ]
+
+        store.reuseExistingScaffoldProject(
+            projectTitle: project.title,
+            projectRoot: project.path,
+            sourceMaterialChoice: .now
+        )
+
+        let postCreateState = try XCTUnwrap(store.scaffoldPostCreateState)
+        XCTAssertEqual(postCreateState.importedItemCount, 1)
+        XCTAssertFalse(postCreateState.shouldAutoPromptForDocuments)
+        XCTAssertEqual(store.statusMessage, "Using existing project. Imported staged documents.")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: postCreateState.importedPaths[0]))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: stagingRoot.path))
+    }
+
+    func testCancelingScaffoldWizardClearsDraftAndReturnsToPreviousSelection() throws {
+        let workspaceRoot = try makeWorkspaceRoot()
+        let store = AppStore(configuration: AppConfiguration(
+            profile: .standalone,
+            workspaceRoot: workspaceRoot,
+            demoWorkspaceRoot: nil
+        ))
+
+        let stagingRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: stagingRoot, withIntermediateDirectories: true, attributes: nil)
+        let stagedURL = stagingRoot.appendingPathComponent("research.pdf")
+        try Data("draft".utf8).write(to: stagedURL)
+
+        store.select(.workflow("scaffold-project"))
+        store.scaffoldProjectWizardStep = .documentSelection
+        store.scaffoldProjectWizardDraft.workingTitle = "Draft title"
+        store.scaffoldProjectWizardDraft.stagedDocumentDirectoryPath = stagingRoot.path
+        store.scaffoldProjectWizardDraft.stagedDocuments = [
+            ScaffoldStagedDocument(
+                sourcePath: "/tmp/research.pdf",
+                stagedPath: stagedURL.path,
+                isDirectory: false
+            )
+        ]
+
+        store.cancelScaffoldProjectWizard()
+
+        XCTAssertEqual(store.selection, .overview)
+        XCTAssertEqual(store.scaffoldProjectWizardStep, .workingTitle)
+        XCTAssertEqual(store.scaffoldProjectWizardDraft, ScaffoldProjectWizardDraft())
+        XCTAssertEqual(store.statusMessage, "Canceled new project setup")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: stagingRoot.path))
+    }
+
     func testScaffoldPostCreateStateTracksImmediateDocumentStepUntilImportStarts() {
         var state = ScaffoldPostCreateState(
             id: "demo",
