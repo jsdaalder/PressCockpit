@@ -9,7 +9,6 @@ enum ScaffoldProjectWizardStep: Int, CaseIterable, Hashable {
     case summary
     case structure
     case sourceMaterial
-    case documentSelection
     case priority
     case review
 
@@ -29,8 +28,6 @@ enum ScaffoldProjectWizardStep: Int, CaseIterable, Hashable {
             return "First structure"
         case .sourceMaterial:
             return "Source material"
-        case .documentSelection:
-            return "Add documents"
         case .priority:
             return "Priority"
         case .review:
@@ -116,20 +113,6 @@ enum ScaffoldProjectPriority: String, CaseIterable, Hashable {
     }
 }
 
-struct ScaffoldStagedDocument: Identifiable, Hashable {
-    let sourcePath: String
-    let stagedPath: String
-    let isDirectory: Bool
-
-    var id: String {
-        stagedPath
-    }
-
-    var displayName: String {
-        URL(fileURLWithPath: sourcePath).lastPathComponent
-    }
-}
-
 struct ScaffoldProjectWizardDraft: Hashable {
     var workingTitle: String = ""
     var projectKind: ScaffoldProjectKind = .journalism
@@ -147,8 +130,6 @@ struct ScaffoldProjectWizardDraft: Hashable {
     var structureAnswerOne: String = ""
     var structureAnswerTwo: String = ""
     var structureAnswerThree: String = ""
-    var stagedDocumentDirectoryPath: String = ""
-    var stagedDocuments: [ScaffoldStagedDocument] = []
 
     mutating func syncAdvancedDefaults(workspaceRoot: URL) {
         guard !trimmedTitle.isEmpty else { return }
@@ -254,31 +235,6 @@ struct ScaffoldProjectWizardDraft: Hashable {
         !derivedFolderName.isEmpty
     }
 
-    var hasStagedDocuments: Bool {
-        !stagedDocuments.isEmpty
-    }
-
-    var hasUserInput: Bool {
-        !trimmedTitle.isEmpty
-            || projectKind != .journalism
-            || !customProjectKind.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || hasPitch != nil
-            || !trimmedPitch.isEmpty
-            || !trimmedSummary.isEmpty
-            || wantsSummaryStructuring
-            || sourceMaterialChoice != nil
-            || priority != .normal
-            || !folderNameOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || !projectRootOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || !topics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || !entities.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || !trimmedStructureAnswerOne.isEmpty
-            || !trimmedStructureAnswerTwo.isEmpty
-            || !trimmedStructureAnswerThree.isEmpty
-            || !stagedDocumentDirectoryPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || hasStagedDocuments
-    }
-
     var derivedFolderName: String {
         let override = folderNameOverride.trimmingCharacters(in: .whitespacesAndNewlines)
         if !override.isEmpty {
@@ -355,7 +311,6 @@ struct ScaffoldProjectWizardView: View {
     @EnvironmentObject private var store: AppStore
     @FocusState private var focusedField: FocusField?
     @State private var existingPathConflict: ExistingPathConflict?
-    @State private var showsCancelConfirmation = false
 
     let workflow: WorkflowDefinition
 
@@ -370,24 +325,14 @@ struct ScaffoldProjectWizardView: View {
         VStack(alignment: .leading, spacing: 18) {
             SectionCard(title: "New project") {
                 VStack(alignment: .leading, spacing: 18) {
-                    HStack(alignment: .top, spacing: 16) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Create a project through a short Q&A instead of a dense setup form.")
-                                .foregroundStyle(AppPalette.subtle)
-                            ProgressView(value: Double(stepIndex(in: activeSteps) + 1), total: Double(activeSteps.count))
-                                .tint(AppPalette.title)
-                            Text("\(stepIndex(in: activeSteps) + 1) of \(activeSteps.count) • \(currentStep.title)")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(AppPalette.subtle)
-                        }
-
-                        Spacer()
-
-                        Button("Cancel") {
-                            attemptCancelWizard()
-                        }
-                        .keyboardShortcut(.cancelAction)
-                        .disabled(store.isRunning)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Create a project through a short Q&A instead of a dense setup form.")
+                            .foregroundStyle(AppPalette.subtle)
+                        ProgressView(value: Double(stepIndex(in: activeSteps) + 1), total: Double(activeSteps.count))
+                            .tint(AppPalette.title)
+                        Text("\(stepIndex(in: activeSteps) + 1) of \(activeSteps.count) • \(currentStep.title)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AppPalette.subtle)
                     }
 
                     stepBody(for: currentStep)
@@ -446,14 +391,6 @@ struct ScaffoldProjectWizardView: View {
                 )
             }
         }
-        .alert("Discard this new project setup?", isPresented: $showsCancelConfirmation) {
-            Button("Keep editing", role: .cancel) {}
-            Button("Discard", role: .destructive) {
-                store.cancelScaffoldProjectWizard()
-            }
-        } message: {
-            Text("Your answers and any staged documents will be discarded.")
-        }
     }
 
     private var currentWizardStep: ScaffoldProjectWizardStep {
@@ -466,7 +403,29 @@ struct ScaffoldProjectWizardView: View {
     }
 
     private var orderedSteps: [ScaffoldProjectWizardStep] {
-        scaffoldProjectWizardOrderedSteps(for: draft, currentStep: currentWizardStep)
+        var steps: [ScaffoldProjectWizardStep] = [
+            .workingTitle,
+            .projectKind,
+            .startingPoint
+        ]
+
+        if draft.hasPitch == true {
+            steps.append(.pitch)
+            if draft.trimmedPitch.isEmpty || currentWizardStep == .summary {
+                steps.append(.summary)
+            }
+        } else if draft.hasPitch == false {
+            steps.append(.summary)
+        }
+
+        if draft.hasPitch != nil {
+            if draft.shouldShowSummaryStructuringStep || currentWizardStep == .structure {
+                steps.append(.structure)
+            }
+            steps.append(contentsOf: [.sourceMaterial, .priority, .review])
+        }
+
+        return steps
     }
 
     private var mappedState: WorkflowParameterState {
@@ -639,71 +598,7 @@ struct ScaffoldProjectWizardView: View {
                             summary: choice.summary,
                             isSelected: draft.sourceMaterialChoice == choice
                         ) {
-                            var updated = draft
-                            updated.sourceMaterialChoice = choice
-                            draft = updated
-                        }
-                    }
-                }
-            }
-        case .documentSelection:
-            promptLayout(
-                question: "Which documents should go into this project now?",
-                helper: "Choose files or folders now. They will be copied into this project's `docs/` folder right after the scaffold is created."
-            ) {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack(spacing: 12) {
-                        Button(draft.hasStagedDocuments ? "Add more documents" : "Choose documents") {
-                            store.addDocumentsToScaffoldWizard()
-                        }
-                        .buttonStyle(.borderedProminent)
-
-                        if draft.hasStagedDocuments {
-                            Button("Clear selection") {
-                                store.clearScaffoldWizardDocuments()
-                            }
-                        }
-                    }
-
-                    if draft.stagedDocuments.isEmpty {
-                        Text("No documents selected yet.")
-                            .font(.caption)
-                            .foregroundStyle(AppPalette.subtle)
-                    } else {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("\(draft.stagedDocuments.count) item\(draft.stagedDocuments.count == 1 ? "" : "s") selected")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(AppPalette.subtle)
-
-                            ForEach(draft.stagedDocuments) { document in
-                                HStack(alignment: .top, spacing: 10) {
-                                    Image(systemName: document.isDirectory ? "folder" : "doc")
-                                        .foregroundStyle(AppPalette.subtle)
-                                        .frame(width: 18)
-
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(document.displayName)
-                                            .foregroundStyle(AppPalette.title)
-                                        Text(document.sourcePath)
-                                            .font(.caption)
-                                            .foregroundStyle(AppPalette.subtle)
-                                            .textSelection(.enabled)
-                                    }
-
-                                    Spacer()
-
-                                    Button("Remove") {
-                                        store.removeDocumentFromScaffoldWizard(document)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                .padding(14)
-                                .background(AppPalette.card.opacity(0.78), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                        .stroke(AppPalette.border)
-                                )
-                            }
+                            draft.sourceMaterialChoice = choice
                         }
                     }
                 }
@@ -741,7 +636,6 @@ struct ScaffoldProjectWizardView: View {
                 ("Summary source", summarySourceLabel),
                 ("Starter structure", starterStructureLabel),
                 ("Source material", draft.sourceMaterialChoice?.label ?? "Not set"),
-                ("Selected documents", selectedDocumentsLabel),
                 ("Priority", draft.priority.label),
                 ("Create at", draft.derivedProjectRoot(workspaceRoot: store.workspaceRoot))
             ])
@@ -868,8 +762,8 @@ struct ScaffoldProjectWizardView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            if draft.sourceMaterialChoice == .now, draft.hasStagedDocuments {
-                Text("The selected documents will be copied into this project's `docs/` folder immediately after creation.")
+            if draft.sourceMaterialChoice == .now {
+                Text("After creation, the next step will immediately be document upload into this project's `docs/` folder.")
                     .font(.caption)
                     .foregroundStyle(AppPalette.subtle)
             }
@@ -894,18 +788,6 @@ struct ScaffoldProjectWizardView: View {
             return "Explicit first structure"
         }
         return draft.wantsSummaryStructuring ? "Pending" : "Skipped for now"
-    }
-
-    private var selectedDocumentsLabel: String {
-        guard draft.sourceMaterialChoice == .now else {
-            return "None"
-        }
-
-        let count = draft.stagedDocuments.count
-        if count == 0 {
-            return "None selected"
-        }
-        return "\(count) item\(count == 1 ? "" : "s")"
     }
 
     private var readmePreview: String {
@@ -979,8 +861,6 @@ struct ScaffoldProjectWizardView: View {
             return draft.wantsSummaryStructuring && !draft.hasCompletedSummaryStructuring
         case .sourceMaterial:
             return draft.sourceMaterialChoice == nil
-        case .documentSelection:
-            return draft.sourceMaterialChoice == .now && !draft.hasStagedDocuments
         case .priority:
             return false
         case .review:
@@ -1004,8 +884,6 @@ struct ScaffoldProjectWizardView: View {
         case .structure:
             store.scaffoldProjectWizardStep = .sourceMaterial
         case .sourceMaterial:
-            store.scaffoldProjectWizardStep = draft.sourceMaterialChoice == .now ? .documentSelection : .priority
-        case .documentSelection:
             store.scaffoldProjectWizardStep = .priority
         case .priority:
             store.scaffoldProjectWizardStep = .review
@@ -1038,10 +916,8 @@ struct ScaffoldProjectWizardView: View {
             } else {
                 store.scaffoldProjectWizardStep = .summary
             }
-        case .documentSelection:
-            store.scaffoldProjectWizardStep = .sourceMaterial
         case .priority:
-            store.scaffoldProjectWizardStep = draft.sourceMaterialChoice == .now ? .documentSelection : .sourceMaterial
+            store.scaffoldProjectWizardStep = .sourceMaterial
         case .review:
             store.scaffoldProjectWizardStep = .priority
         }
@@ -1065,14 +941,6 @@ struct ScaffoldProjectWizardView: View {
         }
 
         store.runWorkflow(workflow, with: mappedState)
-    }
-
-    private func attemptCancelWizard() {
-        if draft.hasUserInput {
-            showsCancelConfirmation = true
-        } else {
-            store.cancelScaffoldProjectWizard()
-        }
     }
 
     private func binding(_ keyPath: WritableKeyPath<ScaffoldProjectWizardDraft, String>) -> Binding<String> {
@@ -1193,42 +1061,6 @@ private func normalizedProjectSlug(_ text: String) -> String {
     }
 
     return pieces.joined(separator: "_")
-}
-
-func scaffoldProjectWizardOrderedSteps(
-    for draft: ScaffoldProjectWizardDraft,
-    currentStep: ScaffoldProjectWizardStep
-) -> [ScaffoldProjectWizardStep] {
-    var steps: [ScaffoldProjectWizardStep] = [
-        .workingTitle,
-        .projectKind,
-        .startingPoint
-    ]
-
-    if draft.hasPitch == true {
-        steps.append(.pitch)
-        if draft.trimmedPitch.isEmpty || currentStep == .summary {
-            steps.append(.summary)
-        }
-    } else if draft.hasPitch == false {
-        steps.append(.summary)
-    }
-
-    if draft.hasPitch != nil {
-        if draft.shouldShowSummaryStructuringStep || currentStep == .structure {
-            steps.append(.structure)
-        }
-
-        steps.append(.sourceMaterial)
-
-        if draft.sourceMaterialChoice == .now || currentStep == .documentSelection {
-            steps.append(.documentSelection)
-        }
-
-        steps.append(contentsOf: [.priority, .review])
-    }
-
-    return steps
 }
 
 private func currentProjectDate() -> String {

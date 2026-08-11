@@ -1035,35 +1035,18 @@ final class AppStore: ObservableObject {
         let readmePath = URL(fileURLWithPath: projectRoot)
             .appendingPathComponent("README.md")
             .path
-        let stagedDocuments = sourceMaterialChoice == .now ? scaffoldProjectWizardDraft.stagedDocuments : []
-        let stagedDocumentDirectoryPath = scaffoldProjectWizardDraft.stagedDocumentDirectoryPath
 
         presentScaffoldPostCreate(
             mode: .reused,
             projectTitle: projectTitle,
             projectRoot: projectRoot,
             readmePath: readmePath,
-            sourceMaterialChoice: sourceMaterialChoice,
-            shouldAutoPromptForDocuments: sourceMaterialChoice == .now && stagedDocuments.isEmpty
+            sourceMaterialChoice: sourceMaterialChoice
         )
 
-        var stagedImportSucceeded = true
-        do {
-            if !stagedDocuments.isEmpty {
-                try importStagedDocumentsIntoScaffoldProject(stagedDocuments)
-            }
-            try cleanupScaffoldWizardStaging(at: stagedDocumentDirectoryPath)
-        } catch {
-            stagedImportSucceeded = false
-            statusMessage = "Using existing project, but staged documents could not be imported"
-            activeAlert = AppAlert(title: "Could not import staged documents", message: error.localizedDescription)
-        }
-
-        if stagedImportSucceeded {
-            statusMessage = sourceMaterialChoice == .now
-                ? (stagedDocuments.isEmpty ? "Using existing project. Add documents now." : "Using existing project. Imported staged documents.")
-                : "Using existing project"
-        }
+        statusMessage = sourceMaterialChoice == .now
+            ? "Using existing project. Add documents now."
+            : "Using existing project"
     }
 
     func openScaffoldPostCreateProject() {
@@ -1232,105 +1215,6 @@ final class AppStore: ObservableObject {
             statusMessage = "Imported \(count) \(count == 1 ? "item" : "items") into docs"
         } catch {
             statusMessage = error.localizedDescription
-        }
-    }
-
-    func addDocumentsToScaffoldWizard() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = true
-        panel.allowsMultipleSelection = true
-        panel.canCreateDirectories = false
-        panel.prompt = "Choose"
-        panel.message = "Choose files or folders to stage for this project's docs folder."
-        panel.directoryURL = workspaceRoot
-
-        guard panel.runModal() == .OK else { return }
-
-        do {
-            var draft = scaffoldProjectWizardDraft
-            let existingSourcePaths = Set(draft.stagedDocuments.map { normalizedPath($0.sourcePath) })
-            let newURLs = panel.urls.filter { !existingSourcePaths.contains(normalizedPath($0.path)) }
-
-            if newURLs.isEmpty {
-                statusMessage = "Those documents are already selected"
-                return
-            }
-
-            let stagingDirectory = try scaffoldWizardStagingDirectory(existingPath: draft.stagedDocumentDirectoryPath)
-            let stagedDocuments = try stageScaffoldWizardDocuments(from: newURLs, into: stagingDirectory)
-            guard !stagedDocuments.isEmpty else { return }
-
-            draft.stagedDocumentDirectoryPath = stagingDirectory.path
-            draft.stagedDocuments.append(contentsOf: stagedDocuments)
-            draft.stagedDocuments.sort {
-                $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
-            }
-            scaffoldProjectWizardDraft = draft
-
-            let count = stagedDocuments.count
-            statusMessage = "Selected \(count) \(count == 1 ? "item" : "items") for import after creation"
-        } catch {
-            statusMessage = error.localizedDescription
-            activeAlert = AppAlert(title: "Could not stage documents", message: error.localizedDescription)
-        }
-    }
-
-    func removeDocumentFromScaffoldWizard(_ document: ScaffoldStagedDocument) {
-        var draft = scaffoldProjectWizardDraft
-        draft.stagedDocuments.removeAll { $0.id == document.id }
-
-        do {
-            let stagedURL = URL(fileURLWithPath: document.stagedPath)
-            if FileManager.default.fileExists(atPath: stagedURL.path) {
-                try FileManager.default.removeItem(at: stagedURL)
-            }
-            cleanupScaffoldWizardStagingDirectoryIfNeeded(path: draft.stagedDocumentDirectoryPath, remainingCount: draft.stagedDocuments.count)
-            if draft.stagedDocuments.isEmpty {
-                draft.stagedDocumentDirectoryPath = ""
-            }
-            scaffoldProjectWizardDraft = draft
-        } catch {
-            statusMessage = error.localizedDescription
-            activeAlert = AppAlert(title: "Could not remove staged document", message: error.localizedDescription)
-        }
-    }
-
-    func clearScaffoldWizardDocuments() {
-        do {
-            try cleanupScaffoldWizardStaging(for: scaffoldProjectWizardDraft)
-            var draft = scaffoldProjectWizardDraft
-            draft.stagedDocuments = []
-            draft.stagedDocumentDirectoryPath = ""
-            scaffoldProjectWizardDraft = draft
-        } catch {
-            statusMessage = error.localizedDescription
-            activeAlert = AppAlert(title: "Could not clear staged documents", message: error.localizedDescription)
-        }
-    }
-
-    func cancelScaffoldProjectWizard() {
-        var stagingCleanupError: Error?
-        do {
-            try cleanupScaffoldWizardStaging(for: scaffoldProjectWizardDraft)
-        } catch {
-            stagingCleanupError = error
-        }
-
-        scaffoldProjectWizardDraft = ScaffoldProjectWizardDraft()
-        scaffoldProjectWizardStep = .workingTitle
-
-        if selection == .workflow("scaffold-project"), canNavigateBack {
-            goBack()
-        } else {
-            select(.overview)
-        }
-
-        if let stagingCleanupError {
-            statusMessage = "Canceled new project setup, but staged documents could not be cleaned up"
-            activeAlert = AppAlert(title: "Could not clean up staged documents", message: stagingCleanupError.localizedDescription)
-        } else {
-            statusMessage = "Canceled new project setup"
         }
     }
 
@@ -2327,17 +2211,10 @@ final class AppStore: ObservableObject {
         logDiagnostics("workflow-finished id=\(workflow.id) exitCode=\(run.exitCode)")
 
         if workflow.id == "scaffold-project", run.exitCode == 0, let scaffoldContext {
-            let stagedImportSucceeded = completeScaffoldProject(using: scaffoldContext)
-            if scaffoldContext.hasStagedDocuments {
-                let count = scaffoldContext.stagedDocuments.count
-                statusMessage = stagedImportSucceeded
-                    ? "Project created. Imported \(count) staged \(count == 1 ? "item" : "items") into docs."
-                    : "Project created, but staged documents could not be imported"
-            } else {
-                statusMessage = scaffoldContext.sourceMaterialChoice == .now
-                    ? "Project created. Add documents now."
-                    : "Created project"
-            }
+            completeScaffoldProject(using: scaffoldContext)
+            statusMessage = scaffoldContext.sourceMaterialChoice == .now
+                ? "Project created. Add documents now."
+                : "Created project"
             return
         }
 
@@ -2351,29 +2228,14 @@ final class AppStore: ObservableObject {
         }
     }
 
-    private func completeScaffoldProject(using context: ScaffoldCompletionContext) -> Bool {
+    private func completeScaffoldProject(using context: ScaffoldCompletionContext) {
         presentScaffoldPostCreate(
             mode: .created,
             projectTitle: context.projectTitle,
             projectRoot: context.projectRoot,
             readmePath: context.readmePath,
-            sourceMaterialChoice: context.sourceMaterialChoice,
-            shouldAutoPromptForDocuments: context.sourceMaterialChoice == .now && !context.hasStagedDocuments
+            sourceMaterialChoice: context.sourceMaterialChoice
         )
-
-        defer {
-            try? cleanupScaffoldWizardStaging(at: context.stagedDocumentDirectoryPath)
-        }
-
-        guard context.hasStagedDocuments else { return true }
-
-        do {
-            try importStagedDocumentsIntoScaffoldProject(context.stagedDocuments)
-            return true
-        } catch {
-            activeAlert = AppAlert(title: "Could not import staged documents", message: error.localizedDescription)
-            return false
-        }
     }
 
     private func presentScaffoldPostCreate(
@@ -2381,8 +2243,7 @@ final class AppStore: ObservableObject {
         projectTitle: String,
         projectRoot: String,
         readmePath: String,
-        sourceMaterialChoice: ScaffoldSourceMaterialChoice,
-        shouldAutoPromptForDocuments: Bool
+        sourceMaterialChoice: ScaffoldSourceMaterialChoice
     ) {
         let postCreateState = ScaffoldPostCreateState(
             id: projectRoot,
@@ -2391,7 +2252,7 @@ final class AppStore: ObservableObject {
             projectRoot: projectRoot,
             readmePath: readmePath,
             sourceMaterialChoice: sourceMaterialChoice,
-            shouldAutoPromptForDocuments: shouldAutoPromptForDocuments,
+            shouldAutoPromptForDocuments: sourceMaterialChoice == .now,
             importedPaths: []
         )
 
@@ -2426,9 +2287,7 @@ final class AppStore: ObservableObject {
             readmePath: URL(fileURLWithPath: projectRoot)
                 .appendingPathComponent("README.md")
                 .path,
-            sourceMaterialChoice: sourceMaterialChoice,
-            stagedDocumentDirectoryPath: draft.stagedDocumentDirectoryPath,
-            stagedDocuments: sourceMaterialChoice == .now ? draft.stagedDocuments : []
+            sourceMaterialChoice: sourceMaterialChoice
         )
     }
 
@@ -2510,82 +2369,6 @@ final class AppStore: ObservableObject {
         }
 
         return importedPaths
-    }
-
-    private func stageScaffoldWizardDocuments(from urls: [URL], into stagingDirectory: URL) throws -> [ScaffoldStagedDocument] {
-        let fileManager = FileManager.default
-        try fileManager.createDirectory(at: stagingDirectory, withIntermediateDirectories: true, attributes: nil)
-
-        var stagedDocuments: [ScaffoldStagedDocument] = []
-        for url in urls {
-            let destination = uniqueImportDestinationURL(for: url, in: stagingDirectory, fileManager: fileManager)
-            var isDirectory: ObjCBool = false
-            fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory)
-            try SecurityScopedAccess.withAccess(to: [url, stagingDirectory]) {
-                try fileManager.copyItem(at: url, to: destination)
-            }
-            stagedDocuments.append(
-                ScaffoldStagedDocument(
-                    sourcePath: url.path,
-                    stagedPath: destination.path,
-                    isDirectory: isDirectory.boolValue
-                )
-            )
-        }
-
-        return stagedDocuments
-    }
-
-    private func importStagedDocumentsIntoScaffoldProject(_ documents: [ScaffoldStagedDocument]) throws {
-        guard var state = scaffoldPostCreateState else { return }
-        let stagedURLs = documents.map { URL(fileURLWithPath: $0.stagedPath) }
-        let importedPaths = try importDocuments(from: stagedURLs, into: state.docsURL)
-        state.importedPaths = Array(Set(state.importedPaths + importedPaths)).sorted()
-        scaffoldPostCreateState = state
-        reloadWorkspace()
-
-        if let itemID = workspaceItemID(forPath: state.projectRoot) {
-            select(.workspace(itemID))
-        }
-    }
-
-    private func scaffoldWizardStagingDirectory(existingPath: String) throws -> URL {
-        let fileManager = FileManager.default
-        if !existingPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            let url = URL(fileURLWithPath: existingPath)
-            try fileManager.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
-            return url
-        }
-
-        let root = supportDirectory().appendingPathComponent("scaffold_wizard_staging", isDirectory: true)
-        try fileManager.createDirectory(at: root, withIntermediateDirectories: true, attributes: nil)
-        let directory = root.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true, attributes: nil)
-        return directory
-    }
-
-    private func cleanupScaffoldWizardStaging(for draft: ScaffoldProjectWizardDraft) throws {
-        guard !draft.stagedDocumentDirectoryPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return
-        }
-        try cleanupScaffoldWizardStaging(at: draft.stagedDocumentDirectoryPath)
-    }
-
-    private func cleanupScaffoldWizardStaging(at path: String) throws {
-        guard !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        let url = URL(fileURLWithPath: path)
-        if FileManager.default.fileExists(atPath: url.path) {
-            try FileManager.default.removeItem(at: url)
-        }
-    }
-
-    private func cleanupScaffoldWizardStagingDirectoryIfNeeded(path: String, remainingCount: Int) {
-        guard remainingCount == 0 else { return }
-        try? cleanupScaffoldWizardStaging(at: path)
-    }
-
-    private func normalizedPath(_ path: String) -> String {
-        URL(fileURLWithPath: path).standardizedFileURL.path
     }
 
     private func appendCaptureRecords(_ records: [CaptureRecord]) {
@@ -3326,12 +3109,6 @@ private struct ScaffoldCompletionContext {
     let projectRoot: String
     let readmePath: String
     let sourceMaterialChoice: ScaffoldSourceMaterialChoice
-    let stagedDocumentDirectoryPath: String
-    let stagedDocuments: [ScaffoldStagedDocument]
-
-    var hasStagedDocuments: Bool {
-        !stagedDocuments.isEmpty
-    }
 }
 
 struct AppAlert: Identifiable, Hashable {
