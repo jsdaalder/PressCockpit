@@ -64,6 +64,7 @@ final class WorkflowRegistryTests: XCTestCase {
         state.textValues["workflow_stage"] = "lead"
         state.textValues["inactive_reason"] = ""
         state.textValues["project_type"] = "data_journalism"
+        state.textValues["dossier"] = "voedselcrisis_2027"
         state.textValues["started"] = "2026-07-12"
         state.textValues["deliverable"] = "A short summary."
         state.textValues["section_answer_1"] = "Main question"
@@ -79,6 +80,8 @@ final class WorkflowRegistryTests: XCTestCase {
         XCTAssertTrue(resolved.arguments.contains("--workflow-stage"))
         XCTAssertTrue(resolved.arguments.contains("lead"))
         XCTAssertTrue(resolved.arguments.contains("--inactive-reason"))
+        XCTAssertTrue(resolved.arguments.contains("--dossier"))
+        XCTAssertTrue(resolved.arguments.contains("voedselcrisis_2027"))
         XCTAssertFalse(resolved.arguments.contains("--status"))
         XCTAssertTrue(resolved.arguments.contains("--section-answer-1"))
         XCTAssertTrue(resolved.arguments.contains("Main question"))

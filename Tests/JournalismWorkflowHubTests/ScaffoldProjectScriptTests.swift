@@ -14,12 +14,14 @@ final class ScaffoldProjectScriptTests: XCTestCase {
         XCTAssertTrue(contents.contains("--activity-state"))
         XCTAssertTrue(contents.contains("--workflow-stage"))
         XCTAssertTrue(contents.contains("--inactive-reason"))
+        XCTAssertTrue(contents.contains("--dossier"))
         XCTAssertTrue(contents.contains("--section-answer-1"))
         XCTAssertTrue(contents.contains("--section-answer-2"))
         XCTAssertTrue(contents.contains("--section-answer-3"))
         XCTAssertTrue(contents.contains("activity_state: {activity_state}"))
         XCTAssertTrue(contents.contains("workflow_stage: {workflow_stage}"))
         XCTAssertTrue(contents.contains("project_type: {project_type}"))
+        XCTAssertTrue(contents.contains("trimmed_dossier"))
         XCTAssertTrue(contents.contains("Main reporting question:"))
         XCTAssertTrue(contents.contains("Expected pattern or claim:"))
         XCTAssertTrue(contents.contains("What this tool should unblock:"))
@@ -49,6 +51,7 @@ final class ScaffoldProjectScriptTests: XCTestCase {
             "--workflow-stage", "feasibility_study",
             "--inactive-reason", "waiting",
             "--project-type", "journalism",
+            "--dossier", "voedselcrisis_2027",
             "--started", "2026-07-14",
             "--deliverable", "Waiting for records."
         ]
@@ -68,6 +71,7 @@ final class ScaffoldProjectScriptTests: XCTestCase {
         XCTAssertTrue(readme.contains("activity_state: inactive"))
         XCTAssertTrue(readme.contains("workflow_stage: feasibility_study"))
         XCTAssertTrue(readme.contains("inactive_reason: waiting"))
+        XCTAssertTrue(readme.contains("dossier: voedselcrisis_2027"))
         XCTAssertTrue(readme.contains("status: on_hold"))
     }
 

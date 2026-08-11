@@ -187,6 +187,7 @@ enum WorkflowPreflightEvaluator {
             "--activity-state",
             "--workflow-stage",
             "--inactive-reason",
+            "--dossier",
             "--section-answer-1",
             "--section-answer-2",
             "--section-answer-3"

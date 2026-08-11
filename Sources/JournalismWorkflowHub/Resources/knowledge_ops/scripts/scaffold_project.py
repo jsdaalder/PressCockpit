@@ -38,6 +38,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--inactive-reason", default="")
     parser.add_argument("--status", default="active")
     parser.add_argument("--project-type", default="journalism")
+    parser.add_argument("--dossier", default="")
     parser.add_argument("--started", required=True)
     parser.add_argument("--deliverable", default="")
     parser.add_argument("--section-answer-1", default="")
@@ -125,6 +126,7 @@ def build_readme(
     inactive_reason: str,
     status: str,
     project_type: str,
+    dossier: str,
     started: str,
     deliverable: str,
     structured_answers: list[str],
@@ -152,6 +154,11 @@ def build_readme(
     lines.extend([
         f"status: {legacy_status}",
         f"project_type: {project_type}",
+    ])
+    trimmed_dossier = dossier.strip()
+    if trimmed_dossier:
+        lines.append(f"dossier: {trimmed_dossier}")
+    lines.extend([
         f"started: {started}",
         f"deliverable: {summary}",
         f"topics: {yaml_list(topics)}",
@@ -445,6 +452,7 @@ def main() -> int:
                 inactive_reason=args.inactive_reason,
                 status=args.status.strip(),
                 project_type=project_type,
+                dossier=args.dossier,
                 started=args.started.strip(),
                 deliverable=args.deliverable,
                 structured_answers=[

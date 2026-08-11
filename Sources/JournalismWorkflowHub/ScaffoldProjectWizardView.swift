@@ -140,6 +140,7 @@ struct ScaffoldProjectWizardDraft: Hashable {
     var wantsSummaryStructuring: Bool = false
     var sourceMaterialChoice: ScaffoldSourceMaterialChoice?
     var priority: ScaffoldProjectPriority = .normal
+    var dossierSlug: String = ""
     var folderNameOverride: String = ""
     var projectRootOverride: String = ""
     var topics: String = ""
@@ -268,6 +269,7 @@ struct ScaffoldProjectWizardDraft: Hashable {
             || wantsSummaryStructuring
             || sourceMaterialChoice != nil
             || priority != .normal
+            || !trimmedDossierSlug.isEmpty
             || !folderNameOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || !projectRootOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || !topics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -317,6 +319,10 @@ struct ScaffoldProjectWizardDraft: Hashable {
         return projectKind.label
     }
 
+    var trimmedDossierSlug: String {
+        dossierSlug.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     func mappedState(for workflow: WorkflowDefinition, workspaceRoot: URL) -> WorkflowParameterState {
         var state = WorkflowParameterState()
         state.applyDefaults(from: workflow.parameters)
@@ -327,6 +333,7 @@ struct ScaffoldProjectWizardDraft: Hashable {
         state.textValues["workflow_stage"] = "lead"
         state.textValues["inactive_reason"] = ""
         state.textValues["project_type"] = mappedProjectType
+        state.textValues["dossier"] = trimmedDossierSlug
         state.textValues["started"] = currentProjectDate()
         state.textValues["deliverable"] = deliverableText
         state.textValues["topics"] = topics.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -742,9 +749,47 @@ struct ScaffoldProjectWizardView: View {
                 ("Starter structure", starterStructureLabel),
                 ("Source material", draft.sourceMaterialChoice?.label ?? "Not set"),
                 ("Selected documents", selectedDocumentsLabel),
+                ("Related dossier", selectedDossierLabel),
                 ("Priority", draft.priority.label),
                 ("Create at", draft.derivedProjectRoot(workspaceRoot: store.workspaceRoot))
             ])
+
+            SectionCard(title: "Related dossier") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Optional. Link the new project to an existing dossier now so project detail, offboarding, and later retrieval start from the same trusted slug.")
+                        .foregroundStyle(AppPalette.subtle)
+
+                    Picker("Related dossier", selection: Binding(
+                        get: { draft.trimmedDossierSlug.isEmpty ? nil : draft.trimmedDossierSlug },
+                        set: { newValue in
+                            var updated = draft
+                            updated.dossierSlug = newValue ?? ""
+                            draft = updated
+                        }
+                    )) {
+                        Text("No dossier yet").tag(Optional<String>.none)
+
+                        if !draft.trimmedDossierSlug.isEmpty,
+                           !availableDossierSlugs.contains(draft.trimmedDossierSlug) {
+                            Text("Missing dossier: \(draft.trimmedDossierSlug)").tag(Optional(draft.trimmedDossierSlug))
+                        }
+
+                        ForEach(store.dossierTargets) { dossier in
+                            Text(store.dossierTargetLabel(for: dossier))
+                                .tag(Optional(URL(fileURLWithPath: dossier.path).lastPathComponent))
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .controlSize(.small)
+
+                    if store.dossierTargets.isEmpty {
+                        Text("No existing dossier folders were found in `Areas/` or `Resources/` yet. Leave this empty for now and link one later from project detail if needed.")
+                            .font(.caption)
+                            .foregroundStyle(AppPalette.subtle)
+                    }
+                }
+            }
 
             DisclosureGroup("Advanced details") {
                 VStack(alignment: .leading, spacing: 14) {
@@ -908,6 +953,17 @@ struct ScaffoldProjectWizardView: View {
         return "\(count) item\(count == 1 ? "" : "s")"
     }
 
+    private var selectedDossierLabel: String {
+        let slug = draft.trimmedDossierSlug
+        guard !slug.isEmpty else {
+            return "No dossier yet"
+        }
+        if let dossier = store.dossierTargets.first(where: { URL(fileURLWithPath: $0.path).lastPathComponent == slug }) {
+            return store.dossierTargetLabel(for: dossier)
+        }
+        return "Missing dossier: \(slug)"
+    }
+
     private var readmePreview: String {
         let summary = readmePreviewSummary
         let previewSections = readmePreviewSectionsData
@@ -920,6 +976,7 @@ struct ScaffoldProjectWizardView: View {
             "---",
             "project: \(draft.trimmedTitle)",
             "project_type: \(draft.mappedProjectType)",
+            draft.trimmedDossierSlug.isEmpty ? nil : "dossier: \(draft.trimmedDossierSlug)",
             "deliverable: \(summary)",
             "---",
             "",
@@ -928,7 +985,7 @@ struct ScaffoldProjectWizardView: View {
             summary,
             "",
             previewSections
-        ].joined(separator: "\n")
+        ].compactMap { $0 }.joined(separator: "\n")
     }
 
     private var readmePreviewSummary: String {
@@ -1101,6 +1158,10 @@ struct ScaffoldProjectWizardView: View {
         default:
             return binding(\.structureAnswerThree)
         }
+    }
+
+    private var availableDossierSlugs: Set<String> {
+        Set(store.dossierTargets.map { URL(fileURLWithPath: $0.path).lastPathComponent })
     }
 
     private var structurePromptSet: ScaffoldStructurePromptSet {

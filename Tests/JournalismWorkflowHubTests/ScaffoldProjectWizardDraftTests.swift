@@ -131,6 +131,13 @@ final class ScaffoldProjectWizardDraftTests: XCTestCase {
         XCTAssertTrue(draft.hasUserInput)
     }
 
+    func testDraftWithDossierLinkIsDirty() {
+        var draft = ScaffoldProjectWizardDraft()
+        draft.dossierSlug = "voedselcrisis_2027"
+
+        XCTAssertTrue(draft.hasUserInput)
+    }
+
     func testMappedStateLeavesStructuredAnswersEmptyWhenStepIsSkipped() throws {
         var draft = ScaffoldProjectWizardDraft()
         draft.updateWorkingTitle("Climate Story", workspaceRoot: URL(fileURLWithPath: "/tmp/workspace"))
@@ -150,6 +157,7 @@ final class ScaffoldProjectWizardDraftTests: XCTestCase {
         XCTAssertEqual(state.textValues["section_answer_1"], "")
         XCTAssertEqual(state.textValues["section_answer_2"], "")
         XCTAssertEqual(state.textValues["section_answer_3"], "")
+        XCTAssertEqual(state.textValues["dossier"], "")
     }
 
     func testMappedStateIncludesStructuredAnswers() throws {
@@ -157,6 +165,7 @@ final class ScaffoldProjectWizardDraftTests: XCTestCase {
         draft.updateWorkingTitle("Climate Story", workspaceRoot: URL(fileURLWithPath: "/tmp/workspace"))
         draft.summaryText = "A short project summary."
         draft.wantsSummaryStructuring = true
+        draft.dossierSlug = "voedselcrisis_2027"
         draft.structureAnswerOne = "Main reporting question"
         draft.structureAnswerTwo = "Working hypothesis"
         draft.structureAnswerThree = "Why this matters now"
@@ -175,6 +184,7 @@ final class ScaffoldProjectWizardDraftTests: XCTestCase {
         XCTAssertEqual(state.textValues["section_answer_1"], "Main reporting question")
         XCTAssertEqual(state.textValues["section_answer_2"], "Working hypothesis")
         XCTAssertEqual(state.textValues["section_answer_3"], "Why this matters now")
+        XCTAssertEqual(state.textValues["dossier"], "voedselcrisis_2027")
     }
 
     private func currentYearString() -> String {
