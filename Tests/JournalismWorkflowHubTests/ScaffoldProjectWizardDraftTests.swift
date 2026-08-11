@@ -70,6 +70,67 @@ final class ScaffoldProjectWizardDraftTests: XCTestCase {
         XCTAssertTrue(draft.hasCompletedSummaryStructuring)
     }
 
+    func testChoosingImmediateDocumentsAddsDedicatedWizardStep() {
+        var draft = ScaffoldProjectWizardDraft()
+        draft.hasPitch = false
+        draft.summaryText = "A short project summary."
+        draft.sourceMaterialChoice = .now
+
+        let steps = scaffoldProjectWizardOrderedSteps(for: draft, currentStep: .priority)
+        let expected: [ScaffoldProjectWizardStep] = [
+            .workingTitle,
+            .projectKind,
+            .startingPoint,
+            .summary,
+            .sourceMaterial,
+            .documentSelection,
+            .priority,
+            .review
+        ]
+
+        XCTAssertEqual(steps, expected)
+    }
+
+    func testDeferringDocumentsSkipsDedicatedWizardStep() {
+        var draft = ScaffoldProjectWizardDraft()
+        draft.hasPitch = false
+        draft.summaryText = "A short project summary."
+        draft.sourceMaterialChoice = .later
+
+        let steps = scaffoldProjectWizardOrderedSteps(for: draft, currentStep: .priority)
+        let expected: [ScaffoldProjectWizardStep] = [
+            .workingTitle,
+            .projectKind,
+            .startingPoint,
+            .summary,
+            .sourceMaterial,
+            .priority,
+            .review
+        ]
+
+        XCTAssertEqual(steps, expected)
+    }
+
+    func testDraftWithoutAnswersIsNotDirty() {
+        let draft = ScaffoldProjectWizardDraft()
+
+        XCTAssertFalse(draft.hasUserInput)
+    }
+
+    func testDraftWithStagedDocumentsIsDirty() {
+        var draft = ScaffoldProjectWizardDraft()
+        draft.stagedDocumentDirectoryPath = "/tmp/staged"
+        draft.stagedDocuments = [
+            ScaffoldStagedDocument(
+                sourcePath: "/tmp/source.pdf",
+                stagedPath: "/tmp/staged/source.pdf",
+                isDirectory: false
+            )
+        ]
+
+        XCTAssertTrue(draft.hasUserInput)
+    }
+
     func testMappedStateLeavesStructuredAnswersEmptyWhenStepIsSkipped() throws {
         var draft = ScaffoldProjectWizardDraft()
         draft.updateWorkingTitle("Climate Story", workspaceRoot: URL(fileURLWithPath: "/tmp/workspace"))
