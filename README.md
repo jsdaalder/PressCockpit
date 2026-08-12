@@ -130,6 +130,7 @@ This creates:
 - `dist/PressCockpit-macOS-0.2.0.zip.sha256`
 
 The packaged app defaults to standalone mode so testers can open the bundled demo workspace without your private newsroom setup.
+These `dist/` outputs are local build artifacts and stay out of the git repo; the shareable zip and checksum should be published through GitHub Releases instead.
 
 You can also change the default launch profile:
 
@@ -139,7 +140,7 @@ scripts/build-macos-release.sh --version 0.2.0 --profile standard
 
 ## Release Tag
 
-Tagged pushes like `v0.2.0` trigger `.github/workflows/macos-release.yml`, which rebuilds the app on GitHub Actions and attaches the zip to the GitHub Release.
+Tagged pushes like `v0.2.0` trigger `.github/workflows/macos-release.yml`, which rebuilds the app on GitHub Actions and attaches the versioned zip and checksum to the GitHub Release.
 
 Example:
 

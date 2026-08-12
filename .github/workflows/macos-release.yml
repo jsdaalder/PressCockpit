@@ -28,6 +28,8 @@ jobs:
           BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
           if [[ "$VERSION" == "manual" ]]; then
             VERSION="0.0.0-dev"
+          elif [[ "$VERSION" == v* ]]; then
+            VERSION="${VERSION#v}"
           fi
           scripts/build-macos-release.sh \
             --version "$VERSION" \

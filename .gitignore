@@ -3,6 +3,4 @@
 .swiftpm/
 DerivedData/
 .DS_Store
-dist/*
-!dist/PressCockpit-*.app/
-!dist/PressCockpit-*.app/**
+dist/
