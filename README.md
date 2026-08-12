@@ -125,6 +125,7 @@ scripts/build-macos-release.sh --version 0.2.0
 
 This creates:
 
+- `dist/PressCockpit.app`
 - `dist/PressCockpit-macOS-0.2.0.zip`
 - `dist/PressCockpit-macOS-0.2.0.zip.sha256`
 
