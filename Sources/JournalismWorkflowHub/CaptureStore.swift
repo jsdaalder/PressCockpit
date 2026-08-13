@@ -83,12 +83,14 @@ struct CaptureStore {
             return []
         }
 
-        return recordDirectories.compactMap { recordDirectory in
+        var recoveredRecords: [CaptureRecord] = []
+
+        for recordDirectory in recordDirectories {
             let recordID = recordDirectory.lastPathComponent
-            guard !existingRecordIDs.contains(recordID) else { return nil }
+            guard !existingRecordIDs.contains(recordID) else { continue }
 
             let hintRecord = hintRecordsByID[recordID]
-            guard let importedURL = recoveredImportedURL(in: recordDirectory, hintRecord: hintRecord) else { return nil }
+            guard let importedURL = recoveredImportedURL(in: recordDirectory, hintRecord: hintRecord) else { continue }
             let resourceValues = try? importedURL.resourceValues(forKeys: requestedKeys)
             let directoryValues = try? recordDirectory.resourceValues(forKeys: requestedKeys)
             let isDirectory = resourceValues?.isDirectory == true
@@ -98,23 +100,26 @@ struct CaptureStore {
                 ?? directoryValues?.creationDate
                 ?? directoryValues?.contentModificationDate
                 ?? .now
+            let displayName = hintRecord?.displayName ?? recoveredDisplayName(for: importedURL, isDirectory: isDirectory)
+            let captureType = hintRecord?.captureType ?? (isDirectory ? .folder : recoveredFileType(for: importedURL))
 
-            return CaptureRecord(
+            recoveredRecords.append(CaptureRecord(
                 id: recordID,
-                displayName: hintRecord?.displayName ?? recoveredDisplayName(for: importedURL, isDirectory: isDirectory),
+                displayName: displayName,
                 originalSourcePath: hintRecord?.originalSourcePath,
                 importedStoragePath: importedURL.path,
                 capturedAt: capturedAt,
-                captureType: hintRecord?.captureType ?? (isDirectory ? .folder : recoveredFileType(for: importedURL)),
+                captureType: captureType,
                 state: .needsReview,
                 failureDescription: "Recovered from capture storage after stored metadata was unavailable.",
                 userNote: hintRecord?.userNote,
                 assignedTargetPath: nil,
                 assignedAt: nil,
                 assignedDestinationPath: nil
-            )
+            ))
         }
-        .sorted { $0.capturedAt > $1.capturedAt }
+
+        return recoveredRecords.sorted { $0.capturedAt > $1.capturedAt }
     }
 
     func replace(with records: [CaptureRecord]) {

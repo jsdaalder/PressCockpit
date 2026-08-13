@@ -288,7 +288,9 @@ final class AppStore: ObservableObject {
 
     var captureAssignmentTargets: [WorkspaceItem] {
         workspaceQueries.items
-            .filter(isCaptureAssignmentTarget)
+            .filter { item in
+                isCaptureAssignmentTarget(item)
+            }
             .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
     }
 
