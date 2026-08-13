@@ -116,6 +116,34 @@ enum ScaffoldProjectPriority: String, CaseIterable, Hashable {
     }
 }
 
+enum ScaffoldDossierChoice: String, CaseIterable, Hashable {
+    case none
+    case existing
+    case new
+
+    var label: String {
+        switch self {
+        case .none:
+            return "No dossier yet"
+        case .existing:
+            return "Use existing dossier"
+        case .new:
+            return "Needs a new dossier"
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .none:
+            return "Leave the project unlinked for now and add a dossier later if needed."
+        case .existing:
+            return "Link the project to an existing dossier folder in Areas or Resources."
+        case .new:
+            return "Store the intended dossier slug now without creating the dossier folder yet."
+        }
+    }
+}
+
 struct ScaffoldStagedDocument: Identifiable, Hashable {
     let sourcePath: String
     let stagedPath: String
@@ -140,6 +168,7 @@ struct ScaffoldProjectWizardDraft: Hashable {
     var wantsSummaryStructuring: Bool = false
     var sourceMaterialChoice: ScaffoldSourceMaterialChoice?
     var priority: ScaffoldProjectPriority = .normal
+    var dossierChoice: ScaffoldDossierChoice = .none
     var dossierSlug: String = ""
     var folderNameOverride: String = ""
     var projectRootOverride: String = ""
@@ -321,6 +350,44 @@ struct ScaffoldProjectWizardDraft: Hashable {
 
     var trimmedDossierSlug: String {
         dossierSlug.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func effectiveDossierChoice(availableDossierSlugs: Set<String>) -> ScaffoldDossierChoice {
+        if dossierChoice != .none {
+            return dossierChoice
+        }
+        guard !trimmedDossierSlug.isEmpty else {
+            return .none
+        }
+        return availableDossierSlugs.contains(trimmedDossierSlug) ? .existing : .new
+    }
+
+    mutating func updateDossierChoice(
+        _ newChoice: ScaffoldDossierChoice,
+        availableDossierSlugs: Set<String>
+    ) {
+        dossierChoice = newChoice
+        switch newChoice {
+        case .none:
+            dossierSlug = ""
+        case .existing:
+            if !availableDossierSlugs.contains(trimmedDossierSlug) {
+                dossierSlug = availableDossierSlugs.sorted().first ?? ""
+            }
+        case .new:
+            if availableDossierSlugs.contains(trimmedDossierSlug) {
+                dossierSlug = ""
+            }
+        }
+    }
+
+    func hasValidDossierSelection(availableDossierSlugs: Set<String>) -> Bool {
+        switch effectiveDossierChoice(availableDossierSlugs: availableDossierSlugs) {
+        case .none:
+            return true
+        case .existing, .new:
+            return !trimmedDossierSlug.isEmpty
+        }
     }
 
     func mappedState(for workflow: WorkflowDefinition, workspaceRoot: URL) -> WorkflowParameterState {
@@ -756,37 +823,71 @@ struct ScaffoldProjectWizardView: View {
 
             SectionCard(title: "Related dossier") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Optional. Link the new project to an existing dossier now so project detail, offboarding, and later retrieval start from the same trusted slug.")
+                    Text("Optional. Decide whether this project belongs to an existing dossier, needs a new dossier slug now, or should stay unlinked for the moment.")
                         .foregroundStyle(AppPalette.subtle)
 
-                    Picker("Related dossier", selection: Binding(
-                        get: { draft.trimmedDossierSlug.isEmpty ? nil : draft.trimmedDossierSlug },
-                        set: { newValue in
-                            var updated = draft
-                            updated.dossierSlug = newValue ?? ""
-                            draft = updated
-                        }
-                    )) {
-                        Text("No dossier yet").tag(Optional<String>.none)
-
-                        if !draft.trimmedDossierSlug.isEmpty,
-                           !availableDossierSlugs.contains(draft.trimmedDossierSlug) {
-                            Text("Missing dossier: \(draft.trimmedDossierSlug)").tag(Optional(draft.trimmedDossierSlug))
-                        }
-
-                        ForEach(store.dossierTargets) { dossier in
-                            Text(store.dossierTargetLabel(for: dossier))
-                                .tag(Optional(URL(fileURLWithPath: dossier.path).lastPathComponent))
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(ScaffoldDossierChoice.allCases, id: \.self) { choice in
+                            WizardChoiceCard(
+                                title: choice.label,
+                                summary: choice.summary,
+                                isSelected: draft.effectiveDossierChoice(availableDossierSlugs: availableDossierSlugs) == choice
+                            ) {
+                                var updated = draft
+                                updated.updateDossierChoice(choice, availableDossierSlugs: availableDossierSlugs)
+                                draft = updated
+                            }
                         }
                     }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                    .controlSize(.small)
 
-                    if store.dossierTargets.isEmpty {
-                        Text("No existing dossier folders were found in `Areas/` or `Resources/` yet. Leave this empty for now and link one later from project detail if needed.")
+                    switch draft.effectiveDossierChoice(availableDossierSlugs: availableDossierSlugs) {
+                    case .none:
+                        Text("You can link a dossier later from project detail if the story grows into a broader theme.")
                             .font(.caption)
                             .foregroundStyle(AppPalette.subtle)
+                    case .existing:
+                        Picker("Related dossier", selection: Binding(
+                            get: { draft.trimmedDossierSlug.isEmpty ? nil : draft.trimmedDossierSlug },
+                            set: { newValue in
+                                var updated = draft
+                                updated.dossierSlug = newValue ?? ""
+                                draft = updated
+                            }
+                        )) {
+                            Text("Choose dossier").tag(Optional<String>.none)
+
+                            if !draft.trimmedDossierSlug.isEmpty,
+                               !availableDossierSlugs.contains(draft.trimmedDossierSlug) {
+                                Text("Missing dossier: \(draft.trimmedDossierSlug)").tag(Optional(draft.trimmedDossierSlug))
+                            }
+
+                            ForEach(store.dossierTargets) { dossier in
+                                Text(store.dossierTargetLabel(for: dossier))
+                                    .tag(Optional(URL(fileURLWithPath: dossier.path).lastPathComponent))
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .controlSize(.small)
+
+                        if store.dossierTargets.isEmpty {
+                            Text("No existing dossier folders were found in `Areas/` or `Resources/` yet. Switch to `Needs a new dossier` if you want to store a slug now without creating the dossier folder yet.")
+                                .font(.caption)
+                                .foregroundStyle(AppPalette.subtle)
+                        }
+                    case .new:
+                        TextField("New dossier slug", text: binding(\.dossierSlug))
+                            .textFieldStyle(.roundedBorder)
+
+                        Text("Use the dossier folder slug you expect to create later, for example `voedselcrisis_2027`. The app will store the link in the new project now, but it will not create the dossier folder for you yet.")
+                            .font(.caption)
+                            .foregroundStyle(AppPalette.subtle)
+
+                        if availableDossierSlugs.contains(draft.trimmedDossierSlug), !draft.trimmedDossierSlug.isEmpty {
+                            Text("That slug already exists as a dossier folder. Switch to `Use existing dossier` if you want to link this project to it directly.")
+                                .font(.caption)
+                                .foregroundStyle(AppPalette.subtle)
+                        }
                     }
                 }
             }
@@ -954,14 +1055,18 @@ struct ScaffoldProjectWizardView: View {
     }
 
     private var selectedDossierLabel: String {
+        let choice = draft.effectiveDossierChoice(availableDossierSlugs: availableDossierSlugs)
         let slug = draft.trimmedDossierSlug
         guard !slug.isEmpty else {
+            if choice == .new {
+                return "New dossier slug not set yet"
+            }
             return "No dossier yet"
         }
         if let dossier = store.dossierTargets.first(where: { URL(fileURLWithPath: $0.path).lastPathComponent == slug }) {
             return store.dossierTargetLabel(for: dossier)
         }
-        return "Missing dossier: \(slug)"
+        return choice == .new ? "New dossier: \(slug)" : "Missing dossier: \(slug)"
     }
 
     private var readmePreview: String {
@@ -1041,7 +1146,9 @@ struct ScaffoldProjectWizardView: View {
         case .priority:
             return false
         case .review:
-            return store.isRunning || !preflightReport.isRunnable
+            return store.isRunning
+                || !preflightReport.isRunnable
+                || !draft.hasValidDossierSelection(availableDossierSlugs: availableDossierSlugs)
         }
     }
 

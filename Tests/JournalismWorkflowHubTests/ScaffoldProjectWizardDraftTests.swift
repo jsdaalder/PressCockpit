@@ -138,6 +138,93 @@ final class ScaffoldProjectWizardDraftTests: XCTestCase {
         XCTAssertTrue(draft.hasUserInput)
     }
 
+    func testEffectiveDossierChoiceDefaultsToNone() {
+        let draft = ScaffoldProjectWizardDraft()
+
+        XCTAssertEqual(draft.effectiveDossierChoice(availableDossierSlugs: []), .none)
+    }
+
+    func testEffectiveDossierChoiceInfersExistingDossierFromSlug() {
+        var draft = ScaffoldProjectWizardDraft()
+        draft.dossierSlug = "voedselcrisis_2027"
+
+        XCTAssertEqual(
+            draft.effectiveDossierChoice(availableDossierSlugs: ["voedselcrisis_2027"]),
+            .existing
+        )
+    }
+
+    func testEffectiveDossierChoiceInfersNewDossierFromCustomSlug() {
+        var draft = ScaffoldProjectWizardDraft()
+        draft.dossierSlug = "new_investigation_theme"
+
+        XCTAssertEqual(
+            draft.effectiveDossierChoice(availableDossierSlugs: ["voedselcrisis_2027"]),
+            .new
+        )
+    }
+
+    func testChoosingNewDossierClearsExistingSlug() {
+        var draft = ScaffoldProjectWizardDraft()
+        draft.dossierSlug = "voedselcrisis_2027"
+
+        draft.updateDossierChoice(.new, availableDossierSlugs: ["voedselcrisis_2027"])
+
+        XCTAssertEqual(draft.dossierChoice, .new)
+        XCTAssertEqual(draft.dossierSlug, "")
+    }
+
+    func testChoosingExistingDossierPrefillsFirstAvailableSlug() {
+        var draft = ScaffoldProjectWizardDraft()
+        draft.dossierSlug = "new_investigation_theme"
+
+        draft.updateDossierChoice(
+            .existing,
+            availableDossierSlugs: ["straat_van_hormuz", "voedselcrisis_2027"]
+        )
+
+        XCTAssertEqual(draft.dossierChoice, .existing)
+        XCTAssertEqual(draft.dossierSlug, "straat_van_hormuz")
+    }
+
+    func testChoosingNoDossierClearsSlug() {
+        var draft = ScaffoldProjectWizardDraft()
+        draft.dossierSlug = "voedselcrisis_2027"
+
+        draft.updateDossierChoice(.none, availableDossierSlugs: ["voedselcrisis_2027"])
+
+        XCTAssertEqual(draft.dossierChoice, .none)
+        XCTAssertEqual(draft.dossierSlug, "")
+    }
+
+    func testNoDossierSelectionIsAlwaysValid() {
+        let draft = ScaffoldProjectWizardDraft()
+
+        XCTAssertTrue(draft.hasValidDossierSelection(availableDossierSlugs: []))
+    }
+
+    func testNewDossierSelectionRequiresSlug() {
+        var draft = ScaffoldProjectWizardDraft()
+        draft.dossierChoice = .new
+
+        XCTAssertFalse(draft.hasValidDossierSelection(availableDossierSlugs: []))
+
+        draft.dossierSlug = "new_investigation_theme"
+
+        XCTAssertTrue(draft.hasValidDossierSelection(availableDossierSlugs: []))
+    }
+
+    func testExistingDossierSelectionRequiresSlug() {
+        var draft = ScaffoldProjectWizardDraft()
+        draft.dossierChoice = .existing
+
+        XCTAssertFalse(draft.hasValidDossierSelection(availableDossierSlugs: []))
+
+        draft.dossierSlug = "voedselcrisis_2027"
+
+        XCTAssertTrue(draft.hasValidDossierSelection(availableDossierSlugs: []))
+    }
+
     func testMappedStateLeavesStructuredAnswersEmptyWhenStepIsSkipped() throws {
         var draft = ScaffoldProjectWizardDraft()
         draft.updateWorkingTitle("Climate Story", workspaceRoot: URL(fileURLWithPath: "/tmp/workspace"))
@@ -185,6 +272,26 @@ final class ScaffoldProjectWizardDraftTests: XCTestCase {
         XCTAssertEqual(state.textValues["section_answer_2"], "Working hypothesis")
         XCTAssertEqual(state.textValues["section_answer_3"], "Why this matters now")
         XCTAssertEqual(state.textValues["dossier"], "voedselcrisis_2027")
+    }
+
+    func testMappedStateIncludesNewDossierSlugWithoutExistingFolder() throws {
+        var draft = ScaffoldProjectWizardDraft()
+        draft.updateWorkingTitle("Climate Story", workspaceRoot: URL(fileURLWithPath: "/tmp/workspace"))
+        draft.summaryText = "A short project summary."
+        draft.dossierChoice = .new
+        draft.dossierSlug = "new_investigation_theme"
+
+        let workflow = WorkflowRegistry(
+            workspaceRoot: URL(fileURLWithPath: "/tmp/workspace"),
+            appProfile: .standard
+        ).allWorkflows().first(where: { $0.id == "scaffold-project" })
+
+        let state = draft.mappedState(
+            for: try XCTUnwrap(workflow),
+            workspaceRoot: URL(fileURLWithPath: "/tmp/workspace")
+        )
+
+        XCTAssertEqual(state.textValues["dossier"], "new_investigation_theme")
     }
 
     private func currentYearString() -> String {
