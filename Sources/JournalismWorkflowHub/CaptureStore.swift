@@ -94,11 +94,15 @@ struct CaptureStore {
             let resourceValues = try? importedURL.resourceValues(forKeys: requestedKeys)
             let directoryValues = try? recordDirectory.resourceValues(forKeys: requestedKeys)
             let isDirectory = resourceValues?.isDirectory == true
+            let recoveredCreationDate = resourceValues?.creationDate
+            let recoveredModificationDate = resourceValues?.contentModificationDate
+            let directoryCreationDate = directoryValues?.creationDate
+            let directoryModificationDate = directoryValues?.contentModificationDate
             let capturedAt = hintRecord?.capturedAt
-                ?? resourceValues?.creationDate
-                ?? resourceValues?.contentModificationDate
-                ?? directoryValues?.creationDate
-                ?? directoryValues?.contentModificationDate
+                ?? recoveredCreationDate
+                ?? recoveredModificationDate
+                ?? directoryCreationDate
+                ?? directoryModificationDate
                 ?? .now
             let displayName = hintRecord?.displayName ?? recoveredDisplayName(for: importedURL, isDirectory: isDirectory)
             let captureType = hintRecord?.captureType ?? (isDirectory ? .folder : recoveredFileType(for: importedURL))

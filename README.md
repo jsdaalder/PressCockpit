@@ -120,14 +120,14 @@ scripts/swiftpm-local.sh test --filter AppStoreNavigationTests
 To build a zipped macOS app bundle for alpha testers:
 
 ```bash
-scripts/build-macos-release.sh --version 0.2.2
+scripts/build-macos-release.sh --version 0.2.3
 ```
 
 This creates:
 
-- `dist/PressCockpit-0.2.2.app`
-- `dist/PressCockpit-macOS-0.2.2.zip`
-- `dist/PressCockpit-macOS-0.2.2.zip.sha256`
+- `dist/PressCockpit-0.2.3.app`
+- `dist/PressCockpit-macOS-0.2.3.zip`
+- `dist/PressCockpit-macOS-0.2.3.zip.sha256`
 
 The packaged app defaults to standalone mode so testers can open the bundled demo workspace without your private newsroom setup.
 These `dist/` outputs are local build artifacts and stay out of the git repo; the shareable zip and checksum should be published through GitHub Releases instead.
@@ -135,18 +135,18 @@ These `dist/` outputs are local build artifacts and stay out of the git repo; th
 You can also change the default launch profile:
 
 ```bash
-scripts/build-macos-release.sh --version 0.2.2 --profile standard
+scripts/build-macos-release.sh --version 0.2.3 --profile standard
 ```
 
 ## Release Tag
 
-Tagged pushes like `v0.2.2` trigger `.github/workflows/macos-release.yml`, which rebuilds the app on GitHub Actions and attaches the versioned zip and checksum to the GitHub Release.
+Tagged pushes like `v0.2.3` trigger `.github/workflows/macos-release.yml`, which rebuilds the app on GitHub Actions and attaches the versioned zip and checksum to the GitHub Release.
 
 Example:
 
 ```bash
-git tag v0.2.2
-git push origin v0.2.2
+git tag v0.2.3
+git push origin v0.2.3
 ```
 
 ## Standalone Mode
