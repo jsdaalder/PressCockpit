@@ -516,13 +516,13 @@ struct CaptureView: View {
             if let selectedCaptureRecord {
                 GuidedReviewPanel(
                     itemTitle: selectedCaptureRecord.displayTitle,
-                    instructions: "Check the source, add a short note if useful, then either file this item into one active project or area or turn it into a placeholder project. Notes are kept when you move between items.",
+                    instructions: "Check the source, add a short note if useful, then either file this item into one active project or dossier or turn it into a placeholder project. Notes are kept when you move between items.",
                     metadataRows: captureReviewMetadata(for: selectedCaptureRecord),
                     linkActions: captureReviewLinkActions(for: selectedCaptureRecord),
                     noteText: $reviewNoteText
                 ) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Assign to existing project or area")
+                        Text("Assign to existing project or dossier")
                             .font(.subheadline.weight(.semibold))
 
                         Picker("Project", selection: $selectedProjectPath) {

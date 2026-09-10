@@ -1972,19 +1972,20 @@ final class AppStore: ObservableObject {
         switch item.section {
         case .projects:
             return item.isProjectRoot && item.inactiveReason != .discarded
-        case .areas:
-            return isTopLevelArea(item)
-        case .resources, .archives:
+        case .areas, .resources:
+            return item.isProjectRoot && isTopLevelDossier(item)
+        case .archives:
             return false
         }
     }
 
-    private func isTopLevelArea(_ item: WorkspaceItem) -> Bool {
+    private func isTopLevelDossier(_ item: WorkspaceItem) -> Bool {
         let rootComponents = workspaceRoot.standardizedFileURL.pathComponents
         let itemComponents = item.url.standardizedFileURL.pathComponents
         guard itemComponents.starts(with: rootComponents) else { return false }
         let relativeComponents = Array(itemComponents.dropFirst(rootComponents.count))
-        guard relativeComponents.first == "Areas" else { return false }
+        guard let topLevelDirectory = relativeComponents.first else { return false }
+        guard topLevelDirectory == "Areas" || topLevelDirectory == "Resources" else { return false }
         return relativeComponents.count == 2
     }
 

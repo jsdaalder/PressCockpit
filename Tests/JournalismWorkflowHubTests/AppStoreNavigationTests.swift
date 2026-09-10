@@ -1345,7 +1345,7 @@ final class AppStoreNavigationTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: expectedArchivePath))
     }
 
-    func testCaptureAssignmentTargetsExcludeArchivedProjectsAndIncludeTopLevelAreas() throws {
+    func testCaptureAssignmentTargetsExcludeArchivedProjectsAndKeepOnlyExplicitDossiers() throws {
         let workspaceRoot = try makeWorkspaceRoot(
             includeArea: true,
             includeArchivedProject: true,
@@ -1368,6 +1368,36 @@ final class AppStoreNavigationTests: XCTestCase {
         This should stay out of Capture assignment targets.
         """.write(to: discardedProject.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
 
+        let nonDossierArea = workspaceRoot.appendingPathComponent("Areas/design_area")
+        try FileManager.default.createDirectory(at: nonDossierArea, withIntermediateDirectories: true, attributes: nil)
+        try """
+        # Design Area
+
+        Operational area that should not appear as a dossier target.
+        """.write(to: nonDossierArea.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
+        let resourceDossier = workspaceRoot.appendingPathComponent("Resources/straat_van_hormuz")
+        try FileManager.default.createDirectory(at: resourceDossier, withIntermediateDirectories: true, attributes: nil)
+        try """
+        ---
+        type: project
+        project: Straat van Hormuz
+        status: active
+        ---
+
+        # Straat van Hormuz
+
+        Reusable dossier material for shipping and energy coverage.
+        """.write(to: resourceDossier.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
+        let nonDossierResource = workspaceRoot.appendingPathComponent("Resources/knowledge_base")
+        try FileManager.default.createDirectory(at: nonDossierResource, withIntermediateDirectories: true, attributes: nil)
+        try """
+        # Knowledge base
+
+        Shared operational notes that should stay out of capture assignment.
+        """.write(to: nonDossierResource.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
         let store = AppStore(configuration: AppConfiguration(
             profile: .standalone,
             workspaceRoot: workspaceRoot,
@@ -1378,11 +1408,15 @@ final class AppStoreNavigationTests: XCTestCase {
         let targetLabels = store.captureAssignmentTargets.map(store.captureAssignmentLabel(for:))
         XCTAssertTrue(targetTitles.contains("Demo Story"))
         XCTAssertTrue(targetTitles.contains("Voedselcrisis 2027"))
+        XCTAssertTrue(targetTitles.contains("Straat van Hormuz"))
         XCTAssertFalse(targetTitles.contains("Archived Story"))
         XCTAssertFalse(targetTitles.contains("Discarded Lead"))
         XCTAssertFalse(targetTitles.contains("Area Notes"))
+        XCTAssertFalse(targetTitles.contains("Design Area"))
+        XCTAssertFalse(targetTitles.contains("Knowledge base"))
         XCTAssertTrue(targetLabels.contains("Demo Story • Active · Investigation"))
         XCTAssertTrue(targetLabels.contains("Voedselcrisis 2027 • Area"))
+        XCTAssertTrue(targetLabels.contains("Straat van Hormuz • Resource"))
     }
 
     func testAssignCaptureRecordCopiesFileIntoTopLevelAreaDocs() throws {
