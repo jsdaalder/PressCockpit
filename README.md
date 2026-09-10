@@ -1,45 +1,70 @@
 # PressCockpit
 
-`PressCockpit` is the current product name for the macOS app in this repo.  
+`PressCockpit` is the current product name for the macOS app in this repo.
 The codebase and package name are still `JournalismWorkflowHub` for now.
 
-PressCockpit is a local-first app for journalists who organize reporting work in ordinary folders.
+PressCockpit is a lightweight, local-first desktop app for keeping journalism projects, source files, drafts, and AI-assisted document analysis in one practical workspace. It is built for reporters and editors who already work across several good tools, but do not want their project context scattered across all of them.
 
-It gives you a trustworthy view over your real workspace, helps you see what is active, open the right project fast, and run local workflows with clear write boundaries. It is not a parallel CMS or a hidden cloud system.
+## The Problem
 
-## What It Helps With
+Modern reporting work often ends up split across disconnected places:
 
-- See active reporting projects first
-- Open project folders, README files, drafts, and docs quickly
-- Create a new project scaffold and a usable first draft
-- Review project state without digging through Finder
-- Capture incoming material and route it into the right project
-- Run local workflows from one app instead of from scattered terminal commands
+- Google Docs and Google Drive for drafts, shared notes, and source material
+- downloaded PDFs on a Mac, which are easy to forget to upload back to Drive
+- a project-management board in Notion or another kanban tool
+- ChatGPT or Codex sessions for analyzing documents, extracting leads, summarizing material, and drafting next steps
+- local folders that still contain the real project archive
 
-## How It Works
+Each tool is useful on its own. The friction comes from keeping the same story, documents, tasks, and analysis state aligned across all of them. Files drift between cloud storage and the local machine, project status lives somewhere else, and AI analysis often happens outside the folder where the underlying material belongs.
 
-PressCockpit reads a normal workspace on disk. It works best when your reporting setup follows a simple folder structure such as:
+PressCockpit tries to fix that coordination problem without replacing the tools. The goal is not to become a new CMS, a new Drive, a new Notion, or a closed research database. The goal is to sit on top of the working folder structure and make the whole project easier to see, search, open, and act on.
+
+## What The Project Does
+
+PressCockpit gives a local desktop view of a reporting workspace. It helps you:
+
+- see active reporting projects first
+- open project folders, README files, drafts, source files, and document pointers quickly
+- keep downloaded material visible so it does not stay stranded on the Mac
+- scaffold new reporting projects with plain folders and starter files
+- review project state without digging through Finder, Drive, Notion, and old chats
+- run local workflows for document analysis, summaries, source review, and drafting support
+- keep workflow outputs inside the project folder where the source material already lives
+
+The app is intentionally lightweight. It makes the existing workspace easier to operate; it does not try to own the work.
+
+## Why It Is Relevant
+
+Journalism work depends on context: which documents belong to which story, what has been checked, what still needs follow-up, and where the source material came from. That context is easy to lose when the reporting process spans cloud documents, local downloads, kanban boards, and AI tools.
+
+PressCockpit is relevant because it treats the folder structure as the durable layer. Google Drive, Notion, ChatGPT, Codex, Finder, and the app can all be useful interfaces, but the project files remain ordinary files that can be opened, moved, backed up, scripted, or reviewed without PressCockpit.
+
+## Local-First Design
+
+PressCockpit reads a normal workspace on disk. It works best when a reporting setup follows a simple structure such as:
 
 - `Projects`
 - `Areas`
 - `Resources`
 - `Archives`
 
-The app reads that directory directly. It does not import your work into a separate app-owned database.
+The app reads that directory directly. It does not import the work into a separate app-owned database or require all work to happen through the app.
 
-If you create a new workspace through the app, it creates plain folders and starter files you can inspect in Finder. If you stop using the app later, those files remain ordinary files on disk.
+If you create a new workspace through PressCockpit, it creates plain folders and starter files you can inspect in Finder. If you stop using the app later, those files remain ordinary files on disk.
 
-## Documents
+This is a core design requirement: you should still be able to work on and with every file without PressCockpit. The app is a layer on top of the local file structure, not the only way into it.
 
-The app works best with local files today.
+## Documents And Tools
 
-It can also work with:
+The app works best with local files today, and is designed to coexist with:
 
-- local `.docx` drafts
-- Google Doc pointers
-- other tools that sync documents into a local folder
+- local PDFs, `.docx` drafts, notes, and data files
+- Google Docs and Google Drive pointers
+- synced folders from cloud providers
+- kanban or planning systems such as Notion
+- ChatGPT and Codex workflows for document analysis
 
-This does not lock you into one provider. The app works over your local directory, and you can change document setup later without moving your workspace into a proprietary system.
+This keeps the workflow flexible. You can keep using the tools that already work, while PressCockpit helps connect their outputs back to the project folder.
 
 ## Privacy And Storage
 
