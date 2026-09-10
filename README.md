@@ -39,6 +39,8 @@ Journalism work depends on context: which documents belong to which story, what 
 
 PressCockpit is relevant because it treats the folder structure as the durable layer. Google Drive, Notion, ChatGPT, Codex, Finder, and the app can all be useful interfaces, but the project files remain ordinary files that can be opened, moved, backed up, scripted, or reviewed without PressCockpit.
 
+The public product direction is tracked in [ROADMAP.md](ROADMAP.md).
+
 ## Local-First Design
 
 PressCockpit reads a normal workspace on disk. It works best when a reporting setup follows a simple structure such as:
